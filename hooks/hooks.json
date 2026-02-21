@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-hooks.json",
-  "description": "Creet v1.1.0 by Creeta - Skill Navigator for Claude Code",
+  "description": "Creet v1.3.0 by Creeta - Skill Navigator for Claude Code",
   "hooks": {
     "SessionStart": [
       {
