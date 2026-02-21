@@ -1,8 +1,8 @@
-# Compass
+# Creet
 
 **Never wonder which plugin to use again.**
 
-Compass is a skill navigator for Claude Code. It scans your installed plugins, finds the best skill for your task, and runs it — all from a single command.
+Creet is a skill navigator for Claude Code by [Creeta](https://www.creeta.com). It scans your installed plugins, finds the best skill for your task, and runs it — all from a single command.
 
 ## The Problem
 
@@ -11,9 +11,9 @@ You installed 10+ plugins. That's 50+ slash commands. You can't remember them al
 ## The Solution
 
 ```
-You: /compass:c build a login page with social auth
+You: /creet:c build a login page with social auth
 
-Compass — Skill Scan
+Creet — Skill Scan
 ┌────┬──────────────────┬──────────┬─────────────────────┐
 │ #  │ Skill            │ Domain   │ What it does        │
 ├────┼──────────────────┼──────────┼─────────────────────┤
@@ -24,7 +24,7 @@ Compass — Skill Scan
 └────┴──────────────────┴──────────┴─────────────────────┘
 Total: 12 skills from 4 plugins
 
-Compass — Recommendation
+Creet — Recommendation
 
 > "Build a login page with social auth"
 
@@ -35,7 +35,7 @@ Compass — Recommendation
 Proceed with /bkend-auth? (y/n)
 ```
 
-Type `y` and Compass runs the skill immediately.
+Type `y` and Creet runs the skill immediately.
 
 ## Installation
 
@@ -44,11 +44,11 @@ Type `y` and Compass runs the skill immediately.
 Clone the repo and load it with `--plugin-dir`:
 
 ```bash
-git clone https://github.com/livevil7/claude-compass.git
-claude --plugin-dir ./claude-compass
+git clone https://github.com/Creeta-creet/creet.git
+claude --plugin-dir ./creet
 ```
 
-Then use `/compass:c` inside Claude Code.
+Then use `/creet:c` inside Claude Code.
 
 ### Option 2: Copy to your commands (Quick setup)
 
@@ -56,7 +56,7 @@ Copy the skill file to your user-level commands for a shorter `/c` command:
 
 ```bash
 mkdir -p ~/.claude/commands
-curl -o ~/.claude/commands/c.md https://raw.githubusercontent.com/livevil7/claude-compass/master/skills/c/SKILL.md
+curl -o ~/.claude/commands/c.md https://raw.githubusercontent.com/Creeta-creet/creet/main/skills/c/SKILL.md
 ```
 
 Restart Claude Code, then use `/c` directly.
@@ -66,13 +66,13 @@ Restart Claude Code, then use `/c` directly.
 If you already cloned the repo:
 
 ```bash
-claude --plugin-dir /path/to/claude-compass
+claude --plugin-dir /path/to/creet
 ```
 
 ## Usage
 
 ```
-/compass:c <what you want to do>
+/creet:c <what you want to do>
 ```
 
 Or if installed as a user command:
@@ -83,7 +83,7 @@ Or if installed as a user command:
 
 ### Examples
 
-| You type | Compass recommends |
+| You type | Creet recommends |
 |----------|-------------------|
 | `/c build a dashboard` | /frontend-design |
 | `/c review my PR` | /code-review → /commit-push-pr |
@@ -99,11 +99,14 @@ Or if installed as a user command:
 
 ## Features
 
+- Auto-scans all installed plugins at session start via SessionStart hook
+- Auto-recommends skills based on keyword matching (8 languages)
 - Works with ANY combination of installed plugins
 - Compares overlapping skills and explains the difference
 - Recommends execution order for multi-skill workflows
 - Max 5 recommendations (no overwhelm)
 - Responds in your language (EN, KO, JA, ZH, ES, FR, DE, IT)
+- Session memory — remembers your most used skills across sessions
 
 ## Requirements
 
