@@ -11,7 +11,7 @@ You installed 10+ plugins. That's 50+ slash commands. You can't remember them al
 ## The Solution
 
 ```
-You: /c build a login page with social auth
+You: /compass:c build a login page with social auth
 
 Compass — Skill Scan
 ┌────┬──────────────────┬──────────┬─────────────────────┐
@@ -39,17 +39,47 @@ Type `y` and Compass runs the skill immediately.
 
 ## Installation
 
+### Option 1: Load directly from GitHub (Recommended)
+
+Clone the repo and load it with `--plugin-dir`:
+
 ```bash
-claude plugin add github.com/livev/claude-compass
+git clone https://github.com/livevil7/claude-compass.git
+claude --plugin-dir ./claude-compass
+```
+
+Then use `/compass:c` inside Claude Code.
+
+### Option 2: Copy to your commands (Quick setup)
+
+Copy the skill file to your user-level commands for a shorter `/c` command:
+
+```bash
+mkdir -p ~/.claude/commands
+curl -o ~/.claude/commands/c.md https://raw.githubusercontent.com/livevil7/claude-compass/master/skills/c/SKILL.md
+```
+
+Restart Claude Code, then use `/c` directly.
+
+### Option 3: Load as a local plugin
+
+If you already cloned the repo:
+
+```bash
+claude --plugin-dir /path/to/claude-compass
 ```
 
 ## Usage
 
 ```
-/c <what you want to do>
+/compass:c <what you want to do>
 ```
 
-That's it. Two characters + your request.
+Or if installed as a user command:
+
+```
+/c <what you want to do>
+```
 
 ### Examples
 
@@ -77,7 +107,7 @@ That's it. Two characters + your request.
 
 ## Requirements
 
-- Claude Code CLI
+- Claude Code v1.0.33+
 - 2+ plugins installed (otherwise you don't need a navigator)
 
 ## License
