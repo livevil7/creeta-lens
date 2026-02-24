@@ -76,23 +76,57 @@ claude --plugin-dir /path/to/creet
 /c <what you want to do>
 ```
 
-### Examples
+### `/c` — Navigate to the best skill
+
+```
+/c <what you want to do>
+```
 
 | You type | What happens |
 | --- | --- |
-| `/c build a login page` | Recommends your best auth + frontend skills |
+| `/c build a login page` | Recommends your best auth + frontend skill |
 | `/c review my PR` | Recommends your code review skill |
 | `/c deploy to production` | Recommends your deployment skill |
 | `/c` (no args) | Shows full skill inventory |
+
+### `/cc` — Run all relevant skills in parallel
+
+```
+/cc <what you want to do>
+```
+
+Instead of picking one, `/cc` finds **every** relevant skill and runs them all simultaneously as independent agents, then synthesizes the results.
+
+| You type | What happens |
+| --- | --- |
+| `/cc build a dashboard with auth` | Runs `/auth`, `/ui-builder`, `/code-review` in parallel — one unified output |
+| `/cc review this codebase` | Runs every review-related skill at once |
+| `/cc` (no args) | Shows full skill inventory (same as `/c`) |
+
+**When to use which:**
+
+| | `/c` | `/cc` |
+|---|---|---|
+| Goal | Best single skill | All relevant skills |
+| Output | One skill's result | Synthesized multi-agent output |
+| Speed | Fast | Slower (parallel agents) |
+| Use when | You know roughly what you need | You want comprehensive coverage |
 
 Creet dynamically matches against whatever plugins you have installed.
 
 ## How It Works
 
+### `/c` — Single skill navigator
 1. **Scan** — Detects all installed skills, MCP tools, and LSP servers
 2. **Recommend** — Matches your request to the best skill(s) via AskUserQuestion
 3. **Execute** — Runs the chosen skill immediately
 4. **Discover** — If no match, suggests installable plugins from registry
+
+### `/cc` — Multi-agent parallel engine
+1. **Scan** — Same as `/c`
+2. **Multi-Match** — Selects ALL relevant skills (no cap)
+3. **Execute** — Launches every matched skill as a parallel Task agent simultaneously
+4. **Synthesize** — Collects all outputs and produces a unified result with agreements, conflicts, and next steps
 
 ## Scanner
 
@@ -139,7 +173,9 @@ creet/
     plugin.json          # Plugin manifest
     marketplace.json     # Marketplace registration
   skills/c/
-    SKILL.md             # Main /c skill definition
+    SKILL.md             # /c skill — navigate to best skill
+  skills/cc/
+    SKILL.md             # /cc skill — run all relevant skills in parallel
   hooks/
     hooks.json           # Hook registration (SessionStart, UserPromptSubmit)
     session-start.js     # Session startup: scan + cache + context injection

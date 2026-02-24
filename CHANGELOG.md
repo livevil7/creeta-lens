@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.4.0] - 2026-02-24
+
+### Added (v1.4.0)
+
+- **`/cc` — Creet Multi**: New skill for parallel multi-agent execution. Finds ALL relevant skills for a request, runs them simultaneously as independent Task agents, and synthesizes the results into a unified output. Unlike `/c` which recommends one skill, `/cc` runs the whole team at once.
+  - N ≤ 5 matched skills: auto-executes without prompting
+  - N > 5 matched skills: confirms via AskUserQuestion before running
+  - Locates each skill's SKILL.md via Glob → injects full prompt into a `general-purpose` Task agent
+  - Synthesis block highlights agreements, conflicts, and recommended next steps
+  - Falls back to `/c` workflow if only 0–1 skills match
+
+### Changed (v1.4.0)
+
+- `session-start.js` Quick Commands section now lists both `/c` and `/cc` with distinct descriptions
+- `skills/c/SKILL.md` description updated to v1.4.0; notes `/cc` as the parallel companion
+
+### Removed (v1.4.0)
+
+- `skills/design-council/SKILL.md` — Was incorrectly shipped as an installable skill. Moved to README as a pattern example under "Building Custom Skills with Creet".
+
 ## [1.3.0] - 2026-02-22
 
 ### Changed (v1.3.0)
