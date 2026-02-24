@@ -133,8 +133,9 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, skill
 
   // Creet usage guide
   ctx += `## Quick Commands\n\n`;
-  ctx += `- \`/c <request>\` - Scan + Recommend + Execute workflow\n`;
-  ctx += `- \`/c\` (no args) - Show full skill inventory\n\n`;
+  ctx += `- \`/c <request>\` - Scan + Recommend + Execute (pick the best skill)\n`;
+  ctx += `- \`/cc <request>\` - Run ALL relevant skills in parallel + synthesize results\n`;
+  ctx += `- \`/c\` or \`/cc\` (no args) - Show full skill inventory\n\n`;
 
   // Report rule
   if (showReport) {
