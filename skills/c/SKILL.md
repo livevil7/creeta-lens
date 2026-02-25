@@ -1,13 +1,13 @@
 ---
 name: c
-description: "Creet v1.4.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. For parallel multi-agent execution, use /cc."
+description: "Creet v1.5.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. For parallel multi-agent execution, use /cc."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| c | Creet v1.4.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. Use /cc to run ALL relevant skills in parallel. | MIT |
+| c | Creet v1.5.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. Use /cc to run ALL relevant skills in parallel. | MIT |
 
 Triggers: creet, navigate, which skill, what skill, find skill, recommend, scan skills, skill list,
 어떤 스킬, 스킬 찾기, 추천, 스킬 목록, どのスキル, スキル検索, 推荐, 哪个技能,

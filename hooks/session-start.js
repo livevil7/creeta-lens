@@ -57,7 +57,7 @@ function main() {
 
     // 5. Output response
     const response = {
-      systemMessage: `Creet v1.3.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected`,
+      systemMessage: `Creet v1.5.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected`,
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         skillCount: skills.length,
@@ -71,7 +71,7 @@ function main() {
   } catch (err) {
     // Fail gracefully - don't break the session
     const fallback = {
-      systemMessage: 'Creet v1.3.0 activated (scan skipped)',
+      systemMessage: 'Creet v1.5.0 activated (scan skipped)',
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         error: err.message,
@@ -92,7 +92,7 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, skill
   let ctx = '';
 
   // Header
-  ctx += `# Creet v1.3.0 - Session Startup\n\n`;
+  ctx += `# Creet v1.5.0 - Session Startup\n\n`;
 
   // Skill inventory
   ctx += `## Installed Skills (Auto-Scanned)\n\n`;
@@ -158,7 +158,7 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, skill
 }
 
 function buildFallbackContext() {
-  return `# Creet v1.3.0 - Session Startup
+  return `# Creet v1.5.0 - Session Startup
 
 Skill scan was skipped (no plugins cache found or scan error).
 Use \`/c <request>\` to manually scan and get recommendations.

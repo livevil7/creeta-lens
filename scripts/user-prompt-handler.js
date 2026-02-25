@@ -124,9 +124,9 @@ function getInput() {
     return { userMessage: process.env.CLAUDE_USER_MESSAGE };
   }
 
-  // Try reading from stdin (non-blocking)
+  // Try reading from stdin (cross-platform: fd 0)
   try {
-    const stdinData = fs.readFileSync('/dev/stdin', 'utf-8');
+    const stdinData = fs.readFileSync(0, 'utf-8');
     if (stdinData) {
       return JSON.parse(stdinData);
     }
