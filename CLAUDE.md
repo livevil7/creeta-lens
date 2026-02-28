@@ -1,70 +1,121 @@
-# creet — Claude Code 스킬 스캐너 & 플러그인 시스템
+# creet — Skill navigator & plan-first execution engine for Claude Code
 
-설치된 모든 플러그인(Skills, MCP tools, LSP servers)을 스캔하여 최적의 스킬을 추천·실행하는 Claude Code 확장 시스템.
+Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the best match, and executes it. Plan-first execution with /cp.
 
-- `/c` — 단일 최적 스킬 추천 및 실행
-- `/cc` — 관련 스킬 전체 병렬 실행 후 결과 합성
+## Version
 
----
+- Current: **v1.7.0**
+- Updated: 2026-02-28
+- Source of truth: `.claude-plugin/plugin.json`
 
-## GitHub
+## Skills
 
-- [Creeta-creet/creet](https://github.com/Creeta-creet/creet) (private)
+| Skill | Description | Workflow |
+|-------|-------------|----------|
+| `/c` | Single skill navigator | Scan → Recommend → Execute → Discover |
+| `/cc` | Parallel multi-agent engine | Scan → Multi-Match → Parallel Execute → Synthesize |
+| `/cp` | Plan-first execution | Scan → Analyze → Generate Plan → Approve → Execute → Post-Exec Update |
 
----
+- `/c <request>` picks the best one skill and runs it
+- `/cc <request>` runs ALL relevant skills as parallel Task agents, then synthesizes outputs
+- `/cp <request>` generates a work plan document, gets user approval, then executes
+- Any command with no args shows full skill inventory
 
-## 기술 스택
+## Hooks (5)
 
-| 레이어 | 기술 |
-|--------|------|
-| 런타임 | Node.js |
-| 플랫폼 | Claude Code hooks |
-| 스킬 스캔 | `skill-scanner.js` |
-| 메모리 | `memory-store.js` (`~/.claude/creet/`) |
-| 진입점 | `hooks/` (UserPromptSubmit, SessionStart 등) |
+| Hook | Event | File | When |
+|------|-------|------|------|
+| SessionStart | Session start (once) | `hooks/session-start.js` | Scans plugins, caches results, loads memory, inits dashboard + plans dir, injects context |
+| UserPromptSubmit | Every message | `scripts/user-prompt-handler.js` | Keyword matching for auto-suggest; `/command` override for explicit invocation |
+| PreToolUse | Before Task tool | `hooks/pre-tool-task.js` | Registers sub-agent as "running" in dashboard |
+| PostToolUse | After Task tool | `hooks/post-tool-task.js` | Marks sub-agent "done" or "error", records duration |
+| Stop | Session end | `hooks/stop.js` | Finalizes session, marks orphaned agents as error |
 
----
+## Libraries (lib/)
 
-## 폴더 구조
+| Module | File | Key Exports | Description |
+|--------|------|-------------|-------------|
+| Skill Scanner | `skill-scanner.js` | `scanInstalledSkills()`, `formatSkillTable()`, `detectDomain()` | Scans `~/.claude/plugins/cache/`. Skills, MCP, LSP, Hybrid. 24 domain patterns. 4-level env var path resolution |
+| Keyword Matcher | `keyword-matcher.js` | `matchKeywords()`, `saveScanCache()`, `formatKeywordTable()` | Dynamic keyword map from scan results. Zero hardcoded mappings. Cache at `.creet-cache.json` |
+| Memory Store | `memory-store.js` | `loadMemory()`, `saveMemory()`, `recordSessionStart()`, `recordSkillUsage()`, `recordPlanCreation()` | Persists at `~/.claude/creet/.creet-memory.json`. Usage counts, recent skills, plan history |
+| Plugin Registry | `plugin-registry.js` | `searchRegistry()`, `KNOWN_PLUGINS` | 60+ known plugins. Suggests installable plugins when no match found |
+| Agent Tracker | `agent-tracker.js` | `initSession()`, `registerAgent()`, `completeAgent()`, `endSession()` | Tracks Task agent lifecycle in `.creet/agent-dashboard.json`. Atomic writes, error logs |
+| Plan Manager | `plan-manager.js` | `generateSlug()`, `generateFileName()`, `savePlanState()`, `loadPlanState()`, `listPlans()` | Plan file naming (`YYYY-MM-DD-slug.md`), state tracking at `.creet/plan-state.json` |
+
+## Folder Structure
 
 ```
 creet/
-├── hooks/          # Claude Code hook 핸들러
-├── lib/            # 핵심 라이브러리 (scanner, memory, handler)
-├── scripts/        # 유틸리티 스크립트
-├── skills/         # 번들 스킬 (c, cc 등)
-├── creet.config.json
-└── CHANGELOG.md
+├── .claude-plugin/
+│   ├── plugin.json            # Plugin manifest (version source of truth)
+│   └── marketplace.json       # Marketplace registration
+├── skills/
+│   ├── c/SKILL.md             # /c — single skill navigator
+│   ├── cc/SKILL.md            # /cc — parallel multi-agent engine
+│   └── cp/SKILL.md            # /cp — plan-first execution
+├── hooks/
+│   ├── hooks.json             # Hook registration (5 hooks)
+│   ├── session-start.js       # SessionStart handler
+│   ├── pre-tool-task.js       # PreToolUse (Task) handler
+│   ├── post-tool-task.js      # PostToolUse (Task) handler
+│   └── stop.js                # Stop handler
+├── scripts/
+│   └── user-prompt-handler.js # UserPromptSubmit handler
+├── lib/
+│   ├── skill-scanner.js       # Plugin scanner (Skills, MCP, LSP)
+│   ├── keyword-matcher.js     # Dynamic keyword matching
+│   ├── memory-store.js        # Session memory persistence
+│   ├── plugin-registry.js     # Known plugins for discovery
+│   ├── agent-tracker.js       # Agent dashboard state management
+│   └── plan-manager.js        # Plan document management
+├── docs/
+│   └── DOCUMENTATION-GUIDE.md # Documentation standards
+├── creet.config.json          # Runtime configuration
+├── CLAUDE.md                  # This file (AI briefing)
+├── CHANGELOG.md               # Version history
+├── README.md                  # User-facing documentation
+└── LICENSE                    # MIT
 ```
 
----
+## Configuration (creet.config.json)
 
-## 주요 파일
+| Option | Default | Description |
+|--------|---------|-------------|
+| `autoRecommend` | `true` | Suggest skills via UserPromptSubmit hook |
+| `showReport` | `true` | Show "Creet Tip" line when a skill matches |
+| `minMatchScore` | `5` | Minimum keyword match score for auto-suggestions |
+| `memoryPath` | `null` | Custom memory file path (null = `~/.claude/creet/`) |
+| `customKeywords` | `[]` | Additional keyword-to-skill mappings |
+| `planDir` | `null` | Custom plan file directory (null = `.creet/plans/`) |
+| `defaultPlanLanguage` | `null` | Force plan language (null = auto-detect from user) |
 
-| 파일 | 역할 |
-|------|------|
-| `lib/skill-scanner.js` | 플러그인 캐시 탐색, 스킬 목록 수집 |
-| `lib/memory-store.js` | 세션 메모리 영속화 (`~/.claude/creet/`) |
-| `lib/user-prompt-handler.js` | UserPromptSubmit 이벤트 처리 |
-| `skills/c/SKILL.md` | `/c` 스킬 정의 |
-| `skills/cc/SKILL.md` | `/cc` 스킬 정의 (병렬 멀티 에이전트) |
+## Detection Targets
 
----
+| Type | Detection Method | Example |
+|------|-----------------|---------|
+| Skill | `skills/*/SKILL.md`, `commands/*.md` | `/commit`, `/pdca` |
+| MCP | `.mcp.json` (direct + `mcpServers` wrapper) | context7, playwright |
+| LSP | `lspServers` in `plugin.json` | typescript |
+| Hybrid | Skill + MCP in same plugin | Marked with `hasMcp` flag |
 
-## Change Log
+## Runtime Files (git-ignored)
 
-### 2026-02-25 (v1.5.0)
-- **크로스플랫폼 호환성 수정 + 버전 동기화**
-  - `user-prompt-handler.js`: `/dev/stdin` → `fs.readFileSync(0)` — Windows에서 `UserPromptSubmit` 훅 완전 동작 안 하던 버그 수정
-  - `skill-scanner.js`: 하드코딩된 플러그인 캐시 경로 → 4단계 env var fallback (`CLAUDE_PLUGIN_CACHE_DIR` → `CLAUDE_PLUGIN_ROOT` 추론 → `CLAUDE_HOME/plugins/cache` → `~/.claude/plugins/cache`)
-  - `memory-store.js`: `process.cwd()` → `~/.claude/creet/` 고정 경로 (작업 디렉토리 변경 시 메모리 유실 방지)
-  - 버전 문자열 불일치 수정: `hooks.json`, `session-start.js` v1.3.0 → v1.5.0 통일
-  - 7개 파일 커밋 후 GitHub push 완료
+| File | Location | Purpose |
+|------|----------|---------|
+| `.creet-cache.json` | Plugin root | Scan results cache for UserPromptSubmit |
+| `.creet-memory.json` | `~/.claude/creet/` | Session memory (usage counts, history) |
+| `agent-dashboard.json` | `.creet/` (project root) | Agent lifecycle tracking |
+| `plan-state.json` | `.creet/` (project root) | Plan status tracking (draft→approved→completed) |
+| `*.md` plan files | `.creet/plans/` | Work plan documents (`YYYY-MM-DD-slug.md`) |
 
-### 2026-02-24 (v1.4.0)
-- `/cc` — Creet Multi 신규 스킬 추가 (병렬 멀티 에이전트 실행)
-  - N ≤ 5 매칭 스킬: 자동 실행
-  - N > 5 매칭 스킬: AskUserQuestion으로 확인 후 실행
-  - 결과 합성: 일치점, 충돌점, 권장 다음 단계 정리
-- `session-start.js`: `/c` + `/cc` 동등 표시
-- `skills/design-council/SKILL.md` 제거 (README 예시로 이동)
+## Languages
+
+EN, KO, JA, ZH, ES, FR, DE, IT (8 languages)
+
+## Recent Changes
+
+- **v1.7.0** (2026-02-28): `/cp` plan-first execution, plan-manager module, planDir/defaultPlanLanguage config
+- **v1.6.0** (2026-02-28): Agent dashboard, 3 new hooks (PreToolUse/PostToolUse/Stop), slash command priority override
+- **v1.5.0** (2026-02-25): Cross-platform fixes (Windows stdin, dynamic paths, stable memory)
+
+See [CHANGELOG.md](CHANGELOG.md) for full history.

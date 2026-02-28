@@ -1,5 +1,46 @@
 # Changelog
 
+## [1.7.0] - 2026-02-28
+
+### Added (v1.7.0)
+
+- **`/cp` — Creet Plan**: New skill for plan-first execution. Generates a work plan document (작업계획서) before executing, saves it as a markdown file, presents for user approval, then executes. 7-phase workflow: Scan → Analyze → Generate Plan → Approve → Execute → Post-Exec Update. `skills/cp/SKILL.md`
+- **Plan Manager module** — Plan document file naming (`YYYY-MM-DD-slug.md`), state tracking (`plan-state.json`), slug generation (Korean/Japanese/Chinese character support), plan listing and summary. `lib/plan-manager.js`
+- **`planDir` config option** — Custom plan file directory override (default: `.creet/plans/`). `creet.config.json`
+- **`defaultPlanLanguage` config option** — Force plan document language (default: auto-detect from user). `creet.config.json`
+- **`recordPlanCreation()`** — New function in memory-store for tracking plan creation in session memory. `lib/memory-store.js`
+
+### Changed (v1.7.0)
+
+- `hooks/session-start.js` — Now initializes plans directory at session start; loads recent plan history into session context; Quick Commands section includes `/cp`
+- `skills/c/SKILL.md` — Added `/cp` cross-reference in Rules section; version → v1.7.0
+- `skills/cc/SKILL.md` — Version → v1.7.0
+- All version strings unified to v1.7.0 across 8 files
+
+## [1.6.0] - 2026-02-28
+
+### Added (v1.6.0)
+
+- **Agent Dashboard** — Real-time sub-agent lifecycle tracking via `.creet/agent-dashboard.json`. Tracks session ID, agent status (pending/running/done/error), duration, error logs. `lib/agent-tracker.js`
+- **PreToolUse hook (Task)** — Registers each Task agent as "running" in the dashboard before execution. `hooks/pre-tool-task.js`
+- **PostToolUse hook (Task)** — Marks Task agent as "done" or "error" after completion, records duration. `hooks/post-tool-task.js`
+- **Stop hook** — Records final session state on exit, marks orphaned agents as error. `hooks/stop.js`
+- **Slash command priority override** — When user explicitly types `/skill-name`, UserPromptSubmit injects highest-priority instruction to execute it immediately instead of re-recommending. `scripts/user-prompt-handler.js`
+- **design-council registry entry** — Added to plugin-registry as a built-in multi-agent orchestration pattern. `lib/plugin-registry.js`
+
+### Changed (v1.6.0)
+
+- `hooks/hooks.json` — Expanded from 2 hooks (SessionStart, UserPromptSubmit) to 5 hooks (+PreToolUse, +PostToolUse, +Stop)
+- `hooks/session-start.js` — Now initializes agent dashboard via `initSession()` at startup; dashboard path included in hook output
+- All version strings unified to v1.6.0 across 7 files
+
+### Documentation (v1.6.0)
+
+- Added `docs/DOCUMENTATION-GUIDE.md` — Documentation standards and structure definition
+- Rewrote `CLAUDE.md` following documentation guide (200-line limit, table-first)
+- Updated `README.md` — Removed internal architecture details, removed hardcoded version numbers
+- Added v1.6.0 entry to `CHANGELOG.md` (this entry)
+
 ## [1.5.0] - 2026-02-25
 
 ### Fixed (v1.5.0)

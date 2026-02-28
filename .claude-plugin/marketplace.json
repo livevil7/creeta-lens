@@ -11,7 +11,7 @@
     {
       "name": "creet",
       "description": "Skill navigator for Claude Code. Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the best match for your task in 8 languages, and executes it. Type /c to start.",
-      "version": "1.5.0",
+      "version": "1.7.0",
       "author": {
         "name": "Creeta",
         "email": "creet@creeta.com"

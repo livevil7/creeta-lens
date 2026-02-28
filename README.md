@@ -72,10 +72,6 @@ claude --plugin-dir /path/to/creet
 
 ## Usage
 
-```
-/c <what you want to do>
-```
-
 ### `/c` — Navigate to the best skill
 
 ```
@@ -103,16 +99,28 @@ Instead of picking one, `/cc` finds **every** relevant skill and runs them all s
 | `/cc review this codebase` | Runs every review-related skill at once |
 | `/cc` (no args) | Shows full skill inventory (same as `/c`) |
 
+### `/cp` — Plan first, then execute
+
+```
+/cp <what you want to do>
+```
+
+Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execution. The plan is saved as a markdown file and presented for your approval.
+
+| You type | What happens |
+| --- | --- |
+| `/cp build auth with JWT` | Generates a work plan, saves to `.creet/plans/2026-02-28-jwt-auth.md`, asks for approval |
+| `/cp refactor the API layer` | Creates a step-by-step plan with matched skills, waits for your go-ahead |
+| `/cp` (no args) | Shows full skill inventory (same as `/c`) |
+
 **When to use which:**
 
-| | `/c` | `/cc` |
-|---|---|---|
-| Goal | Best single skill | All relevant skills |
-| Output | One skill's result | Synthesized multi-agent output |
-| Speed | Fast | Slower (parallel agents) |
-| Use when | You know roughly what you need | You want comprehensive coverage |
-
-Creet dynamically matches against whatever plugins you have installed.
+| | `/c` | `/cc` | `/cp` |
+|---|---|---|---|
+| Goal | Best single skill | All relevant skills | Plan before executing |
+| Output | One skill's result | Synthesized multi-agent output | Work plan document + execution |
+| Speed | Fast | Slower (parallel agents) | Deliberate (plan → approve → execute) |
+| Use when | You know what you need | You want comprehensive coverage | You want to review before running |
 
 ## How It Works
 
@@ -128,66 +136,31 @@ Creet dynamically matches against whatever plugins you have installed.
 3. **Execute** — Launches every matched skill as a parallel Task agent simultaneously
 4. **Synthesize** — Collects all outputs and produces a unified result with agreements, conflicts, and next steps
 
-## Scanner
-
-Creet's skill scanner automatically detects all plugin types:
-
-| Type | Detection | What it finds |
-| --- | --- | --- |
-| **Skill** | `skills/*/SKILL.md` and `commands/*.md` | Slash commands from any plugin |
-| **MCP** | `.mcp.json` (direct and wrapper formats) | MCP tool servers |
-| **LSP** | `lspServers` in `plugin.json` | Language servers |
-| **Hybrid** | Skill + MCP in same plugin | Plugins with both types |
-
-### Scanner Details
-
-- Scans `~/.claude/plugins/cache/` for all installed plugins
-- Supports YAML frontmatter and markdown table formats for skill metadata
-- Extracts trigger keywords (multi-line, 8 languages)
-- Auto-detects domain from 24 pattern categories
-- Hybrid plugins are marked with `hasMcp` flag
-
-### Dynamic Keyword Matching
-
-Creet builds its keyword map **dynamically** from scanner results. Each skill's trigger keywords become the matching dictionary. No hardcoded skill-to-keyword mappings — if a plugin declares triggers, Creet uses them automatically.
+### `/cp` — Plan-first execution engine
+1. **Scan** — Same as `/c`
+2. **Analyze & Match** — Identifies all relevant skills with reasons
+3. **Generate Plan** — Creates a work plan document and saves to `.creet/plans/`
+4. **Approve** — Presents plan for user approval (Approve / Modify / Cancel)
+5. **Execute** — Runs the approved plan (single skill or parallel agents)
+6. **Post-Exec Update** — Appends execution results to the plan file
 
 ## Features
 
-- Auto-scans all installed plugins at session start via SessionStart hook
+- Auto-scans all installed plugins at session start
 - Detects Skills, MCP tools, and LSP servers from plugin cache
 - **Zero hardcoded dependencies** — works with any plugin combination
 - Dynamic keyword matching from scanner-extracted triggers
-- Uses AskUserQuestion for interactive skill selection
+- Interactive skill selection via AskUserQuestion
 - Compares overlapping skills and explains the difference
 - Recommends execution order for multi-skill workflows
+- **Plan-first execution** — `/cp` generates a work plan document before executing, with user approval
+- Plan files saved as `YYYY-MM-DD-slug.md` in `.creet/plans/`
+- Agent dashboard — tracks parallel Task agent lifecycle in real-time
+- Slash command priority override — `/skill-name` invokes immediately without re-recommendation
 - Max 5 recommendations (no overwhelm)
 - Responds in your language (EN, KO, JA, ZH, ES, FR, DE, IT)
 - Session memory — remembers your most used skills across sessions
 - Plugin Discovery — suggests installable plugins when no match found
-
-## Architecture
-
-```
-creet/
-  .claude-plugin/
-    plugin.json          # Plugin manifest
-    marketplace.json     # Marketplace registration
-  skills/c/
-    SKILL.md             # /c skill — navigate to best skill
-  skills/cc/
-    SKILL.md             # /cc skill — run all relevant skills in parallel
-  hooks/
-    hooks.json           # Hook registration (SessionStart, UserPromptSubmit)
-    session-start.js     # Session startup: scan + cache + context injection
-  scripts/
-    user-prompt-handler.js  # Per-message keyword matching (from cache)
-  lib/
-    skill-scanner.js     # Core scanner (Skills, MCP, LSP detection)
-    keyword-matcher.js   # Dynamic keyword matching (no hardcoded maps)
-    memory-store.js      # Session memory persistence
-    plugin-registry.js   # Known plugins registry for discovery
-  creet.config.json      # Configuration
-```
 
 ## Configuration
 
@@ -195,12 +168,13 @@ creet/
 
 ```json
 {
-  "version": "1.3.0",
   "autoRecommend": true,
   "showReport": true,
   "minMatchScore": 5,
   "memoryPath": null,
-  "customKeywords": []
+  "customKeywords": [],
+  "planDir": null,
+  "defaultPlanLanguage": null
 }
 ```
 
@@ -209,8 +183,10 @@ creet/
 | `autoRecommend` | `true` | Show skill suggestions in responses |
 | `showReport` | `true` | Show Creet tip line when skill matches |
 | `minMatchScore` | `5` | Minimum keyword match score for recommendations |
-| `memoryPath` | `null` | Custom path for memory file (null = plugin root) |
+| `memoryPath` | `null` | Custom path for memory file (null = `~/.claude/creet/`) |
 | `customKeywords` | `[]` | Additional keyword-to-skill mappings |
+| `planDir` | `null` | Custom plan file directory (null = `.creet/plans/`) |
+| `defaultPlanLanguage` | `null` | Force plan document language (null = auto-detect) |
 
 ## Building Custom Skills with Creet
 

@@ -15,6 +15,7 @@ const { loadMemory, saveMemory, recordSessionStart, formatMemorySummary } = requ
 const { formatKeywordTable, saveScanCache } = require(path.join(PLUGIN_ROOT, 'lib', 'keyword-matcher'));
 const { KNOWN_PLUGINS } = require(path.join(PLUGIN_ROOT, 'lib', 'plugin-registry'));
 const { initSession, getDashboardPath } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
+const { formatPlanSummary, ensurePlansDir } = require(path.join(PLUGIN_ROOT, 'lib', 'plan-manager'));
 
 // Load config
 let config = {};
@@ -31,8 +32,9 @@ try {
 
 function main() {
   try {
-    // 0. Initialize agent dashboard for this session
+    // 0. Initialize agent dashboard + plans directory for this session
     const dashboard = initSession();
+    ensurePlansDir(config.planDir || null);
 
     // 1. Scan installed skills and cache for UserPromptSubmit hook
     const skills = scanInstalledSkills();
@@ -49,19 +51,23 @@ function main() {
     // 3. Build keyword table from scan results (dynamic, not hardcoded)
     const keywordTable = formatKeywordTable(skills);
 
-    // 4. Build additional context
+    // 4. Build plan history for context
+    const planSummary = formatPlanSummary(config.planDir || null);
+
+    // 5. Build additional context
     const additionalContext = buildAdditionalContext({
       skillTable,
       memorySummary,
       keywordTable,
+      planSummary,
       skillCount: skills.length,
       pluginCount: [...new Set(skills.map(s => s.plugin))].length,
       config,
     });
 
-    // 5. Output response
+    // 6. Output response
     const response = {
-      systemMessage: `Creet v1.6.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard ready`,
+      systemMessage: `Creet v1.7.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready`,
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         skillCount: skills.length,
@@ -80,7 +86,7 @@ function main() {
   } catch (err) {
     // Fail gracefully - don't break the session
     const fallback = {
-      systemMessage: 'Creet v1.6.0 activated (scan skipped)',
+      systemMessage: 'Creet v1.7.0 activated (scan skipped)',
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         error: err.message,
@@ -94,14 +100,14 @@ function main() {
 
 // ── Context Builder ───────────────────────────────────────
 
-function buildAdditionalContext({ skillTable, memorySummary, keywordTable, skillCount, pluginCount, config: cfg }) {
+function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planSummary, skillCount, pluginCount, config: cfg }) {
   const autoRecommend = cfg.autoRecommend !== false;
   const showReport = cfg.showReport !== false;
 
   let ctx = '';
 
   // Header
-  ctx += `# Creet v1.6.0 - Session Startup\n\n`;
+  ctx += `# Creet v1.7.0 - Session Startup\n\n`;
 
   // Skill inventory
   ctx += `## Installed Skills (Auto-Scanned)\n\n`;
@@ -140,11 +146,18 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, skill
   ctx += `- Format: "No installed skill matches, but you can install: \`install-command\`"\n`;
   ctx += `- Use the user's language for the suggestion\n\n`;
 
+  // Plan history
+  if (planSummary) {
+    ctx += `## Recent Plans\n\n`;
+    ctx += planSummary + '\n\n';
+  }
+
   // Creet usage guide
   ctx += `## Quick Commands\n\n`;
   ctx += `- \`/c <request>\` - Scan + Recommend + Execute (pick the best skill)\n`;
   ctx += `- \`/cc <request>\` - Run ALL relevant skills in parallel + synthesize results\n`;
-  ctx += `- \`/c\` or \`/cc\` (no args) - Show full skill inventory\n\n`;
+  ctx += `- \`/cp <request>\` - Plan-first execution: generate work plan, get approval, then execute\n`;
+  ctx += `- \`/c\`, \`/cc\`, or \`/cp\` (no args) - Show full skill inventory\n\n`;
 
   // Report rule
   if (showReport) {
@@ -167,7 +180,7 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, skill
 }
 
 function buildFallbackContext() {
-  return `# Creet v1.6.0 - Session Startup
+  return `# Creet v1.7.0 - Session Startup
 
 Skill scan was skipped (no plugins cache found or scan error).
 Use \`/c <request>\` to manually scan and get recommendations.

@@ -1,13 +1,13 @@
 ---
 name: c
-description: "Creet v1.5.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. For parallel multi-agent execution, use /cc."
+description: "Creet v1.7.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. For parallel use /cc, for plan-first use /cp."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| c | Creet v1.5.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. Use /cc to run ALL relevant skills in parallel. | MIT |
+| c | Creet v1.7.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. Use /cc for parallel, /cp for plan-first execution. | MIT |
 
 Triggers: creet, navigate, which skill, what skill, find skill, recommend, scan skills, skill list,
 어떤 스킬, 스킬 찾기, 추천, 스킬 목록, どのスキル, スキル検索, 推荐, 哪个技能,
@@ -67,3 +67,4 @@ If NO installed skill matches:
 - If user already specified a skill (e.g., `/commit`), do NOT re-recommend
 - `/c` with no args = show full inventory only (skip recommend phase)
 - For running ALL relevant skills simultaneously, direct the user to `/cc`
+- For plan-first execution with approval before running, direct the user to `/cp`
