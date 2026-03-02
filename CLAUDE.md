@@ -130,13 +130,43 @@ See [CHANGELOG.md](CHANGELOG.md) for full history.
 
 ## Release Checklist
 
-1. 코드 변경 완료 + 커밋
-2. 버전 범프 (9곳 동시): `plugin.json`, `marketplace.json`, `hooks.json`, `CLAUDE.md`, `session-start.js`, `skills/c/SKILL.md`, `skills/cc/SKILL.md`, `skills/cp/SKILL.md`, `CHANGELOG.md`
-3. 커밋: `chore: bump version to vX.Y.Z`
-4. 태그: `git tag vX.Y.Z`
-5. Push: `git push origin master --tags`
-6. GitHub Release: `gh release create vX.Y.Z --title "vX.Y.Z — Title" --notes-file -`
-7. marketplace.json의 `source.ref` 업데이트 (해당 태그로)
+**상세 지침**: [docs/RELEASE-GUIDE.md](docs/RELEASE-GUIDE.md)
+
+### SemVer 규칙
+
+- MAJOR: 하위호환 깨는 변경 (스킬 이름, 훅 인터페이스, 설정 키 삭제)
+- MINOR: 새 기능 (새 스킬, 새 훅, 새 lib 모듈)
+- PATCH: 버그 수정, 문서 개선, 기존 기능 보강
+
+### 버전 기록 위치 (9곳 — 반드시 동시에 같은 버전으로)
+
+| # | 파일 | 수정 위치 |
+| --- | ------ | --------- |
+| 1 | `.claude-plugin/plugin.json` | `"version"` |
+| 2 | `.claude-plugin/marketplace.json` | `"version"` + `"source.ref"` (2곳) |
+| 3 | `hooks/hooks.json` | `"description"` 내 버전 |
+| 4 | `hooks/session-start.js` | 문자열 리터럴 (4곳) |
+| 5 | `skills/c/SKILL.md` | YAML description + table (2곳) |
+| 6 | `skills/cc/SKILL.md` | YAML description + table (2곳) |
+| 7 | `skills/cp/SKILL.md` | YAML description + table (2곳) |
+| 8 | `CLAUDE.md` | Version 섹션 + Recent Changes |
+| 9 | `CHANGELOG.md` | 새 버전 섹션 추가 |
+
+### 절차
+
+1. 코드 변경 커밋 (버전 범프와 분리)
+2. CHANGELOG.md에 새 버전 섹션 추가
+3. 9곳 버전 범프 → `git commit -m "chore: bump version to vX.Y.Z"`
+4. `git tag vX.Y.Z`
+5. `git push origin master --tags` (--tags 필수)
+6. `gh release create vX.Y.Z --title "vX.Y.Z — Title" --latest`
+
+### 검증
+
+```bash
+# 구버전 잔존 확인 (CHANGELOG/docs 제외, 0건이어야 함)
+grep -rn "vOLD" --include="*.json" --include="*.js" skills/ hooks/ .claude-plugin/
+```
 
 ## Publishing
 
