@@ -3,7 +3,7 @@ id: synth_{timestamp}_{hex}
 type: synthesis
 created: {iso_datetime}
 status: completed
-generator: creet/multi
+generator: lens/multi
 language: {language}
 skills: [{skill_list}]
 request: "{request_summary}"

@@ -1,5 +1,5 @@
 /**
- * Creet - PostToolUse Hook (matcher: Task)
+ * Lens - PostToolUse Hook (matcher: Task)
  * Tracks when a sub-agent (Task tool) completes execution.
  *
  * Triggered: After each Task tool invocation completes

@@ -3,7 +3,7 @@ id: exec_{timestamp}_{hex}
 type: execution
 created: {iso_datetime}
 status: {final_status}
-generator: creet/{skill_name}
+generator: lens/{skill_name}
 language: {language}
 parent: {plan_id}
 refs: [{plan_id}]

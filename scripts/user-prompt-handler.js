@@ -1,5 +1,5 @@
 /**
- * Creet - UserPromptSubmit Hook
+ * Lens - UserPromptSubmit Hook
  * Analyzes user input and suggests matching skills.
  */
 
@@ -64,7 +64,7 @@ function main() {
     if (matches.length > 0 && matches[0].score >= MIN_SCORE) {
       // Installed skill match found
       const suggestions = matches.slice(0, 2).map(m => `/${m.skill}`).join(', ');
-      const hint = `Creet detected skill match: ${suggestions} may help with this request. Suggest it naturally if appropriate.`;
+      const hint = `Lens detected skill match: ${suggestions} may help with this request. Suggest it naturally if appropriate.`;
 
       const response = {
         systemMessage: hint,
@@ -85,7 +85,7 @@ function main() {
 
     if (registryMatches.length > 0) {
       const pluginNames = registryMatches.map(r => r.name).join(', ');
-      const hint = `Creet: No installed skill matches, but external plugins may help: ${pluginNames}. Suggest them if the user uses /c.`;
+      const hint = `Lens: No installed skill matches, but external plugins may help: ${pluginNames}. Suggest them if the user uses /c.`;
 
       const response = {
         systemMessage: hint,

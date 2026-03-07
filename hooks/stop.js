@@ -1,5 +1,5 @@
 /**
- * Creet - Stop Hook
+ * Lens - Stop Hook
  * Records final session state when Claude Code's main agent stops.
  *
  * Triggered: When the main agent finishes (Stop event)

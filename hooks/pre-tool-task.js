@@ -1,5 +1,5 @@
 /**
- * Creet - PreToolUse Hook (matcher: Task)
+ * Lens - PreToolUse Hook (matcher: Task)
  * Tracks when a sub-agent (Task tool) starts execution.
  *
  * Triggered: Before each Task tool invocation
