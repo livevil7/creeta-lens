@@ -2,7 +2,7 @@
 
 **Never wonder which plugin to use again.**
 
-Lens is a skill navigator for Claude Code by [Lensa](https://www.lensa.com). It scans your installed plugins, finds the best skill for your task, and runs it — all from a single command.
+Lens is a skill navigator for Claude Code by [Creeta](https://www.creeta.com). It scans your installed plugins, finds the best skill for your task, and runs it — all from a single command.
 
 Works with **any** combination of plugins. No hardcoded dependencies.
 
@@ -45,7 +45,7 @@ Select a skill and Lens runs it immediately.
 Clone the repo and load it with `--plugin-dir`:
 
 ```bash
-git clone https://github.com/Lensa-lens/lens.git
+git clone https://github.com/CreetaCorp/lens.git
 claude --plugin-dir ./lens
 ```
 
@@ -57,7 +57,7 @@ Copy the skill file to your user-level commands for a shorter `/c` command:
 
 ```bash
 mkdir -p ~/.claude/commands
-curl -o ~/.claude/commands/c.md https://raw.githubusercontent.com/Lensa-lens/lens/main/skills/c/SKILL.md
+curl -o ~/.claude/commands/c.md https://raw.githubusercontent.com/CreetaCorp/lens/main/skills/c/SKILL.md
 ```
 
 Restart Claude Code, then use `/c` directly.
