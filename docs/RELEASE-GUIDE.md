@@ -1,4 +1,4 @@
-# Creet Release Guide
+# Lens Release Guide
 
 버전 업데이트 시 반드시 이 문서를 따른다.
 
@@ -28,11 +28,11 @@
 |---|------|------|------|
 | 1 | `.claude-plugin/plugin.json` | `"version": "X.Y.Z"` | JSON value |
 | 2 | `.claude-plugin/marketplace.json` | `"version": "X.Y.Z"` + `"ref": "vX.Y.Z"` | JSON value (2곳) |
-| 3 | `hooks/hooks.json` | `"description": "Creet vX.Y.Z by Creeta ..."` | 문자열 내 버전 |
-| 4 | `hooks/session-start.js` | `Creet vX.Y.Z activated` (4곳) | 문자열 리터럴 |
-| 5 | `skills/c/SKILL.md` | `Creet vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 6 | `skills/cc/SKILL.md` | `Creet Multi vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 7 | `skills/cp/SKILL.md` | `Creet Plan vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
+| 3 | `hooks/hooks.json` | `"description": "Lens vX.Y.Z by Creeta ..."` | 문자열 내 버전 |
+| 4 | `hooks/session-start.js` | `Lens vX.Y.Z activated` (4곳) | 문자열 리터럴 |
+| 5 | `skills/c/SKILL.md` | `Lens vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
+| 6 | `skills/cc/SKILL.md` | `Lens Multi vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
+| 7 | `skills/cp/SKILL.md` | `Lens Plan vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
 | 8 | `CLAUDE.md` | `Current: **vX.Y.Z**` + `Updated: YYYY-MM-DD` + Recent Changes | Markdown |
 | 9 | `CHANGELOG.md` | `## [X.Y.Z] - YYYY-MM-DD` 섹션 추가 | Markdown |
 
@@ -89,7 +89,7 @@ git commit -m "fix: updatePlanStatus regex safety"
 
 **주의사항**:
 - `marketplace.json`은 `version`과 `source.ref` 2곳 모두 변경
-- `session-start.js`는 4곳 (`activated` 메시지 2개 + `Session Startup` 제목 1개 + 에러 시 1개)
+- `session-start.js`는 4곳 (`activated` 메시지 2개 + `Session Startup` 제목 2개)
 - 각 SKILL.md는 YAML description + table description 2곳
 - `CLAUDE.md`는 Version 섹션 + Recent Changes 섹션
 
@@ -159,9 +159,9 @@ EOF
 Claude Code는 **버전 번호**로 플러그인 캐시를 관리한다.
 
 - 코드를 변경했지만 버전을 안 올리면 → 기존 유저는 **변경사항을 못 봄**
-- 캐시 경로: `~/.claude/plugins/cache/Creeta-creet/creet/{version}/`
-- 수동 캐시 삭제: `rm -rf ~/.claude/plugins/cache/Creeta-creet/creet/`
-- 개발 중에는 `claude --plugin-dir ./creet`으로 캐시 우회
+- 캐시 경로: `~/.claude/plugins/cache/CreetaCorp/lens/{version}/`
+- 수동 캐시 삭제: `rm -rf ~/.claude/plugins/cache/CreetaCorp/lens/`
+- 개발 중에는 `claude --plugin-dir ./lens`으로 캐시 우회
 
 ## 6. 버전 검증 체크리스트
 
@@ -172,7 +172,7 @@ Claude Code는 **버전 번호**로 플러그인 캐시를 관리한다.
 git tag -l | tail -3
 
 # 2. 원격 태그 확인
-gh api repos/Creeta-creet/creet/tags --jq '.[].name' | head -5
+gh api repos/CreetaCorp/lens/tags --jq '.[].name' | head -5
 
 # 3. GitHub Releases 확인
 gh release list | head -5
