@@ -52,7 +52,7 @@
 
 ```bash
 git clone https://github.com/CreetaCorp/lens.git
-claude --plugin-dir ./creet
+claude --plugin-dir ./lens
 ```
 
 캐시 없이 디렉토리에서 직접 로드. 개발/테스트 전용.
