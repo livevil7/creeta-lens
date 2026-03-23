@@ -4,8 +4,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v1.7.1**
-- Updated: 2026-03-02
+- Current: **v1.8.0**
+- Updated: 2026-03-23
 - Source of truth: `.claude-plugin/plugin.json`
 
 ## Skills
@@ -122,6 +122,7 @@ EN, KO, JA, ZH, ES, FR, DE, IT (8 languages)
 
 ## Recent Changes
 
+- **v1.8.0** (2026-03-23): Creet → Lens complete rebranding — storage paths `.creet/` → `.lens/`, schema, GitHub repo, marketplace
 - **v1.7.1** (2026-03-02): Quality fixes — path consistency, cancelled status, 8-lang headers, YAML parser, JSON safety
 - **v1.7.0** (2026-02-28): `/cp` plan-first execution, plan-manager module, planDir/defaultPlanLanguage config
 - **v1.6.0** (2026-02-28): Agent dashboard, 3 new hooks (PreToolUse/PostToolUse/Stop), slash command priority override

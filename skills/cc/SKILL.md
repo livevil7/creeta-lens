@@ -1,13 +1,13 @@
 ---
 name: cc
-description: "Lens Multi v1.7.1 — Find ALL relevant skills and run them in parallel as a multi-agent team. Synthesizes all outputs into one unified result."
+description: "Lens Multi v1.8.0 — Find ALL relevant skills and run them in parallel as a multi-agent team. Synthesizes all outputs into one unified result."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v1.7.1 — Parallel multi-skill execution. Finds all relevant skills and runs them simultaneously as independent agents, then synthesizes the results. | MIT |
+| cc | Lens Multi v1.8.0 — Parallel multi-skill execution. Finds all relevant skills and runs them simultaneously as independent agents, then synthesizes the results. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬,
 同時実行, 並列, マルチエージェント, 并行, 同时执行, 多代理,

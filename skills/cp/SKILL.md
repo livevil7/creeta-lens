@@ -1,13 +1,13 @@
 ---
 name: cp
-description: "Lens Plan v1.7.1 — Plan-first execution. Generates a work plan document, gets user approval, then executes. For instant execution use /c, for parallel use /cc."
+description: "Lens Plan v1.8.0 — Plan-first execution. Generates a work plan document, gets user approval, then executes. For instant execution use /c, for parallel use /cc."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v1.7.1 — Plan-first execution. Analyzes task, finds matching skills, generates a work plan document (작업계획서), saves to file, and executes only after user approval. | MIT |
+| cp | Lens Plan v1.8.0 — Plan-first execution. Analyzes task, finds matching skills, generates a work plan document (작업계획서), saves to file, and executes only after user approval. | MIT |
 
 Triggers: plan, work plan, plan first, plan before, execution plan, review before execute,
 작업계획, 계획서, 작업계획서, 계획 먼저, 실행 전 계획, 계획 세워줘, 작업 계획,

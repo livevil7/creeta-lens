@@ -1,13 +1,13 @@
 ---
 name: c
-description: "Lens v1.7.1 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. For parallel use /cc, for plan-first use /cp."
+description: "Lens v1.8.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. For parallel use /cc, for plan-first use /cp."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| c | Lens v1.7.1 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. Use /cc for parallel, /cp for plan-first execution. | MIT |
+| c | Lens v1.8.0 — Scan all installed plugins (Skills, MCP tools, LSP servers), recommend the best match, and execute. Use /cc for parallel, /cp for plan-first execution. | MIT |
 
 Triggers: lens, navigate, which skill, what skill, find skill, recommend, scan skills, skill list,
 어떤 스킬, 스킬 찾기, 추천, 스킬 목록, どのスキル, スキル検索, 推荐, 哪个技能,

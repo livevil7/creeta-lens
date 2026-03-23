@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.0] - 2026-03-23
+
+### Changed (v1.8.0)
+
+- **Creet → Lens rebranding** — Complete rename across all source files, hooks, skills, docs, and config
+- **Storage paths** — `.creet/` → `.lens/`, `.creet-cache.json` → `.lens-cache.json`, `.creet-memory.json` → `.lens-memory.json`
+- **Schema** — `creet-agent-dashboard/1.0.0` → `lens-agent-dashboard/1.0.0`
+- **GitHub repo** — `Creeta-creet/creet` → `CreetaCorp/lens`
+- **Marketplace** — `Creeta-creet` → `CreetaCorp`
+
 ## [1.7.1] - 2026-03-02
 
 ### Fixed (v1.7.1)

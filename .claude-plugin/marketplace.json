@@ -15,7 +15,7 @@
     {
       "name": "lens",
       "description": "Skill navigator for Claude Code. Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the best match for your task in 8 languages, and executes it. Single (/c), parallel (/cc), or plan-first (/cp).",
-      "version": "1.7.1",
+      "version": "1.8.0",
       "author": {
         "name": "Creeta",
         "email": "creet@creeta.com"
@@ -25,7 +25,7 @@
       "source": {
         "source": "github",
         "repo": "CreetaCorp/lens",
-        "ref": "v1.7.1"
+        "ref": "v1.8.0"
       },
       "license": "MIT",
       "category": "productivity",
