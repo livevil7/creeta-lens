@@ -1,14 +1,17 @@
 # Changelog
 
-## [1.8.0] - 2026-03-23
+## [1.9.0] - 2026-03-31
 
-### Changed (v1.8.0)
+### Changed (v1.9.0)
 
-- **Creet → Lens rebranding** — Complete rename across all source files, hooks, skills, docs, and config
-- **Storage paths** — `.creet/` → `.lens/`, `.creet-cache.json` → `.lens-cache.json`, `.creet-memory.json` → `.lens-memory.json`
-- **Schema** — `creet-agent-dashboard/1.0.0` → `lens-agent-dashboard/1.0.0`
-- **GitHub repo** — `Creeta-creet/creet` → `CreetaCorp/lens`
-- **Marketplace** — `Creeta-creet` → `CreetaCorp`
+- **`/cc` completely rewritten** — Leader-Worker-Supervisor-QA team orchestration replacing the previous parallel multi-agent approach
+- **General-purpose Workers** — Workers are now general-purpose agents, not limited to installed skills
+- **Mandatory user approval** — User approval required before execution (Phase 1.3)
+- **QA Verification phase** — Phase 5 added with actual testing via Playwright/Bash/curl
+- **Supervisor quality review** — Scoring system introduced (80+ = pass)
+- **Max 5 iteration feedback loop** — Failed sub-tasks re-dispatched with Supervisor feedback
+- **English-only** — All output and documentation switched to English for international distribution
+- **Rebranded** — Repository moved from `Creeta-creet/creet` to `CreetaCorp/lens`
 
 ## [1.7.1] - 2026-03-02
 

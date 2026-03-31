@@ -1,8 +1,8 @@
-# Lens
+# Lens v1.9.0
 
 **Never wonder which plugin to use again.**
 
-Lens is a skill navigator for Claude Code by [Creeta](https://www.creeta.com). It scans your installed plugins, finds the best skill for your task, and runs it — all from a single command.
+Lens is a skill navigator and multi-agent orchestrator for Claude Code by [Creeta](https://www.creeta.com). It scans your installed plugins, finds the best skill for your task, and runs it — all from a single command.
 
 Works with **any** combination of plugins. No hardcoded dependencies.
 
@@ -85,18 +85,28 @@ claude --plugin-dir /path/to/lens
 | `/c deploy to production` | Recommends your deployment skill |
 | `/c` (no args) | Shows full skill inventory |
 
-### `/cc` — Run all relevant skills in parallel
+### `/cc` — Leader-Worker-Supervisor-QA Orchestration
 
 ```
 /cc <what you want to do>
 ```
 
-Instead of picking one, `/cc` finds **every** relevant skill and runs them all simultaneously as independent agents, then synthesizes the results.
+`/cc` uses a **Leader-Worker-Supervisor-QA** team pattern to tackle any task — not limited to installed skills. The Leader decomposes the task, Workers execute sub-tasks in parallel, the Supervisor reviews quality, and QA verifies the final output.
+
+```
+Leader → Workers (parallel) → Supervisor → QA Verification → Final Report
+```
+
+Key behaviors:
+- **Works on ANY task** — not limited to installed skills or plugins
+- **Mandatory user approval** — the Leader presents a work plan and waits for your approval before Workers execute
+- **Max 5 iteration feedback loop** — Supervisor can send work back to Workers up to 5 times until quality standards are met
 
 | You type | What happens |
 | --- | --- |
-| `/cc build a dashboard with auth` | Runs `/auth`, `/ui-builder`, `/code-review` in parallel — one unified output |
-| `/cc review this codebase` | Runs every review-related skill at once |
+| `/cc build a dashboard with auth` | Leader decomposes → Workers build auth, UI, tests in parallel → Supervisor reviews → QA verifies |
+| `/cc review this codebase` | Leader plans review strategy → Workers analyze different areas → Supervisor synthesizes → QA validates |
+| `/cc refactor the payment module` | Leader breaks down refactoring → Workers handle each component → Supervisor ensures consistency → QA checks |
 | `/cc` (no args) | Shows full skill inventory (same as `/c`) |
 
 ### `/cp` — Plan first, then execute
@@ -130,11 +140,19 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 3. **Execute** — Runs the chosen skill immediately
 4. **Discover** — If no match, suggests installable plugins from registry
 
-### `/cc` — Multi-agent parallel engine
-1. **Scan** — Same as `/c`
-2. **Multi-Match** — Selects ALL relevant skills (no cap)
-3. **Execute** — Launches every matched skill as a parallel Task agent simultaneously
-4. **Synthesize** — Collects all outputs and produces a unified result with agreements, conflicts, and next steps
+### `/cc` — Leader-Worker-Supervisor-QA Orchestration
+1. **Leader** — Decomposes the task into sub-tasks and presents a work plan for user approval
+2. **Workers** — Execute sub-tasks in parallel (any task, not limited to installed skills)
+3. **Supervisor** — Reviews Worker outputs for quality; can send back for rework (up to 5 iterations)
+4. **QA Verification** — Final quality gate before delivering the result
+5. **Final Report** — Unified output with all findings and recommendations
+
+```
+Leader --> Workers (parallel) --> Supervisor --> QA --> Final Report
+                  ^                    |
+                  +--------------------+
+                   Feedback (max 5x)
+```
 
 ### `/cp` — Plan-first execution engine
 1. **Scan** — Same as `/c`
