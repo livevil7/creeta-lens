@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-hooks.json",
-  "description": "Lens v1.8.0 by Creeta - Skill Navigator + Agent Dashboard + Plan System for Claude Code",
+  "description": "Lens v1.9.0 — Skill Navigator + Agent Dashboard + Plan System for Claude Code",
   "hooks": {
     "SessionStart": [
       {

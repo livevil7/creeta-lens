@@ -2,7 +2,7 @@
 
 **Never wonder which plugin to use again.**
 
-Lens is a skill navigator and multi-agent orchestrator for Claude Code by [Creeta](https://www.creeta.com). It scans your installed plugins, finds the best skill for your task, and runs it — all from a single command.
+Lens is a skill navigator and multi-agent orchestrator for Claude Code. It scans your installed plugins, finds the best skill for your task, and runs it — all from a single command.
 
 Works with **any** combination of plugins. No hardcoded dependencies.
 

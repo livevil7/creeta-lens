@@ -4,8 +4,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v1.8.0**
-- Updated: 2026-03-23
+- Current: **v1.9.0**
+- Updated: 2026-04-01
 - Source of truth: `.claude-plugin/plugin.json`
 
 ## Skills
@@ -122,6 +122,7 @@ EN, KO, JA, ZH, ES, FR, DE, IT (8 languages)
 
 ## Recent Changes
 
+- **v1.9.0** (2026-04-01): Leader-Worker-Supervisor-QA orchestration for /cc, legacy Creet cleanup, version unification
 - **v1.8.0** (2026-03-23): Creet → Lens complete rebranding — storage paths `.creet/` → `.lens/`, schema, GitHub repo, marketplace
 - **v1.7.1** (2026-03-02): Quality fixes — path consistency, cancelled status, 8-lang headers, YAML parser, JSON safety
 - **v1.7.0** (2026-02-28): `/cp` plan-first execution, plan-manager module, planDir/defaultPlanLanguage config
@@ -172,6 +173,6 @@ grep -rn "vOLD" --include="*.json" --include="*.js" skills/ hooks/ .claude-plugi
 ## Publishing
 
 - Anthropic 공식 디렉토리 제출: <https://clau.de/plugin-directory-submission>
-- 독립 마켓플레이스: `/plugin marketplace add CreetaCorp/lens`
+- 독립 마켓플레이스: `/plugin marketplace add lens`
 - 개발용: `claude --plugin-dir ./lens`
 - 상세: [docs/PUBLISHING-GUIDE.md](docs/PUBLISHING-GUIDE.md)

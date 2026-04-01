@@ -225,9 +225,9 @@ Claude Code 런타임이 읽는 메타데이터 + **버전의 단일 원천**.
   "version": "X.Y.Z",
   "description": "[/c와 /cc의 핵심 기능을 포함한 50단어 이내 설명]",
   "author": {
-    "name": "Creeta",
-    "email": "lens@creeta.com",
-    "url": "https://www.creeta.com"
+    "name": "Lens",
+    "email": "livevil7@gmail.com",
+    "url": "https://github.com/CreetaCorp/lens"
   },
   "repository": "https://github.com/CreetaCorp/lens",
   "license": "MIT",

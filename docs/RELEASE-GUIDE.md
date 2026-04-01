@@ -28,7 +28,7 @@
 |---|------|------|------|
 | 1 | `.claude-plugin/plugin.json` | `"version": "X.Y.Z"` | JSON value |
 | 2 | `.claude-plugin/marketplace.json` | `"version": "X.Y.Z"` + `"ref": "vX.Y.Z"` | JSON value (2곳) |
-| 3 | `hooks/hooks.json` | `"description": "Lens vX.Y.Z by Creeta ..."` | 문자열 내 버전 |
+| 3 | `hooks/hooks.json` | `"description": "Lens vX.Y.Z — ..."` | 문자열 내 버전 |
 | 4 | `hooks/session-start.js` | `Lens vX.Y.Z activated` (4곳) | 문자열 리터럴 |
 | 5 | `skills/c/SKILL.md` | `Lens vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
 | 6 | `skills/cc/SKILL.md` | `Lens Multi vX.Y.Z` (description + table, 2곳) | YAML + Markdown |

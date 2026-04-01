@@ -3,29 +3,29 @@
   "name": "CreetaCorp",
   "description": "Lens - Skill navigator for Claude Code. Scans Skills, MCP tools, and LSP servers from all installed plugins and recommends the best match for your task.",
   "owner": {
-    "name": "Creeta",
-    "email": "creet@creeta.com",
-    "url": "https://www.creeta.com"
+    "name": "Lens",
+    "email": "livevil7@gmail.com",
+    "url": "https://github.com/CreetaCorp/lens"
   },
   "metadata": {
-    "description": "Lens plugin marketplace by Creeta",
+    "description": "Lens plugin marketplace",
     "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "lens",
       "description": "Skill navigator for Claude Code. Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the best match for your task in 8 languages, and executes it. Single (/c), parallel (/cc), or plan-first (/cp).",
-      "version": "1.8.0",
+      "version": "1.9.0",
       "author": {
-        "name": "Creeta",
-        "email": "creet@creeta.com"
+        "name": "Lens",
+        "email": "livevil7@gmail.com"
       },
       "homepage": "https://github.com/CreetaCorp/lens",
       "repository": "https://github.com/CreetaCorp/lens",
       "source": {
         "source": "github",
         "repo": "CreetaCorp/lens",
-        "ref": "v1.8.0"
+        "ref": "v1.9.0"
       },
       "license": "MIT",
       "category": "productivity",
