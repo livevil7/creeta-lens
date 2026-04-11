@@ -4,8 +4,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v2.0.0**
-- Updated: 2026-04-06
+- Current: **v3.0.0**
+- Updated: 2026-04-11
 - Source of truth: `.claude-plugin/plugin.json`
 
 ## Skills
@@ -120,94 +120,9 @@ lens/
 
 EN, KO, JA, ZH, ES, FR, DE, IT (8 languages)
 
-## Recent Changes
+## 문서
 
-- **v2.0.0** (2026-04-06): gstack integration — /c gstack 우선 매칭, /cc 에이전트별 스킬 할당, /cp 계획서에 추천 스킬 테이블
-- **v1.9.0** (2026-04-01): Leader-Worker-Supervisor-QA orchestration for /cc, legacy Creet cleanup, version unification
-- **v1.8.0** (2026-03-23): Creet → Lens complete rebranding — storage paths `.creet/` → `.lens/`, schema, GitHub repo, marketplace
-- **v1.7.1** (2026-03-02): Quality fixes — path consistency, cancelled status, 8-lang headers, YAML parser, JSON safety
-- **v1.7.0** (2026-02-28): `/cp` plan-first execution, plan-manager module, planDir/defaultPlanLanguage config
-- **v1.6.0** (2026-02-28): Agent dashboard, 3 new hooks (PreToolUse/PostToolUse/Stop), slash command priority override
-
-See [CHANGELOG.md](CHANGELOG.md) for full history.
-
-## Release Checklist
-
-**상세 지침**: [docs/RELEASE-GUIDE.md](docs/RELEASE-GUIDE.md)
-
-### SemVer 규칙
-
-- MAJOR: 하위호환 깨는 변경 (스킬 이름, 훅 인터페이스, 설정 키 삭제)
-- MINOR: 새 기능 (새 스킬, 새 훅, 새 lib 모듈)
-- PATCH: 버그 수정, 문서 개선, 기존 기능 보강
-
-### 버전 기록 위치 (9곳 — 반드시 동시에 같은 버전으로)
-
-| # | 파일 | 수정 위치 |
-| --- | ------ | --------- |
-| 1 | `.claude-plugin/plugin.json` | `"version"` |
-| 2 | `.claude-plugin/marketplace.json` | `"version"` + `"source.ref"` (2곳) |
-| 3 | `hooks/hooks.json` | `"description"` 내 버전 |
-| 4 | `hooks/session-start.js` | 문자열 리터럴 (4곳) |
-| 5 | `skills/c/SKILL.md` | YAML description + table (2곳) |
-| 6 | `skills/cc/SKILL.md` | YAML description + table (2곳) |
-| 7 | `skills/cp/SKILL.md` | YAML description + table (2곳) |
-| 8 | `CLAUDE.md` | Version 섹션 + Recent Changes |
-| 9 | `CHANGELOG.md` | 새 버전 섹션 추가 |
-
-### 절차
-
-1. 코드 변경 커밋 (버전 범프와 분리)
-2. CHANGELOG.md에 새 버전 섹션 추가
-3. 9곳 버전 범프 → `git commit -m "chore: bump version to vX.Y.Z"`
-4. `git tag vX.Y.Z`
-5. `git push origin master --tags` (--tags 필수)
-6. `gh release create vX.Y.Z --title "vX.Y.Z — Title" --latest`
-
-### ⚠️ GitHub Release 필수 (이거 안 하면 플러그인 업데이트 안 됨)
-
-Claude Code 플러그인 시스템은 **GitHub Release의 latest 태그**를 기준으로 버전을 결정한다.
-태그만 만들고 Release를 안 만들면, 이전 Release의 버전이 계속 설치된다.
-
-**반드시 확인할 것:**
-
-```bash
-# 1. Release가 latest로 잡혀있는지 확인
-gh release list --repo CreetaCorp/lens
-# → 새 버전이 "Latest"로 표시되어야 함
-
-# 2. 안 되어있으면 release 생성
-gh release create vX.Y.Z --repo CreetaCorp/lens --title "vX.Y.Z — Title" --latest
-
-# 3. 이전 버전 태그가 낡은 커밋을 가리키면 Claude Code가 옛날 코드를 가져옴
-#    marketplace.json의 source.ref 가 가리키는 태그도 최신 커밋이어야 함
-gh api repos/CreetaCorp/lens/git/refs/tags/vX.Y.Z --jq '.object.sha'
-```
-
-**플러그인 설치 검증 (릴리즈 후 반드시 실행):**
-
-```bash
-# 캐시 삭제 → 재설치 → 버전 확인
-rm -rf ~/.claude/plugins/cache/CreetaCorp/
-claude plugins uninstall lens@CreetaCorp
-claude plugins install lens@CreetaCorp
-
-# 설치된 버전 확인
-find ~/.claude/plugins/cache/CreetaCorp/lens/ -name "plugin.json" -path "*claude-plugin*" \
-  -exec python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['version'])" {} \;
-# → vX.Y.Z 이어야 함
-```
-
-### 검증
-
-```bash
-# 구버전 잔존 확인 (CHANGELOG/docs 제외, 0건이어야 함)
-grep -rn "vOLD" --include="*.json" --include="*.js" skills/ hooks/ .claude-plugin/
-```
-
-## Publishing
-
-- Anthropic 공식 디렉토리 제출: <https://clau.de/plugin-directory-submission>
-- 독립 마켓플레이스: `/plugin marketplace add lens`
-- 개발용: `claude --plugin-dir ./lens`
-- 상세: [docs/PUBLISHING-GUIDE.md](docs/PUBLISHING-GUIDE.md)
+- 진행 중인 작업: `docs/tasks/` 확인
+- 프로젝트 규칙: `docs/rules/` 확인
+- 작업 히스토리: `docs/history/` 참조
+- 변경 이력: [CHANGELOG.md](CHANGELOG.md)
