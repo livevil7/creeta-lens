@@ -1,6 +1,6 @@
 {
   "name": "lens",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Skill navigator for Claude Code. Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the best match for your task in 8 languages, and executes it. Plan-first execution with /cp. Type /c to start.",
   "author": {
     "name": "Lens",

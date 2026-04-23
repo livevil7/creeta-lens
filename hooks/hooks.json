@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-hooks.json",
-  "description": "Lens v3.0.0 by Creeta - Task Execution Engine + Documentation Management for Claude Code",
+  "description": "Lens v3.1.0 by Creeta - Task Execution Engine + Documentation Management for Claude Code",
   "hooks": {
     "SessionStart": [
       {

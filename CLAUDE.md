@@ -4,8 +4,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.0.0**
-- Updated: 2026-04-11
+- Current: **v3.1.0**
+- Updated: 2026-04-23
 - Source of truth: `.claude-plugin/plugin.json`
 
 ## Skills
