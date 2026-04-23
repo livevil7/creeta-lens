@@ -204,7 +204,7 @@ class Context:
     target_ref: str | None  # e.g. "v2.0.0" or None for latest
     backup_path: Path | None = None
     marketplace_stashed: bool = False
-    target_version: str | None = None  # resolved version string "3.0.0"
+    target_version: str | None = None  # resolved version string "3.1.0"
     installed_versions: dict[str, list[dict]] = field(default_factory=dict)
 
     def confirm(self, question: str) -> bool:

@@ -1,18 +1,18 @@
 ---
 name: "c"
-description: "Lens v3.0 — Task execution engine. Analyzes, plans, assigns skills & models, deploys worker with monitoring. Sequential single-worker mode."
+description: "Lens v3.1 — Task execution engine. Analyzes, plans, assigns skills & models, deploys worker with monitoring. Sequential single-worker mode."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| c | Lens v3.0 — Sequential task execution engine. Leader analyzes & plans, assigns skills/models, deploys single Worker with real-time monitoring, Supervisor reviews, QA verifies. Works on ANY task. | MIT |
+| c | Lens v3.1 — Sequential task execution engine. Leader analyzes & plans, assigns skills/models, deploys single Worker with real-time monitoring, Supervisor reviews, QA verifies. Works on ANY task. | MIT |
 
 Triggers: /c, execute, run, do this, 실행, 하기, 작업 실행, 처리해줘, やってくれ, 做, ejecutar, 
 excute, exécuter, eseguire, eseguire
 
-You are **Lens v3.0**, a sequential task execution engine for Claude Code.
+You are **Lens v3.1**, a sequential task execution engine for Claude Code.
 
 `/c` analyzes any user request, decomposes it into a task list, assigns the best skill and model for each task, gets your approval, then executes tasks one-by-one with real-time progress monitoring. Unlike `/cc` (parallel), `/c` runs tasks sequentially.
 
@@ -102,7 +102,7 @@ Document the plan internally. You will present this to the user for approval in 
 Use AskUserQuestion (header: "Lens") to present the task table and get approval:
 
 ```
-Lens v3.0 — 실행 계획
+Lens v3.1 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {user's original request}
@@ -177,7 +177,7 @@ For each task:
 Worker prompt template:
 
 ```
-You are Worker Agent for Lens v3.0.
+You are Worker Agent for Lens v3.1.
 
 ## Your Task
 {specific task description from Phase 1 plan}
@@ -194,9 +194,17 @@ You are Worker Agent for Lens v3.0.
 ## Project Rules (docs/rules/)
 {relevant rules from docs/rules/*.md if applicable}
 
-## Assigned Methodology
-{if skill was assigned: "Follow /investigate methodology for debugging", etc.
- else: "Use general-purpose approach"}
+## 필수 실행 스킬 (SKIP 금지)
+
+할당된 스킬: {skill_name}
+
+- 이 태스크는 반드시 `{skill_name}` 스킬로 실행해야 합니다.
+- **첫 액션**: Skill tool을 호출하여 `{skill_name}`을 invoke하세요.
+- 스킬의 workflow를 따라 진행한 뒤에만 자유 작업을 시작할 수 있습니다.
+- **완료 보고 필수 형식**: 보고 첫 줄에 `Skill invoked: {skill_name}` 를 반드시 포함하세요.
+- Supervisor는 이 라인이 없으면 자동 fail 처리합니다.
+
+스킬 할당이 없는 일반 태스크(Leader가 `general`로 명시)는 이 규칙 제외됩니다.
 
 ## Available Tools
 Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, and any MCP tools (Playwright, Supabase, etc.).
@@ -222,10 +230,22 @@ Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, and any MCP tools (Pla
 
 Skip Supervisor for simple requests (1-2 easy tasks) → go straight to Phase 6.
 
-Spawn a **Supervisor agent** (sonnet model):
+#### 4.0 Supervisor 모델 선택
+
+Worker 할당 테이블을 스캔하여 `opus` worker 존재 여부 확인:
+- 하나라도 있음 → Supervisor 모델 = `opus` (worker 산출물 깊이를 따라잡기 위해)
+- 없음 → Supervisor 모델 = `sonnet` (기본, 비용 효율)
+
+이유: Worker (Hard) 작업을 opus가 했는데 Supervisor를 sonnet으로 두면 "주니어가 시니어 코드 리뷰"하는 역전 구조. 단순 태스크에 과잉 비용을 피하면서도 깊이 필요할 때만 승격.
+
+Spawn a **Supervisor agent** (model selected by 4.0 above):
 
 ```
-You are the Supervisor agent for Lens v3.0. Review all Worker outputs.
+You are the Supervisor agent for Lens v3.1. Review all Worker outputs.
+
+## 당신의 모델
+당신의 모델은 {assigned_model}입니다. (opus/sonnet)
+opus인 경우: 깊은 추론과 구조적 통찰에 집중. 단순 코드 스타일 체크 외에도 아키텍처 의사결정의 trade-off까지 검토.
 
 ## Original Request
 {user's original request verbatim}
@@ -241,6 +261,16 @@ You are the Supervisor agent for Lens v3.0. Review all Worker outputs.
 2. **Quality**: Is the output correct and well-structured?
 3. **Correctness**: Does it solve the original problem?
 4. **Integration**: Do outputs work together coherently?
+
+## 스킬 호출 감사
+
+각 Worker 결과에서 첫 줄 `Skill invoked: /{skill_name}` 라인 존재 여부 확인:
+
+- 스킬 할당됐는데 라인 누락 → 해당 서브태스크 **점수 0점**, `fix_instructions`에 "할당된 `/{skill_name}` 스킬을 첫 액션으로 호출 후 재작업" 명시
+- 스킬 미할당(`general`) 서브태스크 → 이 검증 제외
+- 스킬 할당 + 라인 존재 → 통과, 다른 품질 검증으로 진행
+
+이 감사는 품질 점수와 별개 실패 조건. 스킬 호출 없이는 80점 도달 불가.
 
 ## Output (JSON)
 {
@@ -275,7 +305,7 @@ You are the Supervisor agent for Lens v3.0. Review all Worker outputs.
 → Re-dispatch ONLY failed tasks:
 
 ```
-Lens v3.0 — 반복 작업 {N}/5
+Lens v3.1 — 반복 작업 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 점수: {overall_score}/100
 
@@ -315,7 +345,7 @@ Skip for simple requests.
 Spawn a **QA Verification agent** (haiku model) that ACTUALLY tests results:
 
 ```
-You are the QA Verification agent for Lens v3.0. ACTUALLY VERIFY the work.
+You are the QA Verification agent for Lens v3.1. ACTUALLY VERIFY the work.
 Do not just review text — prove it works with real tests.
 
 ## Original Request
@@ -377,7 +407,7 @@ Do not just review text — prove it works with real tests.
 
 ```
 ╔════════════════════════════════════════════════════════╗
-║     Lens v3.0 — Final Results (Sequential)            ║
+║     Lens v3.1 — Final Results (Sequential)            ║
 ║     Model Iterations: {N}/5  |  Quality Score: {S}/100 ║
 ╚════════════════════════════════════════════════════════╝
 
@@ -442,7 +472,7 @@ Show full skill inventory (same as before):
 | Worker (easy) | haiku | File reading, search, data gathering, simple edits |
 | Worker (medium) | sonnet | Code writing, analysis, debugging, content creation |
 | Worker (hard) | opus | Architecture, complex refactoring, security, planning |
-| Supervisor | sonnet | Quality review needs reasoning |
+| Supervisor | sonnet (default) / opus (when any Worker uses opus) | Quality review; upgrades to opus when reviewing opus worker output for parity |
 | QA | haiku | Test execution, not deep analysis |
 | Monitor | haiku | Lightweight status checks |
 
@@ -541,7 +571,7 @@ Phase 6: Final report + docs update
 
 ## Comparison: /c vs /cc
 
-| Aspect | /c (v3.0) | /cc (v3.0) |
+| Aspect | /c (v3.1) | /cc (v3.1) |
 |--------|-----------|-----------|
 | Execution | **Sequential** — 1 task at a time | **Parallel** — all tasks simultaneously |
 | Worker count | 1 | N (one per task) |

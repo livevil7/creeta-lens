@@ -1,13 +1,13 @@
 ---
 name: "cp"
-description: "Lens Plan v3.0 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
+description: "Lens Plan v3.1 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.0 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
+| cp | Lens Plan v3.1 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
@@ -91,6 +91,9 @@ You are **Lens Plan**, the documentation management engine for Claude Code proje
 - 권장 방식과 이유
 - 대안이 있다면 비교
 
+## ⚠️ 사전 리스크
+(Phase 2.5 Pre-mortem에서 자동 채움)
+
 ## 진행상황
 - **마지막 업데이트**: YYYY-MM-DD
 - 초기 계획 상태
@@ -107,6 +110,84 @@ You are **Lens Plan**, the documentation management engine for Claude Code proje
 - **기술적 접근**: 이유 포함 (지시만 하지 않음)
 - **전문가 깊이**: 주니어가 놓칠 통찰 포함 (엣지 케이스, 보안, 스케일링)
 - **불필요한 섹션 생략**: 단순 작업에 "비기능 요구사항" 같은 건 불필요
+
+### Phase 2.5: Pre-mortem (Opus + Codex 병렬)
+
+Phase 2 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적으로 리스크 분석**을 수행합니다. 결과는 문서의 `## ⚠️ 사전 리스크` 섹션에 출처를 병기해 저장합니다.
+
+**두 모델을 쓰는 이유**: 같은 모델로 자기 검증 시 동일 편향 공유. Opus (세션 컨텍스트 기반)와 Codex (독립 코드 분석)의 교차 검증으로 블라인드 스팟 해소.
+
+#### 2.5.1 Opus Pre-mortem
+
+현재 세션 모델이 opus면 내부 추론으로 직접 수행. 그 외 모델이면 Task tool로 opus agent를 spawn해 다음 프롬프트 전달:
+
+```text
+이 작업 계획의 허점을 찾아주세요. 200단어 이내.
+
+## 계획 문서
+{Phase 2에서 저장한 계획 내용 전체}
+
+## 프로젝트 컨텍스트
+- CLAUDE.md 요약: {주요 기술 스택, 컨벤션}
+- 관련 docs/rules/: {해당 프로젝트 rules 파일들}
+
+## 평가 관점 (세션 컨텍스트 활용)
+1. 이 프로젝트 convention 위반 우려
+2. 기존 docs/rules와의 중복 또는 충돌
+3. 세션에서 논의된 과거 결정과의 모순
+```
+
+#### 2.5.2 Codex Pre-mortem
+
+`docs/rules/codex-integration.md` 의 감지 로직으로 Codex CLI 존재 확인:
+
+1. `command -v codex` 또는 VSCode 확장 경로 확인
+2. 존재하면: Bash tool로 `codex exec --skip-git-repo-check "..."` 호출
+3. 부재하면: skip하고 "Codex 미설치 — Opus 단독 pre-mortem" 플래그 기록
+
+Codex 프롬프트:
+
+```text
+이 작업 계획의 허점을 찾아주세요. 200단어 이내, 순수 텍스트, 한국어.
+
+## 계획 문서
+{Phase 2에서 저장한 계획 내용 전체}
+
+## 평가 관점 (독립 코드 분석)
+1. 실패할 수 있는 3가지 구체 시나리오 (트리거 + 결과)
+2. 보안/성능/엣지 케이스 누락
+3. 기술적 블라인드 스팟
+
+JSON 금지, 자유 서술.
+```
+
+Codex 호출 중 실패 (timeout, 인증 만료) 시 "Codex 호출 실패: {에러 요약}" 기록하고 Opus 결과만 사용. 상세: `docs/rules/codex-integration.md`.
+
+#### 2.5.3 결과 통합
+
+두 결과를 문서의 `## ⚠️ 사전 리스크` 섹션으로 Write (전체 파일 재작성 또는 해당 섹션만 Edit):
+
+```markdown
+## ⚠️ 사전 리스크
+
+### Claude Opus 관점 (세션 컨텍스트 기반)
+{Opus pre-mortem 응답 본문}
+
+### Codex GPT-5.2 관점 (독립 코드 분석)
+{Codex pre-mortem 응답 본문, 또는 "Codex 미설치 — 단일 모델 pre-mortem" 표기}
+```
+
+#### 2.5.4 Blocker 판정
+
+Pre-mortem 결과에 다음 키워드 발견 시 Phase 4 "Approve" 대신 **"Modify 강제"** 로 진입:
+
+- "보안 치명적", "security critical", "data loss 우려", "되돌릴 수 없는"
+
+이 경우 사용자에게 "⚠️ Blocker 수준 리스크 발견 — Modify 권장" 메시지와 함께 Phase 4 AskUserQuestion에서 "Modify (권장)" 옵션을 첫 번째로 노출.
+
+#### 2.5.5 원자성 보장
+
+Phase 2.5 실패해도 Phase 2의 계획 문서는 이미 저장됐으므로 복구 가능. Phase 2와 Phase 2.5는 **분리된 두 번의 Write 작업**. Phase 2.5 실패 시 문서에 `## ⚠️ 사전 리스크\n(Pre-mortem 실행 실패: {에러})` 만 기록.
 
 ### Phase 3: TodoWrite 연동
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.1.0] - 2026-04-23
+
+### Added (v3.1.0)
+
+- **`/cp` PLAN 모드 Phase 2.5 Pre-mortem** — 계획 문서 저장 직후 Opus + Codex GPT-5.2 병렬 pre-mortem 실행. 결과를 계획 문서의 `## ⚠️ 사전 리스크` 섹션에 출처(Claude Opus / Codex GPT-5.2)를 병기해 저장. Codex CLI 미설치 환경에서는 Opus 단독 fallback + 명시 표기. `skills/cp/SKILL.md`
+- **Supervisor 조건부 opus 승격** — `/c`, `/cc` Phase 4 Supervisor가 Worker 할당에 `opus`가 포함된 경우 자동으로 `sonnet → opus`로 승격. Worker (Hard) = opus인데 Supervisor = sonnet이었던 역전 구조 해소. 단순 태스크는 비용 절약을 위해 sonnet 유지. Supervisor 프롬프트에 "당신의 모델은 {assigned_model}" 자기인식 명시. `skills/c/SKILL.md`, `skills/cc/SKILL.md`
+- **Worker 스킬 강제 할당 (Skill Enforcement)** — Worker 프롬프트의 기존 "할당된 Skill (있는 경우)" 참고 블록을 "필수 실행 스킬 (SKIP 금지)" 명령문으로 교체. 첫 액션 = Skill invoke 강제, 완료 보고 첫 줄에 `Skill invoked: /{skill_name}` 필수. `skills/c/SKILL.md`, `skills/cc/SKILL.md`
+- **Supervisor 감사 조항** — Supervisor 프롬프트에 "스킬 호출 감사" 섹션 추가. Worker 완료 보고에서 `Skill invoked:` 라인 존재 여부를 grep으로 검증, 스킬 할당됐는데 누락 시 해당 서브태스크 **점수 0점** + 재작업 지시. `general`로 명시된 일반 태스크는 감사 제외. JSON 출력 스키마에 `skill_audit` 필드 추가. `skills/c/SKILL.md`, `skills/cc/SKILL.md`
+- **Codex CLI 통합 규칙** — 신규 `docs/rules/codex-integration.md` 문서. Codex CLI 감지 로직(PATH/VSCode 확장 경로/fallback), 인증 확인, 표준 호출 패턴(`codex exec --skip-git-repo-check`), 응답 파싱 규칙(`codex` ~ `tokens used` 본문 추출), pre-mortem 프롬프트 템플릿, 에러 처리, 비용/성능 가이드
+
+### Changed (v3.1.0)
+
+- **`/cp` 계획 문서 템플릿** — `## 기술적 접근`과 `## 진행상황` 사이에 `## ⚠️ 사전 리스크` 섹션 placeholder 자동 추가. Phase 2.5에서 채움. Phase 2와 2.5를 분리된 Write 작업으로 처리해 원자성 보장 (Phase 2.5 실패해도 계획 문서 이미 저장됨). `skills/cp/SKILL.md`
+- **Model Assignment Table** — `/c`, `/cc` 모두 Supervisor 행을 `sonnet` → `sonnet (default) / opus (when any Worker uses opus)`로 갱신
+- **버전 동기화** — 9곳 버전 문자열 `v3.0.0` → `v3.1.0`: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (2곳), `hooks/hooks.json`, `hooks/session-start.js` (4곳), `skills/c/SKILL.md` (2곳), `skills/cc/SKILL.md` (2곳), `skills/cp/SKILL.md` (2곳), `CLAUDE.md`
+- **docs/history/ 정리** — v3.0.0 릴리스 시 완료됐으나 `docs/tasks/`에 남아있던 3개 task 파일을 `docs/history/`로 이관
+
 ## [3.0.0] - 2026-04-11
 
 ### Added (v3.0.0)

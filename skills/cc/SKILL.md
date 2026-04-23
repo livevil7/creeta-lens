@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
+description: "Lens Multi v3.1 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.1 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.1**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, a Monitor agent tracks progress in real-time, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -83,7 +83,7 @@ You are **Lens Multi v3.0**, the parallel task execution engine for Claude Code.
 | Worker (Medium) | sonnet | 코드/분석 작업 |
 | Worker (Hard) | opus | 복잡한 아키텍처 |
 | Monitor | haiku | 상태 확인만 필요 |
-| Supervisor | sonnet | 품질 검토 |
+| Supervisor | sonnet (기본) / opus (opus worker 있을 때) | 품질 검토; opus worker 산출물 리뷰 시 동급으로 승격 |
 | QA | haiku | 테스트 실행 |
 
 ---
@@ -135,10 +135,10 @@ You are **Lens Multi v3.0**, the parallel task execution engine for Claude Code.
 
 **실행은 사용자 승인 없이 절대 시작하지 않습니다.**
 
-**AskUserQuestion** (header: "Lens Multi v3.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.1 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.0 — 실행 계획
+Lens Multi v3.1 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -240,8 +240,17 @@ Worker 프롬프트 템플릿:
 관련 파일: {관련 파일 목록}
 기술 스택: {기술 스택}
 
-## 할당된 Skill (있는 경우)
-{skill 이름 및 workflow}
+## 필수 실행 스킬 (SKIP 금지)
+
+할당된 스킬: {skill_name}
+
+- 이 태스크는 반드시 `{skill_name}` 스킬로 실행해야 합니다.
+- **첫 액션**: Skill tool을 호출하여 `{skill_name}`을 invoke하세요.
+- 스킬의 workflow를 따라 진행한 뒤에만 자유 작업을 시작할 수 있습니다.
+- **완료 보고 필수 형식**: 보고 첫 줄에 `Skill invoked: {skill_name}` 를 반드시 포함하세요.
+- Supervisor는 이 라인이 없으면 자동 fail 처리합니다.
+
+스킬 할당이 없는 일반 태스크(Leader가 `general`로 명시)는 이 규칙 제외됩니다.
 
 ## 사용 가능한 도구
 Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, 및 모든 MCP 도구
@@ -277,10 +286,22 @@ Monitor가 모든 Worker 완료를 보고할 때까지 대기합니다.
 
 ### Phase 4: Supervisor — 품질 검토
 
-모든 Worker가 완료되면, **별도의 Supervisor Agent** (sonnet 모델)를 시작합니다:
+#### 4.0 Supervisor 모델 선택
+
+Phase 1의 Worker 할당 테이블에서 `opus` worker 존재 여부 스캔:
+- 하나라도 있음 → Supervisor 모델 = `opus`
+- 없음 → Supervisor 모델 = `sonnet` (기본)
+
+이유: Worker (Hard) 작업을 opus가 했는데 Supervisor를 sonnet으로 두면 "주니어가 시니어 코드 리뷰"하는 역전 구조. 단순 태스크에 과잉 비용을 피하면서도 깊이가 필요할 때만 승격.
+
+모든 Worker가 완료되면, **별도의 Supervisor Agent** (위 로직으로 선택된 모델)를 시작합니다:
 
 ```
 당신은 Supervisor Agent입니다. 모든 Worker의 출력 품질과 완성도를 검토합니다.
+
+## 당신의 모델
+당신의 모델은 {assigned_model}입니다.
+opus인 경우: 깊은 추론과 구조적 통찰에 집중. 단순 코드 스타일 체크 외에도 아키텍처 의사결정의 trade-off까지 검토.
 
 ## 원본 요청
 {사용자 원본 요청}
@@ -297,6 +318,16 @@ Monitor가 모든 Worker 완료를 보고할 때까지 대기합니다.
 2. **품질**: 출력이 정확하고 잘 구조화되어 있는가?
 3. **통합**: 출력들이 서로 일관성 있게 연결되는가?
 
+## 스킬 호출 감사
+
+각 Worker 결과에서 첫 줄 `Skill invoked: /{skill_name}` 라인 존재 여부 확인:
+
+- 스킬 할당됐는데 라인 누락 → 해당 서브태스크 **점수 0점**, `fix_instructions`에 "할당된 `/{skill_name}` 스킬을 첫 액션으로 호출 후 재작업" 명시
+- 스킬 미할당(`general`) 서브태스크 → 이 검증 제외
+- 스킬 할당 + 라인 존재 → 통과, 다른 품질 검증으로 진행
+
+이 감사는 품질 점수와 별개의 실패 조건. 스킬 호출 없이는 80점 도달 불가.
+
 ## 결과 (JSON)
 {
   "overall_pass": true/false,
@@ -308,7 +339,8 @@ Monitor가 모든 Worker 완료를 보고할 때까지 대기합니다.
       "score": 0-100,
       "pass": true/false,
       "issues": ["구체적 문제"],
-      "fix_instructions": "다시 할 내용"
+      "fix_instructions": "다시 할 내용",
+      "skill_audit": {"required": true/false, "line_present": true/false, "pass": true/false}
     }
   ],
   "summary": "한 문단 평가",
@@ -336,7 +368,7 @@ Supervisor 보고서를 읽습니다.
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.0 — 반복 {N}/5
+Lens Multi v3.1 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -438,7 +470,7 @@ Lens Multi v3.0 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.0 — 최종 결과                       ║
+║   Lens Multi v3.1 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ╚══════════════════════════════════════════════════════╝
 
@@ -570,7 +602,7 @@ Worker #2  |  점수: {score}/100  |  ✓ 통과
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.0 — 최종 결과
+Lens Multi v3.1 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 
