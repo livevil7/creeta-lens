@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.2.0] - 2026-05-04
+
+### Added (v3.2.0)
+
+- **`/cs` Multi-Repo Sync skill** — 워크스페이스 하위 모든 git repo를 일괄 동기화하는 신규 명령어. `pull` (incoming만), `push` (outgoing만), `sync` (둘 다, 기본). Fetch → fast-forward pull → dirty면 auto-commit (`chore: auto-sync YYYY-MM-DD`) → ahead push 4단계 파이프라인. Diverged repo는 손대지 않고 `manual resolve required`로 보고. fail-soft: 한 repo 실패가 나머지를 막지 않음. `skills/cs/SKILL.md`
+- **SessionStart auto-pull hook** — 새 세션 시작 시 자동으로 `/cs pull` 실행. 다른 기기에서 push한 변경을 가만히 받음. 끄려면 `LENS_SYNC_AUTO_PULL=0` 환경변수. push는 자동 실행하지 않음 (안전성 우선, 명시적 `/cs` 또는 `/cs push` 필요). `hooks/sync-pull.js`, `hooks/hooks.json`
+- **`scripts/git-sync-all.sh` self-contained** — 종속성 없는 POSIX shell 스크립트. workspace 자동 감지 (Windows: `/c/Users/ADMIN/Documents/GIT`, macOS: `~/projects` `~/livevil-setting` `~/spotedcrypto-v2`), `GIT_ROOTS` 환경변수로 override 가능. 모든 git repo를 1-level 스캔, fail-soft 처리, 컬러 박스 리포트 출력
+- **Cross-platform Bash resolution** — Windows에서 Git for Windows의 `bash.exe`, msys64, WSL fallback 자동 감지. macOS/Linux에서는 `/bin/bash`. 사용자가 어느 노트북에서 lens를 실행해도 작동
+
+### Changed (v3.2.0)
+
+- **plugin description** — "Skill navigator" 만에서 "Skill navigator + multi-repo git sync"로 확장
+- **hooks.json description** — Lens v3.2.0 표기 + sync 기능 언급
+- **keywords** — `git-sync`, `multi-repo`, `auto-pull` 추가
+
 ## [3.1.0] - 2026-04-23
 
 ### Added (v3.1.0)

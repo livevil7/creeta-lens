@@ -1,7 +1,7 @@
 {
   "name": "lens",
-  "version": "3.1.0",
-  "description": "Skill navigator for Claude Code. Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the best match for your task in 8 languages, and executes it. Plan-first execution with /cp. Type /c to start.",
+  "version": "3.2.0",
+  "description": "Skill navigator + multi-repo git sync for Claude Code. Scans plugins (Skills, MCP, LSP), recommends best match in 8 languages, executes with /c, /cc, /cp. Multi-repo sync with /cs (auto-pull on session start, push on demand).",
   "author": {
     "name": "Lens",
     "email": "livevil7@gmail.com",
@@ -25,6 +25,9 @@
     "auto-recommend",
     "multilingual",
     "plan-first",
-    "work-plan"
+    "work-plan",
+    "git-sync",
+    "multi-repo",
+    "auto-pull"
   ]
 }
