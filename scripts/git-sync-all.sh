@@ -8,9 +8,8 @@
 #   push : 모든 repo 자동 commit + push (dirty, ahead 해소)
 #   sync : pull + push (기본값)
 #
-# 스캔 루트: GIT_ROOTS 환경변수 또는 아래 기본값
-#   - Windows: c:/Users/ADMIN/Documents/GIT
-#   - Mac:     ~/Documents/GIT ~/projects ~/livevil-setting ~/spotedcrypto-v2
+# 스캔 루트: GIT_ROOTS 환경변수가 우선. 없으면 $HOME 기준 표준 후보를
+# 자동 탐지(존재하는 디렉터리만 채택). 사용자명/머신 의존 없음.
 # =============================================
 
 set -uo pipefail
@@ -19,16 +18,23 @@ ACTION="${1:-sync}"
 DATE_ISO=$(date +%Y-%m-%d)
 DATE_READABLE=$(date "+%Y-%m-%d %H:%M")
 
-# ── 기기별 스캔 루트 자동 감지 ─────────────
-# ~/Documents/GIT (Mac)은 아카이브 폴더라 제외.
-# 활성 repo는 ~/projects/, ~/livevil-setting, ~/spotedcrypto-v2, ~/ai-gateway 등.
+# ── 스캔 루트 자동 감지 ─────────────────────
+# GIT_ROOTS 가 명시되어 있으면 그것을 사용.
+# 그렇지 않으면 $HOME 기준 표준 후보들 — 머신/사용자명에 무관.
+# 존재하는 디렉터리만 아래 수집 루프에서 실제로 처리됨.
+# $HOME 은 macOS / Linux / Windows(Git Bash) 모두에서 사용자 홈을 가리킴.
 if [ -n "${GIT_ROOTS:-}" ]; then
   ROOTS=($GIT_ROOTS)
-elif [ "$(uname)" = "Darwin" ]; then
-  ROOTS=("$HOME/projects" "$HOME/livevil-setting" "$HOME/spotedcrypto-v2")
 else
-  # Windows (Git Bash) or Linux
-  ROOTS=("/c/Users/ADMIN/Documents/GIT")
+  ROOTS=(
+    "$HOME/Documents/Git"
+    "$HOME/Documents/GIT"
+    "$HOME/projects"
+    "$HOME/Projects"
+    "$HOME/git"
+    "$HOME/livevil-setting"
+    "$HOME/spotedcrypto-v2"
+  )
 fi
 
 # ── repo 목록 수집 (중첩 제외, .git 있는 1레벨 하위만) ─────
@@ -44,8 +50,18 @@ for root in "${ROOTS[@]}"; do
   done
 done
 
-# 중복 제거
-REPOS=($(printf '%s\n' "${REPOS[@]}" | awk '!seen[$0]++'))
+# 중복 제거 — device:inode 로 dedup 하여 Windows 케이스 무차별 / 심볼릭 링크
+# 같은 가짜 중복까지 흡수. GNU stat (Linux/Git Bash) 와 BSD stat (macOS) 모두 지원.
+_dedup=()
+declare -A _seen_id=()
+for p in "${REPOS[@]}"; do
+  id=$(stat -c '%d:%i' "$p" 2>/dev/null || stat -f '%d:%i' "$p" 2>/dev/null || echo "$p")
+  if [ -z "${_seen_id[$id]:-}" ]; then
+    _seen_id[$id]=1
+    _dedup+=("$p")
+  fi
+done
+REPOS=("${_dedup[@]}")
 
 # ── 로그 함수 ─────────────────────────────
 total=${#REPOS[@]}
