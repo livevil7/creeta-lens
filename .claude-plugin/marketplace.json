@@ -25,7 +25,7 @@
       "source": {
         "source": "github",
         "repo": "CreetaCorp/lens",
-        "ref": "v3.2.0"
+        "ref": "v3.2.1"
       },
       "license": "MIT",
       "category": "productivity",
