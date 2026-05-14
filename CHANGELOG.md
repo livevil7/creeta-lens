@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.2] - 2026-05-14
+
+### Fixed (v3.2.2)
+
+- **KNOWN_PLUGINS registry 정리** — `lib/plugin-registry.js`에서 사용 빈도 낮은 추천 항목 9개 제거: `brand-guardian`, `content-creator`, `growth-hacker`, `product-sales-specialist`, `pricing-packaging-specialist`, `app-store-optimizer`, `docker-compose`, `playwright-test`, `data-analyst`. 유지: `design-council` (lens 자체 skill), `superpowers` (travisvn 추천).
+- **brand-guardian@ccplugins not-found 에러 해소** — `source: 'ccplugins/awesome-claude-code-plugins'` 패턴이 Claude Code plugin loader에서 `ccplugins`를 marketplace ID로 잘못 해석해 `Plugin not available for MCP: brand-guardian@ccplugins - error type: plugin-not-found` 로그가 startup마다 반복되는 문제를 KNOWN_PLUGINS에서 해당 entry 제거로 차단.
+
 ## [3.2.1] - 2026-05-14
 
 ### Added (v3.2.1)

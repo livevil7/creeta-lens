@@ -15,7 +15,7 @@
     {
       "name": "lens",
       "description": "Skill navigator + multi-repo git sync for Claude Code. Scans plugins (Skills, MCP, LSP), recommends best match in 8 languages, executes with /c, /cc, /cp. Multi-repo sync with /cs (auto-pull on session start, push on demand).",
-      "version": "3.2.1",
+      "version": "3.2.2",
       "author": {
         "name": "Lens",
         "email": "livevil7@gmail.com"
@@ -25,7 +25,7 @@
       "source": {
         "source": "github",
         "repo": "CreetaCorp/lens",
-        "ref": "v3.2.1"
+        "ref": "v3.2.2"
       },
       "license": "MIT",
       "category": "productivity",
