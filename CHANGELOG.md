@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.2.1] - 2026-05-14
+
+### Added (v3.2.1)
+
+- **Karpathy 4규칙 헤더 블록** — `/c`, `/cc`, `/cp` 3개 SKILL.md 본문 시작 직후에 4가지 코딩 원칙 (Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution-완화) 박스 삽입. Leader · Worker · Supervisor · QA 모든 phase에서 자동 적용. 출처: <https://github.com/multica-ai/andrej-karpathy-skills>
+- **Worker dispatch 프롬프트에도 4규칙 박스** — `/c` Worker prompt template, `/cc` Worker prompt + 재할당 Worker prompt 안에 별도 박스 삽입. SKILL.md 헤더만으로는 spawn된 Worker가 못 읽는 문제 해소. 특히 `/cc`는 N개 Worker 병렬 dispatch라 Rule 3(외과적 변경: 본인 task 외 영역 금지) 명시
+- **/cp Pre-mortem과의 관계 명문화** — Phase 2.5 Pre-mortem은 Rule 1("생각 먼저")의 부분 실현. 중복 적용이 아니라 Pre-mortem 단계 자체가 Rule 1의 구체적 실행임을 본문에 명시
+
+### Changed (v3.2.1)
+
+- **Goal-Driven Execution 완화 채택** — 원문은 TDD 강제지만 도메인 분기로 의역. 코드/SDK = TDD, 콘텐츠/문서 = acceptance criteria, 운영 스크립트 = dry-run + 수동 확인, 인프라 = before/after diff. 단순 문서 수정에 과한 검증을 요구하지 않으면서 검증 가능성은 유지
+
+### Note (v3.2.1)
+
+본 patch release는 lens 본체 로직 변경 없음. SKILL.md 본문에 항상 준수해야 하는 코딩 원칙 메타블록을 추가하는 docs/policy 변경. 외부 SoT: `livevil-setting/docs/rules/coding-principles.md` (사용자 환경 종속, 본 plugin과 분리)
+
 ## [3.2.0] - 2026-05-04
 
 ### Added (v3.2.0)
