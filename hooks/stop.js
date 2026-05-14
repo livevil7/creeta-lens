@@ -13,6 +13,8 @@ const path = require('path');
 const fs = require('fs');
 
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
+const { installFailSoftHandlers, readJsonInput, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
+installFailSoftHandlers('stop');
 
 // Load agent tracker
 const { endSession, loadDashboard, getDashboardPath } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
@@ -20,7 +22,7 @@ const { endSession, loadDashboard, getDashboardPath } = require(path.join(PLUGIN
 function main() {
   try {
     // Read stop reason from stdin
-    const input = readStdin();
+    const input = readJsonInput();
     const stopReason = input?.stop_reason || 'unknown';
 
     // Determine session end status
@@ -32,10 +34,10 @@ function main() {
 
     // Stop hook does not support hookSpecificOutput in Claude Code schema
     // Dashboard is already saved by endSession() above
-    console.log(JSON.stringify({}));
+    writeJson({});
     process.exit(0);
   } catch (err) {
-    console.log(JSON.stringify({}));
+    writeJson({});
     process.exit(0);
   }
 }
@@ -51,24 +53,6 @@ function calculateDuration(startIso, endIso) {
   const mins = Math.floor(ms / 60000);
   const secs = Math.floor((ms % 60000) / 1000);
   return `${mins}m ${secs}s`;
-}
-
-/**
- * Read JSON input from stdin (cross-platform).
- */
-function readStdin() {
-  try {
-    const data = fs.readFileSync(0, 'utf-8');
-    if (data) return JSON.parse(data);
-  } catch {}
-
-  if (process.argv[2]) {
-    try {
-      return JSON.parse(process.argv[2]);
-    } catch {}
-  }
-
-  return {};
 }
 
 main();

@@ -8,25 +8,19 @@ const fs = require('fs');
 
 // Resolve plugin root (hooks/ is one level deep)
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
+const { installFailSoftHandlers, safeEnsureDir, safeReadJson, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
+installFailSoftHandlers('session-start');
 
 // Load modules
 const { scanInstalledSkills, formatSkillTable } = require(path.join(PLUGIN_ROOT, 'lib', 'skill-scanner'));
 const { loadMemory, saveMemory, recordSessionStart, formatMemorySummary } = require(path.join(PLUGIN_ROOT, 'lib', 'memory-store'));
 const { formatKeywordTable, saveScanCache } = require(path.join(PLUGIN_ROOT, 'lib', 'keyword-matcher'));
-const { KNOWN_PLUGINS } = require(path.join(PLUGIN_ROOT, 'lib', 'plugin-registry'));
+const { KNOWN_PLUGINS, formatPluginSource } = require(path.join(PLUGIN_ROOT, 'lib', 'plugin-registry'));
 const { initSession, getDashboardPath } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
 const { formatPlanSummary, ensurePlansDir } = require(path.join(PLUGIN_ROOT, 'lib', 'plan-manager'));
 
 // Load config
-let config = {};
-try {
-  const configPath = path.join(PLUGIN_ROOT, 'lens.config.json');
-  if (fs.existsSync(configPath)) {
-    config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  }
-} catch {
-  config = {};
-}
+const config = safeReadJson(path.join(PLUGIN_ROOT, 'lens.config.json'), {}) || {};
 
 // ── Main ──────────────────────────────────────────────────
 
@@ -40,9 +34,7 @@ function main() {
       const resultsDir = config.resultsDir
         ? path.resolve(config.resultsDir)
         : path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.lens', 'results');
-      if (!fs.existsSync(resultsDir)) {
-        fs.mkdirSync(resultsDir, { recursive: true });
-      }
+      safeEnsureDir(resultsDir);
     }
 
     // 1. Scan installed skills and cache for UserPromptSubmit hook
@@ -76,7 +68,7 @@ function main() {
 
     // 6. Output response
     const response = {
-      systemMessage: `Lens v3.2.2 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready`,
+      systemMessage: `Lens v3.3.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready`,
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         skillCount: skills.length,
@@ -90,19 +82,19 @@ function main() {
       },
     };
 
-    console.log(JSON.stringify(response));
+    writeJson(response);
     process.exit(0);
   } catch (err) {
     // Fail gracefully - don't break the session
     const fallback = {
-      systemMessage: 'Lens v3.2.2 activated (scan skipped)',
+      systemMessage: 'Lens v3.3.0 activated (scan skipped)',
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         error: err.message,
         additionalContext: buildFallbackContext(),
       },
     };
-    console.log(JSON.stringify(fallback));
+    writeJson(fallback);
     process.exit(0);
   }
 }
@@ -116,7 +108,7 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planS
   let ctx = '';
 
   // Header
-  ctx += `# Lens v3.2.2 - Session Startup\n\n`;
+  ctx += `# Lens v3.3.0 - Session Startup\n\n`;
 
   // Skill inventory
   ctx += `## Installed Skills (Auto-Scanned)\n\n`;
@@ -145,7 +137,7 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planS
   ctx += `| Plugin | Source | Domain | Description |\n`;
   ctx += `|--------|--------|--------|-------------|\n`;
   for (const p of KNOWN_PLUGINS) {
-    ctx += `| ${p.name} | ${p.source} | ${p.domain} | ${p.description} |\n`;
+    ctx += `| ${p.name} | ${formatPluginSource(p.source)} | ${p.domain} | ${p.description} |\n`;
   }
   ctx += `\n`;
   ctx += `### Discovery Rules\n`;
@@ -189,7 +181,7 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planS
 }
 
 function buildFallbackContext() {
-  return `# Lens v3.2.2 - Session Startup
+  return `# Lens v3.3.0 - Session Startup
 
 Skill scan was skipped (no plugins cache found or scan error).
 Use \`/c <request>\` to manually scan and get recommendations.

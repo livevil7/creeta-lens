@@ -13,6 +13,8 @@ const path = require('path');
 const fs = require('fs');
 
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
+const { installFailSoftHandlers, readJsonInput, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
+installFailSoftHandlers('post-tool-task');
 
 // Load agent tracker
 const { completeAgent, loadDashboard } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
@@ -20,7 +22,7 @@ const { completeAgent, loadDashboard } = require(path.join(PLUGIN_ROOT, 'lib', '
 function main() {
   try {
     // Read tool output from stdin
-    const input = readStdin();
+    const input = readJsonInput();
 
     // Determine completion status
     const hasError = !!(input?.tool_error) || !!(input?.error);
@@ -54,39 +56,19 @@ function main() {
       },
     };
 
-    console.log(JSON.stringify(response));
+    writeJson(response);
     process.exit(0);
   } catch (err) {
     // Never fail loudly
-    console.log(JSON.stringify({
+    writeJson({
       hookSpecificOutput: {
         hookEventName: 'PostToolUse',
         matcher: 'Task',
         error: err.message,
       },
-    }));
+    });
     process.exit(0);
   }
-}
-
-/**
- * Read JSON input from stdin (cross-platform).
- */
-function readStdin() {
-  try {
-    const data = fs.readFileSync(0, 'utf-8');
-    if (data) return JSON.parse(data);
-  } catch {
-    // stdin not available or not JSON
-  }
-
-  if (process.argv[2]) {
-    try {
-      return JSON.parse(process.argv[2]);
-    } catch {}
-  }
-
-  return {};
 }
 
 main();

@@ -15,7 +15,7 @@
 
 "use strict";
 
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
@@ -40,6 +40,12 @@ if (!fs.existsSync(script)) {
 
 function findBash() {
   const platform = os.platform();
+  if (process.env.GIT_BASH && fs.existsSync(process.env.GIT_BASH)) {
+    return process.env.GIT_BASH;
+  }
+  if (process.env.BASH_PATH && fs.existsSync(process.env.BASH_PATH)) {
+    return process.env.BASH_PATH;
+  }
   if (platform === "win32") {
     // Common Git for Windows install paths
     const candidates = [
@@ -51,10 +57,15 @@ function findBash() {
     for (const c of candidates) {
       if (c && fs.existsSync(c)) return c;
     }
+    const where = spawnSync("where.exe", ["bash"], { encoding: "utf-8", windowsHide: true });
+    const first = (where.stdout || "").split(/\r?\n/).map((s) => s.trim()).find(Boolean);
+    if (first) return first;
     // Last resort: hope `bash` is on PATH (WSL or Cygwin)
     return "bash";
   }
-  return "/bin/bash";
+  const command = spawnSync("command", ["-v", "bash"], { encoding: "utf-8", shell: true });
+  const found = (command.stdout || "").trim();
+  return found || "/bin/bash";
 }
 
 const bash = findBash();

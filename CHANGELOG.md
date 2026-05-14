@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.3.0] - 2026-05-14
+
+### Added (v3.3.0)
+
+- **`formatPluginSource(source)` helper export** — `lib/plugin-registry.js`. string과 typed object 양쪽을 안전하게 string으로 렌더링. session-start.js의 Plugin Discovery Registry 표가 이 helper로 source 컬럼을 출력하므로 미래에 다른 source 타입(`marketplace`, `internal-pattern` 등)이 추가돼도 표 형식 안 깨짐.
+- **typed source 분기 지원** — `formatPluginSource`가 `type: 'github'` / `'marketplace'` / `'internal-pattern'` / fallback (`source.id || source.repo || source.marketplace`) 4가지 케이스 처리.
+
+### Changed (v3.3.0)
+
+- **`KNOWN_PLUGINS` source 데이터 구조: string → typed object** — 이전 `source: 'ccplugins/awesome-claude-code-plugins'` 형식은 Claude Code 내부 plugin loader가 `'/'` 기준으로 split해서 owner를 marketplace ID로 잘못 해석하던 근본 원인. 새 형식 `source: { type: 'github', repo: '...' }` 는 의미가 명시적이라 같은 오해석이 발생할 수 없음.
+- **`searchRegistry()` 견고성** — query가 빈 문자열/null이어도 안전, `keyword`를 `String()`으로 강제 변환.
+
+### Fixed (v3.3.0)
+
+- **`Plugin not available for MCP: X@ccplugins - plugin-not-found` 패턴 영구 차단** — v3.2.2의 KNOWN_PLUGINS 항목 9개 정리는 증상 fix였고, v3.3.0의 source 구조 변경이 근본 fix. 미래에 어떤 plugin이 추가돼도 같은 fake-marketplace lookup이 안 일어남.
+
+### Note (v3.3.0)
+
+backward compat: `formatPluginSource()`가 string도 그대로 통과시키므로 외부 코드가 `source` 필드를 string으로 가정하더라도 안 깨짐. minor bump 기준.
+
+
+
 ## [3.2.2] - 2026-05-14
 
 ### Fixed (v3.2.2)
