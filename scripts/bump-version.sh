@@ -35,46 +35,66 @@ fi
 
 TODAY=$(date +%Y-%m-%d)
 
-echo "=== Updating 9 files ==="
+echo "=== Updating 10 files ==="
+
+# Regex patterns match ANY v[0-9].[0-9].[0-9] so hardcoded stale versions
+# get caught even when they drift from $CURRENT (e.g. v3.1.0 left behind
+# after a bump that only touched plugin.json).
 
 # 1. .claude-plugin/plugin.json
-sed -i "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
-echo "[1/9] .claude-plugin/plugin.json"
+sed -i -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
+echo "[1/10] .claude-plugin/plugin.json"
 
 # 2. .claude-plugin/marketplace.json (version + ref)
-sed -i "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/marketplace.json
-sed -i "s/\"ref\": \"v$CURRENT\"/\"ref\": \"v$NEW_VERSION\"/" .claude-plugin/marketplace.json
-echo "[2/9] .claude-plugin/marketplace.json"
+sed -i -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/marketplace.json
+sed -i -E "s/\"ref\": \"v[0-9]+\.[0-9]+\.[0-9]+\"/\"ref\": \"v$NEW_VERSION\"/" .claude-plugin/marketplace.json
+echo "[2/10] .claude-plugin/marketplace.json"
 
 # 3. hooks/hooks.json
-sed -i "s/Lens v$CURRENT/Lens v$NEW_VERSION/g" hooks/hooks.json
-echo "[3/9] hooks/hooks.json"
+sed -i -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/hooks.json
+echo "[3/10] hooks/hooks.json"
 
-# 4. hooks/session-start.js (4 occurrences)
-sed -i "s/Lens v$CURRENT/Lens v$NEW_VERSION/g" hooks/session-start.js
-echo "[4/9] hooks/session-start.js"
+# 4. hooks/session-start.js (multiple occurrences)
+sed -i -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/session-start.js
+echo "[4/10] hooks/session-start.js"
 
 # 5. skills/c/SKILL.md
-sed -i "s/Lens v$CURRENT/Lens v$NEW_VERSION/g" skills/c/SKILL.md
-echo "[5/9] skills/c/SKILL.md"
+sed -i -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" skills/c/SKILL.md
+echo "[5/10] skills/c/SKILL.md"
 
 # 6. skills/cc/SKILL.md
-sed -i "s/Lens Multi v$CURRENT/Lens Multi v$NEW_VERSION/g" skills/cc/SKILL.md
-echo "[6/9] skills/cc/SKILL.md"
+sed -i -E "s/Lens Multi v[0-9]+\.[0-9]+\.[0-9]+/Lens Multi v$NEW_VERSION/g" skills/cc/SKILL.md
+echo "[6/10] skills/cc/SKILL.md"
 
 # 7. skills/cp/SKILL.md
-sed -i "s/Lens Plan v$CURRENT/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
-echo "[7/9] skills/cp/SKILL.md"
+sed -i -E "s/Lens Plan v[0-9]+\.[0-9]+\.[0-9]+/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
+echo "[7/10] skills/cp/SKILL.md"
 
-# 8. CLAUDE.md (Current version + add to Recent Changes)
-sed -i "s/Current: \*\*v$CURRENT\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
-sed -i "s/Updated: [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}/Updated: $TODAY/" CLAUDE.md
-echo "[8/9] CLAUDE.md"
+# 8. CLAUDE.md (Current version + Updated date)
+sed -i -E "s/Current: \*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
+sed -i -E "s/Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Updated: $TODAY/" CLAUDE.md
+echo "[8/10] CLAUDE.md"
 
-# 9. CHANGELOG.md - prepend new section header (user fills in details)
-CHANGELOG_HEADER="## [$NEW_VERSION] - $TODAY\n\n### Added (v$NEW_VERSION)\n\n### Changed (v$NEW_VERSION)\n\n### Fixed (v$NEW_VERSION)\n"
-sed -i "1s/^/$(echo -e "$CHANGELOG_HEADER")\n/" CHANGELOG.md
-echo "[9/9] CHANGELOG.md (template added - fill in details)"
+# 9. README.md (title)
+sed -i -E "s/^# Lens v[0-9]+\.[0-9]+\.[0-9]+/# Lens v$NEW_VERSION/" README.md
+echo "[9/10] README.md"
+
+# 10. CHANGELOG.md - prepend new section header (user fills in details).
+# Uses awk because git-bash sed can choke on multi-line substitutions.
+awk -v ver="$NEW_VERSION" -v today="$TODAY" '
+NR==1 {
+  print "## [" ver "] - " today
+  print ""
+  print "### Added (v" ver ")"
+  print ""
+  print "### Changed (v" ver ")"
+  print ""
+  print "### Fixed (v" ver ")"
+  print ""
+}
+{ print }
+' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+echo "[10/10] CHANGELOG.md (template added - fill in details)"
 
 echo ""
 echo "=== Verification ==="
@@ -89,20 +109,29 @@ COUNT=$(grep -rl "v$NEW_VERSION\|\"$NEW_VERSION\"" \
   skills/cc/SKILL.md \
   skills/cp/SKILL.md \
   CLAUDE.md \
+  README.md \
   CHANGELOG.md 2>/dev/null | wc -l)
 
-echo "Files with v$NEW_VERSION: $COUNT/9"
+echo "Files with v$NEW_VERSION: $COUNT/10"
 
-# Check old version remnants (excluding CHANGELOG and docs)
-OLD_COUNT=$(grep -rl "v$CURRENT\|\"$CURRENT\"" \
-  .claude-plugin/ hooks/ skills/ CLAUDE.md 2>/dev/null | wc -l)
+# Check stale version remnants — any v[0-9].[0-9].[0-9] that is NOT the new
+# version, across version-bearing files (excludes CHANGELOG and docs/history
+# which legitimately list older versions).
+STALE=$(grep -rohE "v[0-9]+\.[0-9]+\.[0-9]+" \
+  .claude-plugin/ hooks/ skills/ CLAUDE.md README.md 2>/dev/null \
+  | sort -u | grep -v "^v$NEW_VERSION$" || true)
 
-if [ "$OLD_COUNT" -gt 0 ]; then
+if [ -n "$STALE" ]; then
   echo ""
-  echo "WARNING: Old version v$CURRENT still found in:"
-  grep -rl "v$CURRENT\|\"$CURRENT\"" .claude-plugin/ hooks/ skills/ CLAUDE.md 2>/dev/null
+  echo "WARNING: stale version strings still found:"
+  echo "$STALE"
+  echo ""
+  echo "Locations:"
+  for v in $STALE; do
+    grep -rln "$v" .claude-plugin/ hooks/ skills/ CLAUDE.md README.md 2>/dev/null
+  done
 else
-  echo "Old version v$CURRENT: clean (0 remnants)"
+  echo "Stale versions: clean (all references are v$NEW_VERSION)"
 fi
 
 echo ""
