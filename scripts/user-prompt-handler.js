@@ -35,13 +35,15 @@ function main() {
 
     const message = input.userMessage;
 
-    if (message.startsWith('/')) {
+    if (isExplicitSlashCommand(message)) {
       const parts = message.split(/\s+/);
       const skillName = parts[0].substring(1);
       const args = parts.slice(1).join(' ');
       const clippedArgs = args.substring(0, 200);
+      const displayedArgs = JSON.stringify(args.substring(0, 100));
+      const toolArgs = JSON.stringify(clippedArgs);
       writeJson({
-        systemMessage: `OVERRIDE - HIGHEST PRIORITY: The user explicitly invoked the /${skillName} skill command${args ? ` with args: "${args.substring(0, 100)}"` : ''}. You MUST execute this skill immediately using the Skill tool with skill="${skillName}"${args ? ` and args="${clippedArgs}"` : ''}. Do NOT call AskUserQuestion. Do NOT ask for confirmation. Do NOT show any other prompt. Just invoke the Skill tool NOW.`,
+        systemMessage: `OVERRIDE - HIGHEST PRIORITY: The user explicitly invoked the /${skillName} skill command${args ? ` with args: ${displayedArgs}` : ''}. You MUST execute this skill immediately using the Skill tool with skill="${skillName}"${args ? ` and args=${toolArgs}` : ''}. Do NOT call AskUserQuestion. Do NOT ask for confirmation. Do NOT show any other prompt. Just invoke the Skill tool NOW.`,
       });
       process.exit(0);
     }
@@ -102,6 +104,13 @@ function getInput() {
     return { userMessage: process.env.CLAUDE_USER_MESSAGE };
   }
   return readJsonInput();
+}
+
+function isExplicitSlashCommand(message) {
+  const command = String(message || '').trimStart().split(/\s+/)[0] || '';
+  if (!command.startsWith('/')) return false;
+  const skillName = command.slice(1);
+  return /^[A-Za-z][A-Za-z0-9_-]*(?::[A-Za-z][A-Za-z0-9_-]*)?$/.test(skillName);
 }
 
 main();

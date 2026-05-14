@@ -425,6 +425,9 @@ def phase3_cache_cleanup(ctx: Context) -> None:
     # Remove all cache folders — installer will repopulate only the target.
     # This prevents the "orphan 1.9.0 keeps coming back" problem.
     for entry in entries:
+        if should_preserve_cache_entry(entry):
+            log_warn(f"preserved {entry.name}/ (active session or protected cache entry)")
+            continue
         if ctx.dry_run:
             log_step(f"would remove {entry.name}/")
             continue
@@ -439,6 +442,65 @@ def phase3_cache_cleanup(ctx: Context) -> None:
 # ─────────────────────────────────────────────────────────────
 # Phase 4: Registry reconciliation + install
 # ─────────────────────────────────────────────────────────────
+
+
+def should_preserve_cache_entry(entry: Path) -> bool:
+    """Return True when deleting this cache entry may break a live session."""
+
+    if entry.name.endswith(".disabled"):
+        return True
+
+    try:
+        if entry.is_symlink():
+            return True
+    except OSError:
+        return True
+
+    in_use = entry / ".in_use"
+    if not in_use.exists():
+        return False
+
+    try:
+        markers = [p for p in in_use.iterdir() if p.is_file()]
+    except OSError:
+        return True
+
+    if not markers:
+        return False
+
+    live_markers = []
+    for marker in markers:
+        if is_pid_running(marker.name):
+            live_markers.append(marker.name)
+            continue
+        try:
+            marker.unlink()
+        except OSError:
+            return True
+
+    return bool(live_markers)
+
+
+def is_pid_running(pid_text: str) -> bool:
+    try:
+        pid = int(pid_text)
+    except ValueError:
+        return True
+
+    if pid <= 0:
+        return False
+
+    try:
+        if os.name == "nt":
+            result = run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                check=False,
+            )
+            return str(pid) in (result.stdout or "")
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
 
 
 def phase4_install(ctx: Context) -> None:

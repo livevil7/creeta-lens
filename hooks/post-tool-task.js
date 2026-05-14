@@ -17,7 +17,7 @@ const { installFailSoftHandlers, readJsonInput, writeJson } = require(path.join(
 installFailSoftHandlers('post-tool-task');
 
 // Load agent tracker
-const { completeAgent, loadDashboard } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
+const { completeAgentByDescription, loadDashboard } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
 
 function main() {
   try {
@@ -29,11 +29,11 @@ function main() {
     const status = hasError ? 'error' : 'done';
     const errorMsg = input?.tool_error || input?.error || null;
 
-    // Try to find agent ID from the corresponding PreToolUse hook
-    // Claude Code doesn't pass correlation IDs between hooks, so we match
-    // the most recent running agent.
-    const agentId = null; // Will match last running agent
-    const agent = completeAgent(agentId, status, errorMsg);
+    // Claude Code does not pass a hook correlation ID, so match by the Task
+    // description first and fall back to the most recent running agent.
+    const toolInput = input?.tool_input || {};
+    const description = toolInput.description || toolInput.prompt || toolInput.task || '';
+    const agent = completeAgentByDescription(description, status, errorMsg);
 
     // Build summary for context
     const dashboard = loadDashboard();

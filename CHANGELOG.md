@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.3.1] - 2026-05-14
+
+### Added (v3.3.1)
+
+- **`scripts/upgrade.py`** — `upgrade.sh`의 Python 포팅. Windows git-bash의 `sed multi-line` / `grep -P locale` 문제를 회피하기 위한 대안 진입점. `python upgrade.py [--dry-run|--yes|--verbose|--version vX.Y.Z]` 형태로 동일 인터페이스 제공.
+- **`lib/hook-utils.js`** — hook 공통 helper 함수 추가 (stdin guard, safe fs wrappers).
+
+### Fixed (v3.3.1)
+
+- **CRITICAL #1 — Hook stdin blocking guard** (`hooks/post-tool-task.js`, `scripts/user-prompt-handler.js`): Claude Code가 stdin 안 보내면 5초 timeout까지 hang하던 패턴 차단. `process.stdin.isTTY` 가드 + fail-soft. lens-qa-review의 CRITICAL #1 해결.
+- **CRITICAL #2 — fs.* try/catch graceful degradation** (`lib/agent-tracker.js` 163줄 refactor, `lib/plan-manager.js`, `lib/skill-scanner.js`): 권한/disk full/file corrupt 상황에서 hook 통째로 throw하던 cascade ERROR 차단. 각 fs call을 try/catch로 감싸고 fallback 동작. lens-qa-review의 CRITICAL #2 해결.
+
+### Note (v3.3.1)
+
+v3.3.0이 plugin source format(구조적 fix)을 다뤘다면, v3.3.1은 lens-qa-review에서 미해결로 남았던 CRITICAL 2건(hook stability)을 codex로 fix한 patch release. 이로써 lens-qa-review의 9건 발견사항 중 핵심 4건(CRITICAL 2 + MAJOR 2)이 모두 release에 흡수됨.
+
 ## [3.3.0] - 2026-05-14
 
 ### Added (v3.3.0)
