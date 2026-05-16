@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.3.3] - 2026-05-16
+
+### Changed (v3.3.3)
+
+- **`lib/plugin-registry.js` — `KNOWN_PLUGINS` 비움** — 외부 플러그인 추천(`superpowers`, `design-council` 패턴 예시) 모두 제거. lens는 lens 자체 기능만 가지도록 정리. `searchRegistry()` / `formatRegistryResults()` API 는 유지(빈 배열일 때 자연스럽게 0건 반환).
+- **`lib/skill-scanner.js` — sentry hardcoded 참조 3곳 제거** — Hybrid plugin 감지 주석에서 `e.g. sentry` 제거, 도메인 매칭 정규식에서 `sentry|` 키워드 제거(다른 generic 키워드 유지), `.mcp.json` wrapper unwrap 주석에서 `used by sentry, etc.` 제거. 동작은 generic 하게 유지, brand-specific 참조만 제거.
+- **`skills/c/SKILL.md` — gstack priority 섹션 삭제** — 별도 standalone skill 디렉토리(`~/.claude/skills/gstack/`)에 대한 우선순위 매핑 테이블 통째 제거. "Match installed skills" 로 generic화.
+- **`skills/cc/SKILL.md` — gstack Priority 섹션 2곳 통째 삭제** — 분해 단계의 매핑 테이블 + 본문의 "스킬 할당" 섹션 모두 제거. "Skill 매칭 확인" 으로 generic화. 외부 MCP 예시 텍스트도 generic 화.
+- **`skills/cp/SKILL.md` — Karpathy 4규칙 풀버전 marker 강화** — `(Karpathy — 항상 준수)` → `(Karpathy — MUST FOLLOW · 기본 지침)` 헤더 + 각 규칙의 do/don't 풀버전 인라인. `/c`, `/cc` 와 marker 정합.
+- **`.claude/settings.local.json` — 죽은 MCP 권한 정리** — `mcp__plugin_supabase_*`, `mcp__plugin_sentry_*` 등 lens 개발 워크스페이스에서 안 쓰이는 MCP 권한 제거.
+
+### Fixed (v3.3.3)
+
+- **`lib/agent-tracker.js` — 락 fallback 재시도 1회 추가** (린트/QA 발견) — 동시 hook 실행 시 `withFileLock` 첫 시도 실패하면 즉시 무락 fallback 으로 떨어지던 패턴을, 한 번 더 락 시도한 후 fallback 으로 변경. dashboard.json clobber 위험 감소. fail-soft 원칙(사용자 도구 호출 비차단) 유지.
+
+### Note (v3.3.3)
+
+사용자가 다른 모든 플러그인/스킬을 정리하면서 lens 가 외부 의존을 명시적 참조하던 부분을 모두 제거. lens 는 이제 lens 자체만으로 동작하며, 설치된 다른 플러그인이 있으면 generic 스캐닝으로 인식한다.
+
 ## [3.3.1] - 2026-05-14
 
 ### Added (v3.3.1)

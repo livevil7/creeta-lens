@@ -23,7 +23,8 @@ if ! echo "$NEW_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
 fi
 
 # Get current version from plugin.json
-CURRENT=$(grep -oP '"version": "\K[^"]+' .claude-plugin/plugin.json)
+# Use sed instead of grep -oP for Windows Git Bash compatibility (PCRE locale issue)
+CURRENT=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([0-9]\+\.[0-9]\+\.[0-9]\+\)".*/\1/p' .claude-plugin/plugin.json | head -1)
 echo "Current version: v$CURRENT"
 echo "New version:     v$NEW_VERSION"
 echo ""
