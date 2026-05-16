@@ -4,9 +4,10 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.3.3**
+- Current: **v3.4.0**
 - Updated: 2026-05-16
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.4.0 breaking: plan 문서가 Goal-first 구조로 전환 (`Goal → Plan A → Plan B → Risks → Progress → Status`). `/cc` 는 Goal-aware 실행 엔진으로 격상 (SUCCESS_CRITERIA 미달 시 done 차단, Plan A↔B 사용자 confirm 전환). 상세: `CHANGELOG.md`.
 
 ## Skills
 
@@ -40,7 +41,7 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 | Memory Store | `memory-store.js` | `loadMemory()`, `saveMemory()`, `recordSessionStart()`, `recordSkillUsage()`, `recordPlanCreation()` | Persists at `~/.claude/lens/.lens-memory.json`. Usage counts, recent skills, plan history |
 | Plugin Registry | `plugin-registry.js` | `searchRegistry()`, `KNOWN_PLUGINS` | 60+ known plugins. Suggests installable plugins when no match found |
 | Agent Tracker | `agent-tracker.js` | `initSession()`, `registerAgent()`, `completeAgent()`, `endSession()` | Tracks Task agent lifecycle in `.lens/agent-dashboard.json`. Atomic writes, error logs |
-| Plan Manager | `plan-manager.js` | `getPlansDir()`, `ensurePlansDir()`, `getStatePath()`, `generateSlug()`, `generateFileName()`, `generatePlanId()`, `savePlanState()`, `loadPlanState()`, `listPlans()`, `formatPlanSummary()`, `generatePlanContent()`, `parsePlanFrontmatter()`, `updatePlanStatus()`, `validatePlanStructure()`, `REQUIRED_SECTIONS` | Plan file naming (`YYYY-MM-DD-slug.md`), document generation (4-lang headers), YAML frontmatter parsing, status lifecycle management, state tracking at `.lens/plan-state.json` |
+| Plan Manager | `plan-manager.js` | `getPlansDir()`, `ensurePlansDir()`, `getStatePath()`, `generateSlug()`, `generateFileName()`, `generatePlanId()`, `savePlanState()`, `loadPlanState()`, `listPlans()`, `formatPlanSummary()`, `generatePlanContent()`, `parsePlanFrontmatter()`, `updatePlanStatus()`, `validatePlanStructure()`, `REQUIRED_SECTIONS`, `extractGoal()`, `extractPlanBTriggers()` | Plan file naming (`YYYY-MM-DD-slug.md`), Goal-first document generation (8-lang headers), YAML frontmatter parsing, status lifecycle, state at `.lens/plan-state.json`. v3.4+ `extractGoal` / `extractPlanBTriggers` 는 `/cc` 핸드오프 진입 시 SUCCESS_CRITERIA 와 Plan B Trigger 매칭에 사용 |
 
 ## Folder Structure
 

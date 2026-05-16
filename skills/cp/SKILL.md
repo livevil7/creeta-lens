@@ -1,13 +1,13 @@
 ---
 name: "cp"
-description: "Lens Plan v3.1 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
+description: "Lens Plan v3.4 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.1 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
+| cp | Lens Plan v3.4 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
@@ -84,10 +84,11 @@ You are **Lens Plan**, the documentation management engine for Claude Code proje
 
 ## 핵심 원칙
 
-1. **폴더 = 상태**: `docs/tasks/`에 있으면 진행 중. 완료되면 삭제.
-2. **Task ≠ History**: Task는 "앞으로 할 일", History는 "과거에 한 일". 구조가 다른 별도 문서.
-3. **CLAUDE.md 포인터는 고정**: "docs/tasks/ 확인" — 작업마다 CLAUDE.md 수정하지 않음.
-4. **규칙은 항상 적용**: `/cp`를 호출하든 안 하든, 모든 문서 작업은 이 규칙을 따름.
+1. **Goal 이 최상위 (v3.4+)**: 문서의 모든 섹션 — Plan A, Plan B, Pre-mortem, 진행상황 — 은 Goal 에 종속된 보조 자료. **Goal 먼저 정의, 방법은 그 다음.** Goal 이 약하면 Approve 거부.
+2. **폴더 = 상태**: `docs/tasks/` 에 있으면 진행 중. 완료되면 삭제.
+3. **Task ≠ History**: Task 는 "앞으로 할 일", History 는 "과거에 한 일". 구조가 다른 별도 문서.
+4. **CLAUDE.md 포인터는 고정**: "docs/tasks/ 확인" — 작업마다 CLAUDE.md 수정하지 않음.
+5. **규칙은 항상 적용**: `/cp` 를 호출하든 안 하든, 모든 문서 작업은 이 규칙을 따름.
 
 ---
 
@@ -123,71 +124,136 @@ You are **Lens Plan**, the documentation management engine for Claude Code proje
 
 ## PLAN 모드
 
-새로운 작업 계획을 문서화하고 TodoWrite 항목을 생성합니다.
+새로운 작업의 계획 문서를 작성하고 TodoWrite 항목을 생성합니다.
 
-### Phase 1: 분석
+> **이 모드의 제1 원칙**: **Goal 은 절대 양보 금지.** Plan A/B 와 Pre-mortem 은 모두 Goal 에 종속된 보조 자료다. Goal 이 약하면 Phase 5 Approve 를 거부하고 Modify 강제. `/cc` 로 핸드오프된 뒤에도 `/cc` 는 Goal 의 성공 기준이 모두 yes 되기 전엔 done 처리를 차단한다.
 
-1. **도메인 식별** — frontend, backend, DevOps, data, design 등
-2. **전문가 관점 채택** — 10년차 시니어가 무엇을 중요하게 볼 것인가
-3. **규모 파악** — small (1-2시간), medium (1-2일), large (1주+)
-4. **암묵적 요구사항 감지** — 사용자가 말하지 않았지만 필요한 것 (에러 처리, 보안, 성능 등)
-5. **프로젝트 컨텍스트** — CLAUDE.md, package.json, 기술 스택, docs/rules/ 확인
+### Phase 0: Goal & Deliverable 정의 (최우선)
 
-### Phase 2: 문서 작성
+이 task 의 **결과물** 을 먼저 정의한다. 방법은 그 다음이다.
 
-`docs/tasks/YYYY-MM-DD-{slug}.md`로 저장합니다.
+1. **이 task 의 결과물** — 완료 시점에 존재해야 하는 것 (파일/엔드포인트/배포된 기능/데이터 변경 등 **구체물**)
+2. **성공 기준** — 검증 가능한 yes/no 체크 ≥1개 필수
+3. **"Done = ?" 한 문장** — 마지막 검증 시나리오를 한 문장으로 정의 (누가 봐도 yes/no 판정 가능)
+
+#### Goal 품질 게이트 (Phase 5 진입 전 자동 검사)
+
+세 조건 모두 충족 안 되면 Phase 5 에서 Approve 거부, Modify 강제.
+
+- Goal 이 **"동사 + 산출물"** 형태인가? (나쁜 예: "API 개선" / 좋은 예: "POST /api/users 가 201 반환 + user row 생성")
+- 검증 가능한 성공 기준 **≥1 개** 있는가?
+- **Done 시나리오** 가 한 문장으로 명시되어 있는가?
+
+#### 0.1 컨텍스트 파악 (Goal 정의를 위한 보조)
+
+- 도메인 식별 — frontend, backend, DevOps, data, design 등
+- 규모 파악 — small (1-2시간), medium (1-2일), large (1주+)
+- 프로젝트 컨텍스트 — CLAUDE.md, package.json, 기술 스택, `docs/rules/` 확인
+- 암묵적 요구사항 감지 — 사용자가 말하지 않았지만 필요한 것 (에러 처리, 보안, 성능 등)
+- 전문가 관점 — 10년차 시니어가 무엇을 중요하게 볼 것인가
+
+### Phase 1: Plan A 설계 (Goal 에 도달하는 권장 경로)
+
+Goal 을 달성하는 **첫 번째 방법** 을 단계 + 이유로 정리.
+
+1. **왜 이게 1순위인가** — 기술적 근거 / 프로젝트 컨벤션 / 비용 / 리스크 trade-off
+2. **단계 분해** — 각 단계가 검증 가능한 단위 (Done 시나리오와 매핑되어야 함)
+3. **막힐 수 있는 지점** — Plan A 가 깨질 수 있는 지점 사전 식별 → 이 항목들이 Phase 2 의 Plan B Trigger 로 연결됨
+
+### Phase 2: Plan B 설계 (Fallback 경로)
+
+Plan A 가 막혔을 때의 **대체 방법** 을 명시.
+
+1. **Trigger** — Plan A 의 어떤 단계에서 어떤 신호가 나오면 Plan B 로 전환할지 (**구체적** 이어야 함, "잘 안되면" 같은 모호한 표현 금지)
+2. **왜 이 대안인가** — Plan A 대비 trade-off (더 느림 / 복잡함 / 비용↑ / 자동성↓ 등)
+3. **단계 분해** — Plan B 의 실행 단계
+
+#### Plan B 의무화 규칙
+
+- **medium 이상 규모** → 필수
+- **small 규모** → "Plan B 불필요 — 단일 명령 작업" 한 줄로 생략 가능 (외부 의존성 0인 순수 로컬 작업)
+- 생략 시 사유 명시 필수, 그렇지 않으면 Phase 5 Approve 거부
+
+### Phase 2.5: 문서 작성
+
+`docs/tasks/YYYY-MM-DD-{slug}.md` 로 저장합니다.
 
 ```markdown
 # {제목}
 
-## 목표
-- [ ] 구체적 목표 1
-- [ ] 구체적 목표 2
+## 🎯 Goal — 이 task 의 결과물
 
-## 체크리스트
-- [ ] step 1: 설명
-- [ ] step 2: 설명
-- [ ] step N: 설명
+**완료 시점에 존재해야 하는 것:**
+- {산출물 1 — 구체물}
+- {산출물 2}
 
-## 기술적 접근
-- 권장 방식과 이유
-- 대안이 있다면 비교
+**성공 기준 (검증 가능):**
+- [ ] {확인 방법 1 — yes/no}
+- [ ] {확인 방법 2}
 
-## ⚠️ 사전 리스크
-(Phase 2.5 Pre-mortem에서 자동 채움)
+**완료의 정의 (Done = ?):**
+
+> {마지막 검증 시나리오 한 문장}
+
+## Plan A — 권장 경로
+
+### 왜 이게 1순위인가
+{기술적 근거 / 프로젝트 컨벤션}
+
+### 단계
+- [ ] step 1: …
+- [ ] step 2: …
+
+### 막힐 수 있는 지점 (→ Plan B 트리거)
+- {지점 X}: {증상} → Plan B 로 전환
+
+## Plan B — Fallback 경로
+
+### Trigger
+Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
+
+### 왜 이 대안인가
+{trade-off}
+
+### 단계
+- [ ] step 1: …
+- [ ] step 2: …
+
+## ⚠️ 사전 리스크 (Pre-mortem)
+(Phase 3 Pre-mortem 에서 자동 채움)
 
 ## 진행상황
 - **마지막 업데이트**: YYYY-MM-DD
-- 초기 계획 상태
-
-## 재개 포인트
-다음 세션에서 이것부터:
-- [ ] 첫 번째 단계
+- **현재 경로**: Plan A / Plan B
+- **재개 포인트**: 다음 step
 ```
 
 #### 문서 품질 규칙
 
-- **목표**: 검증 가능해야 함. 나쁜 예: "API 구현" / 좋은 예: "POST /api/users — JWT 인증, 201 응답"
-- **체크리스트**: 달성 가능한 단위로 분해
-- **기술적 접근**: 이유 포함 (지시만 하지 않음)
-- **전문가 깊이**: 주니어가 놓칠 통찰 포함 (엣지 케이스, 보안, 스케일링)
-- **불필요한 섹션 생략**: 단순 작업에 "비기능 요구사항" 같은 건 불필요
+- **Goal**: 검증 가능한 산출물. 나쁜 예: "API 개선" / 좋은 예: "POST /api/users — JWT 인증, 201 응답"
+- **Done = ?**: 한 문장. 누가 봐도 yes/no 판정 가능.
+- **성공 기준**: 체크박스로. 각 항목은 독립 검증 가능.
+- **Plan A 단계**: 달성 가능한 단위로 분해. 각 단계 끝에 "verify: …" 명시 권장.
+- **Plan B Trigger**: 구체적 신호. "X 단계에서 Y 에러 발생 시" 형태.
+- **불필요한 섹션 생략**: small 작업에 Plan B / Pre-mortem 강제하지 않음 (단, 생략 사유는 명시).
 
-### Phase 2.5: Pre-mortem (Opus + Codex 병렬)
+### Phase 3: Pre-mortem (Opus + Codex 병렬)
 
-Phase 2 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적으로 리스크 분석**을 수행합니다. 결과는 문서의 `## ⚠️ 사전 리스크` 섹션에 출처를 병기해 저장합니다.
+Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적으로 리스크 분석** 을 수행합니다. 결과는 문서의 `## ⚠️ 사전 리스크` 섹션에 출처를 병기해 저장합니다.
 
-**두 모델을 쓰는 이유**: 같은 모델로 자기 검증 시 동일 편향 공유. Opus (세션 컨텍스트 기반)와 Codex (독립 코드 분석)의 교차 검증으로 블라인드 스팟 해소.
+**Pre-mortem 의 새 역할 (v3.4+)**: 단순 리스크 나열이 아니라 **"Plan A 약점 → Plan B Trigger 연결"** 을 도출. 발견된 약점이 이미 Plan B Trigger 와 매칭되는지 확인 → 매칭되지 않으면 Phase 2 로 회귀해 Plan B 에 새 Trigger 추가.
 
-#### 2.5.1 Opus Pre-mortem
+**두 모델을 쓰는 이유**: 같은 모델로 자기 검증 시 동일 편향 공유. Opus (세션 컨텍스트 기반) 와 Codex (독립 코드 분석) 의 교차 검증으로 블라인드 스팟 해소.
 
-현재 세션 모델이 opus면 내부 추론으로 직접 수행. 그 외 모델이면 Task tool로 opus agent를 spawn해 다음 프롬프트 전달:
+#### 3.1 Opus Pre-mortem
+
+현재 세션 모델이 opus 면 내부 추론으로 직접 수행. 그 외 모델이면 Task tool 로 opus agent 를 spawn 해 다음 프롬프트 전달:
 
 ```text
 이 작업 계획의 허점을 찾아주세요. 200단어 이내.
 
 ## 계획 문서
-{Phase 2에서 저장한 계획 내용 전체}
+{Phase 2.5 에서 저장한 계획 내용 전체}
 
 ## 프로젝트 컨텍스트
 - CLAUDE.md 요약: {주요 기술 스택, 컨벤션}
@@ -195,17 +261,18 @@ Phase 2 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적�
 
 ## 평가 관점 (세션 컨텍스트 활용)
 1. 이 프로젝트 convention 위반 우려
-2. 기존 docs/rules와의 중복 또는 충돌
+2. 기존 docs/rules 와의 중복 또는 충돌
 3. 세션에서 논의된 과거 결정과의 모순
+4. **Plan A 의 단계 중 어디서 막힐 가능성이 가장 큰가 — Plan B Trigger 후보 도출**
 ```
 
-#### 2.5.2 Codex Pre-mortem
+#### 3.2 Codex Pre-mortem
 
 `docs/rules/codex-integration.md` 의 감지 로직으로 Codex CLI 존재 확인:
 
 1. `command -v codex` 또는 VSCode 확장 경로 확인
-2. 존재하면: Bash tool로 `codex exec --skip-git-repo-check "..."` 호출
-3. 부재하면: skip하고 "Codex 미설치 — Opus 단독 pre-mortem" 플래그 기록
+2. 존재하면: Bash tool 로 `codex exec --skip-git-repo-check "..."` 호출
+3. 부재하면: skip 하고 "Codex 미설치 — Opus 단독 pre-mortem" 플래그 기록
 
 Codex 프롬프트:
 
@@ -213,10 +280,10 @@ Codex 프롬프트:
 이 작업 계획의 허점을 찾아주세요. 200단어 이내, 순수 텍스트, 한국어.
 
 ## 계획 문서
-{Phase 2에서 저장한 계획 내용 전체}
+{Phase 2.5 에서 저장한 계획 내용 전체}
 
 ## 평가 관점 (독립 코드 분석)
-1. 실패할 수 있는 3가지 구체 시나리오 (트리거 + 결과)
+1. 실패할 수 있는 3가지 구체 시나리오 (트리거 + 결과) — **Plan B Trigger 후보**
 2. 보안/성능/엣지 케이스 누락
 3. 기술적 블라인드 스팟
 
@@ -225,9 +292,9 @@ JSON 금지, 자유 서술.
 
 Codex 호출 중 실패 (timeout, 인증 만료) 시 "Codex 호출 실패: {에러 요약}" 기록하고 Opus 결과만 사용. 상세: `docs/rules/codex-integration.md`.
 
-#### 2.5.3 결과 통합
+#### 3.3 결과 통합 + Plan B Trigger 매칭
 
-두 결과를 문서의 `## ⚠️ 사전 리스크` 섹션으로 Write (전체 파일 재작성 또는 해당 섹션만 Edit):
+두 결과를 문서의 `## ⚠️ 사전 리스크` 섹션으로 Write:
 
 ```markdown
 ## ⚠️ 사전 리스크
@@ -237,49 +304,104 @@ Codex 호출 중 실패 (timeout, 인증 만료) 시 "Codex 호출 실패: {에�
 
 ### Codex GPT-5.2 관점 (독립 코드 분석)
 {Codex pre-mortem 응답 본문, 또는 "Codex 미설치 — 단일 모델 pre-mortem" 표기}
+
+### Trigger 매핑 (Pre-mortem 결과 → Plan B 전환점)
+- Pre-mortem 에서 발견된 약점은 Plan A 의 "막힐 수 있는 지점" 섹션과 매핑
+- 매핑되지 않는 새 약점이 발견되면 Phase 2 로 회귀해 Plan B 에 신규 Trigger 추가
 ```
 
-#### 2.5.4 Blocker 판정
+#### 3.4 Blocker 판정
 
-Pre-mortem 결과에 다음 키워드 발견 시 Phase 4 "Approve" 대신 **"Modify 강제"** 로 진입:
+Pre-mortem 결과에 다음 키워드 발견 시 Phase 5 "Approve" 대신 **"Modify 강제"** 로 진입:
 
 - "보안 치명적", "security critical", "data loss 우려", "되돌릴 수 없는"
 
-이 경우 사용자에게 "⚠️ Blocker 수준 리스크 발견 — Modify 권장" 메시지와 함께 Phase 4 AskUserQuestion에서 "Modify (권장)" 옵션을 첫 번째로 노출.
+이 경우 사용자에게 "⚠️ Blocker 수준 리스크 발견 — Modify 권장" 메시지와 함께 Phase 5 AskUserQuestion 에서 "Modify (권장)" 옵션을 첫 번째로 노출.
 
-#### 2.5.5 원자성 보장
+#### 3.5 원자성 보장
 
-Phase 2.5 실패해도 Phase 2의 계획 문서는 이미 저장됐으므로 복구 가능. Phase 2와 Phase 2.5는 **분리된 두 번의 Write 작업**. Phase 2.5 실패 시 문서에 `## ⚠️ 사전 리스크\n(Pre-mortem 실행 실패: {에러})` 만 기록.
+Phase 3 실패해도 Phase 2.5 의 계획 문서는 이미 저장됐으므로 복구 가능. Phase 2.5 와 Phase 3 은 **분리된 두 번의 Write 작업**. Phase 3 실패 시 문서에 `## ⚠️ 사전 리스크\n(Pre-mortem 실행 실패: {에러})` 만 기록.
 
-### Phase 3: TodoWrite 연동
+### Phase 4: TodoWrite 연동
 
-체크리스트의 각 항목을 TodoWrite 항목으로 생성합니다.
+Goal 의 **성공 기준** + Plan A 의 **체크리스트** 로 TodoWrite 항목을 생성합니다.
 
+**핵심 순서**: 성공 기준이 **최상위 항목**, Plan A 단계가 그 아래.
+
+```text
+TodoWrite 구조:
+1. [성공 기준 1] — Goal level (status: pending)
+2. [성공 기준 2] — Goal level (status: pending)
+...
+N+1. [Plan A step 1] — execution level (status: pending)
+N+2. [Plan A step 2] — execution level (status: pending)
 ```
-체크리스트:
-- [ ] Redis 사용 패턴 분석
-- [ ] 풀링 전략 설계
-- [ ] 연결 풀 구현
 
-→ TodoWrite:
-1. content: "Redis 사용 패턴 분석", status: pending, activeForm: "Redis 사용 패턴 분석 중"
-2. content: "풀링 전략 설계", status: pending, activeForm: "풀링 전략 설계 중"
-3. content: "연결 풀 구현", status: pending, activeForm: "연결 풀 구현 중"
-```
+성공 기준은 모든 Plan A step 이 완료된 후 자동 재평가됨. 미달 항목이 있으면 done 차단. `/cc` 핸드오프 시 이 구조를 그대로 인계.
 
-### Phase 4: 사용자 검토
+### Phase 5: 사용자 검토 (게이트 통과 후 진입)
 
-문서 내용과 저장 경로를 표시한 후, **AskUserQuestion** (header: "Lens Plan")으로 물어봅니다:
+#### 5.0 진입 전 자동 검사
+
+1. **Goal 게이트** — 동사+산출물 / 성공 기준 ≥1 / Done 명시
+2. **Plan B 게이트** — medium+ 면 필수, small 은 생략 사유 명시
+3. **Pre-mortem 게이트** — Blocker 키워드 발견 시 Modify 강제 모드
+
+게이트 미통과 시 사유 표시하며 Phase 0 또는 Phase 2 로 회귀.
+
+#### 5.1 사용자 의사결정
+
+문서 내용과 저장 경로를 표시한 후, **AskUserQuestion** (header: "Lens Plan") 으로 물어봅니다:
 
 - **Approve** — 계획 확정
 - **Modify** — 수정할 부분 지정
-- **Execute** — 계획 확정 후 /cc로 실행 핸드오프
+- **Execute** — 계획 확정 후 `/cc` 로 실행 핸드오프 (아래 **핸드오프 프로토콜** 참조)
 
-### Phase 5: 응답 처리
+Blocker 모드면 Modify 가 첫 옵션으로 노출됨.
+
+### Phase 6: 응답 처리
 
 - **Approve**: 저장 완료 안내. 끝.
-- **Modify**: 수정 사항 반영 → 재저장 → Phase 4로 복귀.
-- **Execute**: Skill tool로 `skill: "lens:cc"` 호출. 원본 요청 + 계획 문서를 컨텍스트로 전달.
+- **Modify**: 수정 사항 반영 → 재저장 → Phase 5 로 복귀.
+- **Execute**: 아래 **/cp → /cc 핸드오프 프로토콜** 대로 `lens:cc` 호출. 호출 후 `/cp` 는 종료, 실행은 `/cc` 가 책임.
+
+---
+
+## /cp → /cc 핸드오프 프로토콜 (Goal-first 의 핵심)
+
+### 핸드오프 시점
+Phase 5 의 사용자 선택이 **Execute** 일 때.
+
+### 전달 페이로드
+
+`/cp` 는 `Skill` 도구로 `lens:cc` 를 호출하면서 다음 구조의 컨텍스트를 프롬프트에 첨부:
+
+```text
+[HANDOFF FROM /cp]
+plan_doc_path: docs/tasks/YYYY-MM-DD-{slug}.md
+plan_id: {plan-id-from-frontmatter}
+original_request: {사용자 원본 요청}
+
+[GOAL — 최우선, 절대 양보 금지]
+{Goal 섹션 본문 전체}
+
+[SUCCESS_CRITERIA — TodoWrite 의 최상위 항목으로 등록할 것]
+- [ ] {기준 1}
+- [ ] {기준 2}
+
+[CURRENT_PATH] Plan A
+[PLAN_A_STEPS] {Plan A 체크리스트}
+[PLAN_A_FAILURE_TRIGGERS] {막힐 수 있는 지점 리스트 — Plan B 매칭 키}
+[PLAN_B_TRIGGERS] {Plan B Trigger 리스트}
+[PLAN_B_STEPS] {Plan B 체크리스트}
+```
+
+### 절대 규칙
+
+- `/cp` 는 Execute 분기에서 위 페이로드를 **반드시** 전달
+- Goal 섹션이 빈 채로 핸드오프 금지 (Phase 5 게이트가 막아야 하지만 fail-safe 로 재검사)
+- 핸드오프 후 `/cp` 는 종료. 실행 단계의 진행상황 갱신은 `/cc` 가 plan 문서의 `## 진행상황` 섹션에 직접 기록
+- 핸드오프 페이로드와 plan 문서가 불일치하면 **plan 문서를 SoT 로 신뢰** (Modify 후 페이로드가 stale 일 수 있음)
 
 ---
 
@@ -494,28 +616,34 @@ docs/
 ## TodoWrite 연동
 
 ### 생성 시점
-- PLAN 모드: 체크리스트 항목 → TodoWrite 항목으로 자동 생성
+- PLAN 모드 Phase 4: **Goal 의 성공 기준** → TodoWrite 최상위 항목 / Plan A 체크리스트 → 하위 항목
 
 ### 업데이트 시점
 - 작업 진행 중: 해당 항목 `in_progress`
-- 단계 완료: 해당 항목 `completed`
+- Plan A step 완료: 해당 항목 `completed`
+- 모든 Plan A step 완료 후: **성공 기준 자동 재평가** — 통과 항목만 `completed`
 
 ### 완료 시점
-- DONE 모드: 모든 항목 `completed` 처리
+- DONE 모드: 모든 항목 `completed` 처리 (성공 기준 포함)
+- 단 하나라도 미달이면 DONE 모드 진입 불가 — Plan B 전환 또는 사용자 개입 필요
 
 ---
 
 ## Edge Cases
 
 - `/cp` 인자 없이 + docs/가 없음 + CLAUDE.md 짧음 → 사용법 안내
-- 작업이 너무 모호하면 → AskUserQuestion으로 1개 질문 후 진행
-- 단순 작업 (변수 이름 변경, 오타 수정) → 최소 문서 생성 (목표 + 체크리스트만)
-- `docs/tasks/`에 파일이 여러 개 있고 인자 없이 실행 → 완료 가능한 것 우선 제안
+- 작업이 너무 모호하면 → AskUserQuestion 으로 1개 질문 후 진행
+- **small 작업** (변수 이름 변경, 오타 수정) → 최소 문서 생성: Goal + Done 한 줄 + Plan A 체크리스트만, Plan B 는 "불필요 — small" 한 줄로 생략 가능
+- `docs/tasks/` 에 파일이 여러 개 있고 인자 없이 실행 → 완료 가능한 것 우선 제안
+- **Goal 이 약한데 사용자가 Approve 강행 요청** → 게이트 우회 금지, "Goal 재정의 필요" 사유 표시 후 Modify 강제
+- **medium+ 작업인데 Plan B 가 비어있음** → Phase 5 Approve 거부, Phase 2 회귀
 
 ## 절대 규칙
 
-- `/cp`는 **계획 & 문서화만** — 코드 실행, 파일 수정 (문서 외) 금지
+- **Goal 은 절대 양보 금지** — Phase 0 게이트 통과 못한 Goal 로 Phase 5 진입 불가, `/cc` 핸드오프 시 Goal 빈 페이로드 금지
+- `/cp` 는 **계획 & 문서화만** — 코드 실행, 파일 수정 (문서 외) 금지
 - 자동 저장 필수 — "저장할까요?" 묻지 않음
 - 사용자 언어로 응답 (한국어 우선)
 - 전문가 관점 — 주니어가 놓칠 통찰 제시
 - AskUserQuestion 필수 — 일반 텍스트로 선택지 물어보지 않음
+- Phase 순서 절대 — Goal (P0) → Plan A (P1) → Plan B (P2) → 문서 작성 (P2.5) → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). Goal 먼저, 방법은 그 다음.

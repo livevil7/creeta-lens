@@ -1,5 +1,33 @@
 # Changelog
 
+## [3.4.0] - 2026-05-16
+
+### BREAKING — Goal-first plan document structure (v3.4.0)
+
+`/cp` 가 생성하는 plan 문서의 마크다운 섹션 구조가 완전히 바뀜. 기존 task 파일은 그대로 읽히지만, 새로 생성되는 파일은 새 구조를 따른다.
+
+- **기존 (v3.3.x)**: `Task → Matched Skills → Execution Plan → Expected Outcomes → Risks → Execution Mode → Status`
+- **신규 (v3.4+)**: `🎯 Goal (deliverables + success criteria + Done=?) → Plan A (rationale + steps + failure points) → Plan B (trigger + tradeoff + steps) → ⚠️ Risks → Progress → Status`
+
+### Changed (v3.4.0)
+
+- **`skills/cp/SKILL.md` — PLAN 모드 완전 재구성** — Phase 0 (Goal & Deliverable) 신설, Phase 1 (Plan A), Phase 2 (Plan B), Phase 2.5 (문서 작성, 새 템플릿), Phase 3 (Pre-mortem), Phase 4 (TodoWrite), Phase 5 (검토 게이트), Phase 6 (응답). Goal 품질 게이트 + Plan B 의무화 규칙 + `/cp → /cc 핸드오프 프로토콜` 섹션 신설. 핵심 원칙에 "Goal 이 최상위" 추가, 절대 규칙에 "Goal 절대 양보 금지" + "Phase 순서 절대" 추가.
+- **`skills/cc/SKILL.md` — Goal-aware 실행 엔진으로 격상** — Phase 0 (/cp 핸드오프 수신) 신설, Phase 1.1 분석에서 Goal/SUCCESS_CRITERIA 우선 정독, Phase 2 TodoWrite 에 SUCCESS_CRITERIA 최상위 등록 명시, Phase 5.0 자동 Plan A↔B 전환 판정 (사용자 confirm 모드, 재시도 한도 3회), Phase 6 QA 에 SUCCESS_CRITERIA 직접 검증 의무, Phase 7 최종 보고에 "Goal 달성: N/N" 형식, Phase 7.4 plan 문서 진행상황 갱신. 절대 규칙에 "Goal 절대 우위" + "핸드오프 페이로드 검증" 추가. v3.1 → v3.4 표기 통일.
+- **`lib/plan-manager.js` — `REQUIRED_SECTIONS` 및 `generatePlanContent()` 재작성** — 새 섹션 목록(`Goal / Plan A / Plan B / Risks / Status`), 8개 언어(EN/KO/JA/ZH/ES/FR/DE/IT) 헤더 dict 에 goal/planA/planB/trigger/deliverable/successCriteria 등 키 추가. Plan B 가 없으면 "Plan B 불필요" 자리표시자 자동 삽입. frontmatter `version: 1` → `2` (구조 변경 신호).
+- **`templates/plan.template.md` — 새 구조 reference 로 교체** — 런타임 미사용이지만 AI 컨텍스트용. Goal/Plan A/Plan B/Risks/Progress/Status 자리표시자.
+- **`CLAUDE.md` Version 섹션** — `Current: v3.4.0` 으로 갱신, `plan-manager.js` exports 목록에 `extractGoal`, `extractPlanBTriggers` 추가.
+
+### Added (v3.4.0)
+
+- **`lib/plan-manager.js` 신규 함수 `extractGoal(content)`** — plan 문서에서 Goal 섹션 파싱 → `{ deliverables, successCriteria, doneDefinition, raw }` 반환. `/cc` 핸드오프 진입 시 SUCCESS_CRITERIA 를 TodoWrite 최상위 항목으로 등록하는 데 사용. best-effort 파서, 인식 못한 형식은 null 반환.
+- **`lib/plan-manager.js` 신규 함수 `extractPlanBTriggers(content)`** — Plan A 의 "막힐 수 있는 지점" 블록에서 트리거 추출. `/cc` 가 Supervisor 실패 신호와 매칭해 Plan B 자동 전환 여부를 판정하는 데 사용.
+- **`/cp → /cc 핸드오프 프로토콜`** — 양쪽 SKILL.md 본문에 동일 표현으로 박힘. HANDOFF FROM /cp 페이로드 (`plan_doc_path`, `plan_id`, `GOAL`, `SUCCESS_CRITERIA`, `CURRENT_PATH`, `PLAN_A_STEPS`, `PLAN_A_FAILURE_TRIGGERS`, `PLAN_B_TRIGGERS`, `PLAN_B_STEPS`) + 절대 규칙 (Goal 빈 채로 핸드오프 금지 / plan 문서가 SoT / `/cc` 는 Goal 수정 권한 없음 / SUCCESS_CRITERIA 미달 시 done 차단).
+
+### Migration notes
+
+- 기존 `docs/tasks/` 의 v3.3.x 형식 plan 파일은 그대로 읽힘 (frontmatter 구조 동일, `parsePlanFrontmatter` 미수정). 다만 `validatePlanStructure()` 는 새 REQUIRED_SECTIONS 기준이므로 구식 파일은 missing sections 를 반환할 수 있음 — 새 구조로 작성된 파일만 통과.
+- `/cc` 의 자동 Plan B 전환은 **사용자 confirm 모드** 로 안전 배포 (Plan A 막힘 신호 감지 시 "Plan B 전환할까요?" AskUserQuestion). 신뢰성 확보 후 향후 자동화 활성화 예정.
+
 ## [3.3.3] - 2026-05-16
 
 ### Changed (v3.3.3)
