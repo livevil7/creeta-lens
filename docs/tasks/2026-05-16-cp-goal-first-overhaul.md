@@ -204,9 +204,13 @@ _(미실행 — Phase 2.5에서 작성)_
 ## 진행상황
 
 - **마지막 업데이트**: 2026-05-16
-- **현재 경로**: Plan A (A1~A5 완료, A6 사용자 핸드오프 대기)
-- **Goal 달성**: 코드 레벨 5/6 ✓ — `extractGoal` / `extractPlanBTriggers` / `validatePlanStructure` (8개 언어) smoke test 통과. 마지막 1개 (실제 lens 빌드 install + 시나리오 S1~S6) 는 사용자 환경 확인 필요.
-- **재개 포인트**: A6 수동 검증 — 새 lens 빌드를 cache 에 install (예: `/lens-upgrade` 또는 plugin reinstall) 한 뒤 S1~S6 시나리오 실행. 미달 항목 발견 시 task 문서 갱신 + 재진입.
+- **현재 경로**: Plan A (A1~A6 의 install 단계까지 완료, S1~S6 수동 검증 대기)
+- **Goal 달성**: 코드/배포 5.5/6 ✓ — smoke test 8개 언어 통과 + v3.4.0 push (origin + creetacorp, tag v3.4.0 annotated) + `/lens-upgrade` 전체 phase 통과 (registry single entry / `claude plugin list` 확인 / installed_plugins.json 백업 보관). 마지막 0.5 는 Claude Code restart 후 S1~S6 실사용 검증.
+- **재개 포인트**: **Claude Code 재시작 필요** (스크립트가 running CLI 를 재시작하지 못함). 재시작 후 S1~S6 시나리오 실행. 미달 항목 발견 시 task 문서 갱신 + 재진입.
+- **git 상태**:
+  - `0e7bdaf feat: v3.4.0 - Goal-first plan structure (BREAKING)` (8 files, +857/-200)
+  - `cdc2529 chore: bump marketplace.json to v3.4.0` (1 file, +3/-3)
+  - `v3.4.0` annotated tag → ba666b9 → 두 remote 모두 보유 (origin + creetacorp)
 - **완료된 deliverable**:
   - ✓ `skills/cp/SKILL.md` Phase 0~6 + 핸드오프 프로토콜 + 핵심 원칙/절대 규칙 갱신
   - ✓ `skills/cc/SKILL.md` Phase 0 신설 + Phase 5.0 자동 전환 + Phase 7.4 진행상황 갱신 + 절대 규칙 보강 + v3.4 라벨링
