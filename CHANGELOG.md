@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.5.0] - 2026-05-20
+
+### Added (v3.5.0)
+
+- **HTML 보고서 뷰 + Task Board** (`reportFormat: "html"` opt-in) — `/cp` 가 만든 task/history 를 Pretendard 미니멀 슬라이드 보고서(`docs/reports/{id}.html`)로 보고, `docs/board.html` 인덱스에서 카드 클릭 시 오른쪽 panel 에 iframe 으로 즉시 표시.
+- `templates/report-shared.css` — 보고서 공통 스타일 (Pretendard / 단일 blue accent / 슬라이드 컴포넌트).
+- `templates/report-conversion-spec.md` — 보고서 작성 규칙 + md=SoT 원칙 + `lens:source-hash` 메타.
+- `templates/report-history.example.html` (8슬라이드), `templates/report-plan.example.html` (6슬라이드) — 양식 reference.
+- `templates/board.template.html` — board UI (Todo/Doing/Done, iframe slide-over panel).
+- `lib/board-builder.js` — `docs/reports/*.html` 스캔 → `docs/board.html` 생성. `lens:source-hash` 로 stale 카드 감지, `_shared.css` 최초 1회 배포.
+
+### Changed (v3.5.0)
+
+- **`skills/cp/SKILL.md`** — "HTML 보고서 뷰 + Task Board (reportFormat: html — opt-in)" 섹션 신설. **md = 데이터/상태 SoT, HTML = 파생 뷰** 원칙. PLAN/DONE 모드에서 reportFormat=html 일 때 보고서 HTML 생성 절차 (reference Read → 의미 재구성 → source 메타 기록 → board 갱신).
+- **`lens.config.json`** — `reportFormat: "md"` (기본, 하위호환), `buildBoard: false` 추가.
+
+### Fixed (v3.5.0)
+
+(없음)
+
 ## [3.4.0] - 2026-05-16
 
 ### BREAKING — Goal-first plan document structure (v3.4.0)

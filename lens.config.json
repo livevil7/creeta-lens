@@ -8,5 +8,7 @@
   "planDir": null,
   "defaultPlanLanguage": null,
   "saveSynthesisResults": true,
-  "resultsDir": null
+  "resultsDir": null,
+  "reportFormat": "md",
+  "buildBoard": false
 }

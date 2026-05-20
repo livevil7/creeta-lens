@@ -1,13 +1,13 @@
 ---
 name: "cp"
-description: "Lens Plan v3.4 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
+description: "Lens Plan v3.5 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.4 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
+| cp | Lens Plan v3.5 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
@@ -402,6 +402,49 @@ original_request: {사용자 원본 요청}
 - Goal 섹션이 빈 채로 핸드오프 금지 (Phase 5 게이트가 막아야 하지만 fail-safe 로 재검사)
 - 핸드오프 후 `/cp` 는 종료. 실행 단계의 진행상황 갱신은 `/cc` 가 plan 문서의 `## 진행상황` 섹션에 직접 기록
 - 핸드오프 페이로드와 plan 문서가 불일치하면 **plan 문서를 SoT 로 신뢰** (Modify 후 페이로드가 stale 일 수 있음)
+
+---
+
+## HTML 보고서 뷰 + Task Board (reportFormat: html — opt-in)
+
+`lens.config.json` 의 `reportFormat: "html"` 일 때만 활성. 기본값(`md`)이면 이 섹션 전체를 무시한다 (md-only 프로젝트 하위호환).
+
+> **원칙: md = SoT, HTML = 파생 뷰.** `docs/tasks|history/*.md` 가 데이터·상태 원본. HTML 은 사람이 보는 시각 보고서. **상태/요약을 HTML 에 원본 저장 금지** — 항상 md 에서 파생.
+
+### 언제 생성하나
+
+- **PLAN 모드**: Phase 2.5(md 저장) 직후 → `docs/reports/{id}.html` 생성 (task 양식, 최대 6슬라이드)
+- **DONE 모드**: Phase 3(history md 저장) 직후 → `docs/reports/{id}.html` 생성/갱신 (history 양식, 최대 8슬라이드)
+
+### 작성 절차 (Claude 가 직접 — 의미 분석/재구성, 단순 복붙 금지)
+
+1. `{lens}/templates/report-conversion-spec.md` 를 **Read** — 양식 규칙·일관성 8규칙 흡수
+2. 양식별 reference 를 **Read**:
+   - task → `{lens}/templates/report-plan.example.html`
+   - history → `{lens}/templates/report-history.example.html`
+3. md 의 Goal/Plan A/Plan B/Risks (PLAN) 또는 요약/결정/검증/후속 (DONE) 을 **의미 단위로 슬라이드 재구성**. 원문에 없는 수치 지어내기 금지.
+4. `docs/reports/{id}.html` Write. `<head>` 에 출처 메타 필수:
+   - `<meta name="lens:source" content="docs/{tasks|history}/{id}.md">`
+   - `<meta name="lens:source-hash" content="{md 내용 sha256 앞12자}">`
+   - `<meta name="lens:builder" content="lens-cp-html">`
+5. **자산 배포**: `docs/reports/_shared.css` 가 없으면 `{lens}/templates/report-shared.css` 를 복사. **있으면 skip** (사용자 커스텀 보존).
+6. **board 갱신**: `lib/board-builder.js` 가 있으면 `node {lens}/lib/board-builder.js {projectRoot}` 실행. 없으면 board 갱신은 후속.
+
+### Task Board
+
+- `docs/board.html` = `reports/` 인덱스. To do / Doing / Done 칼럼. 카드 클릭 → 오른쪽 slide-over panel 에 `<iframe src="reports/{id}.html">` 로 보고서 즉시 표시 (페이지 전환 없음).
+- 빌더 `lib/board-builder.js`: `docs/reports/*.html` 스캔 → `<meta name="lens:*">` 와 슬라이드에서 메타 추출 → `docs/board.html` 생성. md 해시 불일치 카드는 **stale** 표시 + 재생성 권고.
+- board.html 은 self-contained (외부 CSS 안 씀). 보고서(reports/)는 `_shared.css` 공유.
+
+### 다국어
+
+- 슬라이드 **본문**은 plan 언어 따름. UI chrome (page-no, eyebrow, 칼럼 라벨) 은 **영문 고정** — 번역 매트릭스 폭발 방지.
+
+### 경로 / 한계
+
+- board.html 과 reports/ 는 같은 `docs/` 하위. **상대경로만** 사용.
+- 지원: 로컬 `file://` + 같은 폴더 http. GitHub Pages 등 배포는 scope 밖.
+- Pretendard 는 CDN 의존 (오프라인 미지원). `_shared.css` 에 `system-ui` fallback 있음.
 
 ---
 

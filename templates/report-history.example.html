@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Publish date restore — namane × Ghost · 보고서</title>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">08</b></div>
+
+<main class="deck">
+
+<!-- ── 1. Cover ───────────────────────────────────── -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 08 · COVER</div>
+  <div class="meta">
+    <span>2026-05-13</span>
+    <span class="dot">·</span>
+    <span class="badge">Done</span>
+    <span class="dot">·</span>
+    <span>namane × Ghost</span>
+  </div>
+
+  <h1 class="h-title">Publish date restore — imweb 원본 발행일을 Ghost에 복원</h1>
+  <p class="lede">
+    Imweb 원본 블로그의 실제 발행일을 매칭해 namane Ghost 블로그의 모든 발행일을
+    본래 시점으로 복원한 일회성 데이터 복구 작업.
+  </p>
+
+  <div class="hero">
+    <div class="num">172<span class="unit">posts</span></div>
+    <div class="caption">
+      <strong>41 클러스터 × 4 언어 fanout</strong>으로 펼쳐진 글의 발행일을
+      가장 멀게는 <strong>854일</strong>까지 거슬러 올라가 복원. 0 에러.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>livevil-contents / docs / reports</span>
+    <span>2026-05-13-publish-date-restore</span>
+  </div>
+</section>
+
+<!-- ── 2. At a glance ─────────────────────────────── -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 08 · AT A GLANCE</div>
+  <h2 class="title">숫자로 본 복원</h2>
+  <p class="sub">한 번의 일괄 작업 결과. 6개 지표가 규모와 정확도를 보여줌.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">posts updated</div>
+      <div class="v">172<span class="unit">건</span></div>
+      <div class="desc"><strong>41 클러스터</strong> × <strong>4 언어 fanout</strong> 한 번에 동기화.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">time span restored</div>
+      <div class="v accent">854<span class="unit">days</span></div>
+      <div class="desc">가장 큰 복원 — <code>budget-korea-travel</code>: 2026 → <strong>2023-12-28</strong>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">errors</div>
+      <div class="v good">0</div>
+      <div class="desc">172 PUT 모두 성공. <strong>역방향 PUT 가능 audit trail</strong> 자동 기록.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">matching threshold</div>
+      <div class="v">0.146</div>
+      <div class="desc">Jaccard 유사도 임계값. 0.20 → 0.146 점진 튜닝.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">languages</div>
+      <div class="v">4</div>
+      <div class="desc">EN · KO · JA · ZH 모두 cluster fanout 동기화.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">false positives</div>
+      <div class="v">9<span class="unit">건</span></div>
+      <div class="desc">알고리즘 개선 대신 <strong>명시 exclude list</strong> 채택.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 3. Problem ────────────────────────────────── -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 08 · PROBLEM</div>
+  <h2 class="title">모든 글이 2026년이라고 표시되고 있었다</h2>
+  <p class="sub">
+    imweb → Ghost 마이그레이션 때 모든 글이 일괄 2026년 발행으로 stamp 됨.
+    만료된 이벤트도, 2년 전 가이드도, 모두 같은 시점.
+  </p>
+
+  <div class="compare">
+    <div class="panel warn">
+      <div class="ph">
+        <span class="tag">Before</span>
+        <h3>stamped 2026</h3>
+      </div>
+      <div class="post-list">
+        <div class="post-row"><span>budget-korea-travel</span><span class="pd">2026-05-04</span></div>
+        <div class="post-row"><span>jeju-restaurants</span><span class="pd">2026-05-04</span></div>
+        <div class="post-row"><span>ddp-kpop-show</span><span class="pd">2026-05-04</span></div>
+        <div class="post-row"><span>april-weather-korea</span><span class="pd">2026-05-04</span></div>
+        <div class="post-row"><span>seoul-night-market</span><span class="pd">2026-05-04</span></div>
+      </div>
+      <p class="note">이벤트 만료일이 무의미하고, "2024년 기준" 본문 stamp는 발행일과 모순. SEO 신호도 흐려진다.</p>
+    </div>
+
+    <div class="panel good">
+      <div class="ph">
+        <span class="tag">After</span>
+        <h3>restored to imweb origin</h3>
+      </div>
+      <div class="post-list">
+        <div class="post-row"><span>budget-korea-travel</span><span class="pd">2023-12-28</span></div>
+        <div class="post-row"><span>jeju-restaurants</span><span class="pd">2024-01-22</span></div>
+        <div class="post-row"><span>ddp-kpop-show</span><span class="pd">2024-06-14</span></div>
+        <div class="post-row"><span>april-weather-korea</span><span class="pd">2026-03-20</span></div>
+        <div class="post-row"><span>seoul-night-market</span><span class="pd">2024-09-02</span></div>
+      </div>
+      <p class="note">각 글이 본래 시점으로 복원. 만료 이벤트는 명확한 과거가 되고, 시즌 가이드는 적절한 시점을 표시.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 4. How it works ─────────────────────────────── -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 08 · PIPELINE</div>
+  <h2 class="title">네 개의 스크립트가 한 일</h2>
+  <p class="sub">단순하고 투명한 파이프라인. 각 단계 출력을 사람이 직접 검토 가능.</p>
+
+  <div class="pipe" style="margin-top:24px">
+    <div class="step">
+      <div class="n">1</div>
+      <h3>Normalize</h3>
+      <p class="what">imweb 원본 블로그의 글 목록을 파싱. EN/JA 라인 정규화로 <strong>83개 원본 record</strong>로 정리.</p>
+      <div class="files"><span class="nm">normalize_imweb.py</span><br>→ imweb_originals.jsonl</div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <h3>Fetch</h3>
+      <p class="what">Ghost Admin API로 namane.ghost.io 글 메타 수집. <strong>427 record</strong>를 jsonl로 저장.</p>
+      <div class="files"><span class="nm">fetch_ghost_posts.py</span><br>→ ghost_namane_posts.jsonl</div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <h3>Match</h3>
+      <p class="what">bag-of-words + <strong>Jaccard 유사도</strong>로 매칭. CJK는 bigrams, Latin은 stemmer.</p>
+      <div class="files"><span class="nm">match_and_report.py</span><br>→ publish_date_diff.tsv</div>
+    </div>
+    <div class="step">
+      <div class="n">4</div>
+      <h3>Apply</h3>
+      <p class="what">≥0.146 매칭에 대해 Ghost API로 <strong>4 언어 fanout 동기화</strong>. 모든 PUT을 audit log에 기록.</p>
+      <div class="files"><span class="nm">apply_dates.py</span><br>→ apply_log.jsonl (172줄)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 5. Key decisions ────────────────────────────── -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 08 · KEY DECISIONS</div>
+  <h2 class="title">왜 이렇게 설계했나</h2>
+  <p class="sub">일회성 작업에서는 정확도보다 투명성, 알고리즘 정교화보다 명시적 처리.</p>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <div class="n">01</div>
+      <div>
+        <h3>Jaccard 유사도</h3>
+        <p>bag-of-words 기반 단순/투명 알고리즘. <strong>왜 그 점수가 나왔는지 즉시 추적 가능</strong>. 정확도보다 transparency가 중요한 one-off 작업이라 채택.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">02</div>
+      <div>
+        <h3>임계값 <code>0.146</code></h3>
+        <p>0.20에서 시작 → stemming 추가로 35 클러스터 → <strong>0.146까지 lower bound</strong> 확장. dry-run 검토 끝에 자동 적용 가능함 확인.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">03</div>
+      <div>
+        <h3>Cluster fanout 동기화</h3>
+        <p>EN-primary가 매칭되면 ko/ja/zh hash variant도 동일 날짜로. <strong>i18n 클러스터 정합성</strong>을 우선.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">04</div>
+      <div>
+        <h3>9개 false positive 명시 제외</h3>
+        <p>"Seoul Pilgrimage Tour"가 K-POP 클러스터의 magnet으로 작동. 알고리즘 개선 대신 <strong>manual exclude list</strong>가 더 효율적.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">05</div>
+      <div>
+        <h3><code>-en</code> suffix strip</h3>
+        <p>마이그레이션된 EN-only 글의 <code>-en</code> suffix로 fanout 글과 그룹핑 안 되던 문제. <strong>cluster_key 산정 시 suffix 제거</strong>.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">06</div>
+      <div>
+        <h3>noon-UTC 타임스탬프</h3>
+        <p><code>YYYY-MM-DDT12:00:00.000Z</code> 사용. 타임존이 음수 shift될 때 발생하는 <strong>날짜 -1 이슈</strong> 회피.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 6. Validation ─────────────────────────────── -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 08 · VALIDATION</div>
+  <h2 class="title">어떻게 믿을 수 있나</h2>
+  <p class="sub">live 데이터 변경 작업. 검증 없이 적용하지 않음. 4단계 안전망이 0 에러를 만든 이유.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">live API를 건드리기 전, 모든 변경을 사람이 읽을 수 있는 형태로 검토.</div>
+    <ol>
+      <li>
+        <h4>Dry-run 검증</h4>
+        <div class="det"><code>apply_dates.py --threshold 0.146</code>를 <strong>--apply 없이</strong> 실행. 172 PUT 요청 미리 출력 후 4-language fanout이 모두 포함되는지 확인.</div>
+      </li>
+      <li>
+        <h4>점진적 임계값 튜닝</h4>
+        <div class="det">처음 0.20 → 33 clusters. stemming 추가 → 35. <strong>0.146까지 낮춰가며</strong> 0.10–0.146 범위의 false positive 분포를 직접 검토.</div>
+      </li>
+      <li>
+        <h4>라이브 직접 verification</h4>
+        <div class="det">apply 후 Ghost Admin API로 3개 post 직접 <code>GET</code> — <code>budget-korea-travel-en → 2023-12-28</code>, <code>april-weather-korea-ja → 2026-03-20</code> (fanout sync 확인), <code>jeju-restaurants → 2024-01-22</code> (cluster anchor).</div>
+      </li>
+      <li>
+        <h4>자동 audit trail</h4>
+        <div class="det"><code>apply_log.jsonl</code>의 <strong>172줄</strong>이 모든 PUT의 <code>(post_id, old_published_at, new_published_at, status=ok)</code>을 기록. 역방향 PUT으로 복구 가능.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ── 7. Files ────────────────────────────────────── -->
+<section class="slide" id="files">
+  <div class="page-no">07 / 08 · ARTIFACTS</div>
+  <h2 class="title">남긴 흔적</h2>
+  <p class="sub">작업 후 디스크에 남은 파일. 4개 스크립트, 5개 데이터, 1개 audit, 1건 원격 변경.</p>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <div class="gh"><h3>Scripts</h3><span class="cnt">4</span></div>
+      <ul>
+        <li><span>normalize_imweb.py</span></li>
+        <li><span>fetch_ghost_posts.py</span></li>
+        <li><span>match_and_report.py</span></li>
+        <li><span>apply_dates.py</span></li>
+      </ul>
+      <p class="note"><code>scripts/restore_dates/</code> · 작은 Python 스크립트가 각자 한 가지 일만.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Data</h3><span class="cnt">5</span></div>
+      <ul>
+        <li><span>imweb_en_raw.txt</span><span class="meta">29 lines</span></li>
+        <li><span>imweb_ja_raw.txt</span><span class="meta">54 lines</span></li>
+        <li><span>imweb_originals.jsonl</span><span class="meta">83 records</span></li>
+        <li><span>ghost_namane_posts.jsonl</span><span class="meta">427 records</span></li>
+        <li><span>publish_date_diff.tsv</span><span class="meta">107 clusters</span></li>
+      </ul>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Audit</h3><span class="cnt">1</span></div>
+      <ul>
+        <li><span>apply_log.jsonl</span><span class="meta">172 PUTs</span></li>
+      </ul>
+      <p class="note"><strong>역방향 PUT</strong>으로 모든 변경 복구 가능한 trail.</p>
+      <p class="note" style="margin-top:0; border-top:none; padding-top:0;">
+        원격 변경 — <strong>namane.ghost.io의 172 posts</strong>의 <code>published_at</code>이 2023-12-28 ~ 2026-03-20 사이로 분포.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 8. Next ───────────────────────────────────── -->
+<section class="slide" id="next">
+  <div class="page-no">08 / 08 · WHAT'S NEXT</div>
+  <h2 class="title">남은 일</h2>
+  <p class="sub">발행일은 되돌렸지만 모든 게 끝난 건 아님. 네 가지 후속 작업.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next">
+      <div class="l">Follow-up · A</div>
+      <h3>GSC 재크롤</h3>
+      <p>작업 시점 GSC 미연동. 향후 연동 후 sitemap ping + <strong>URL Inspection API</strong>로 주요 글 재인덱싱 요청 필요.</p>
+    </div>
+    <div class="next">
+      <div class="l">Follow-up · B</div>
+      <h3>본문 stamp 갱신</h3>
+      <p>"2026년 기준" / "(2024 ver.)" 같은 본문 내 연도 stamp는 그대로. 발행일만 변경. <strong>stale 본문이 신뢰성에 영향</strong> 크면 별도 task.</p>
+    </div>
+    <div class="next">
+      <div class="l">Follow-up · C</div>
+      <h3>만료 이벤트 unpublish 정책</h3>
+      <p><code>ddp-kpop-show</code> 같은 종료 이벤트 글은 날짜는 정정됐지만 여전히 publish 상태. <strong>[종료] 표시 또는 unpublish 정책</strong>이 필요.</p>
+    </div>
+    <div class="next">
+      <div class="l">Follow-up · D</div>
+      <h3>알고리즘 재사용</h3>
+      <p>같은 패턴(외부 source 발행일 → Ghost 복원)이 <strong>다른 사이트</strong>에 필요하면 <code>scripts/restore_dates/</code>의 4개 스크립트 재사용 가능. threshold + exclude list만 조정.</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">일회성 작업에서는 정확도보다 투명성, 알고리즘 정교화보다 명시적 처리.</div>
+    <div class="right">livevil-contents · namane Ghost<br>2026-05-13</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+
+  function tick() {
+    const h = document.documentElement;
+    const pct = h.scrollTop / (h.scrollHeight - h.clientHeight) * 100;
+    rail.style.width = Math.min(100, Math.max(0, pct)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      const r = slides[i].getBoundingClientRect();
+      if (r.top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>
