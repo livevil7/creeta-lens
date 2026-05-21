@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.6.2] - 2026-05-21
+
+### Fixed
+
+- **`/cp` PLAN/DONE 가 md 만 남기고 끝나던 문제** — HTML 보고서+board 생성이 부록 "HTML 보고서 뷰" 섹션에만 있고 PLAN Phase 순서에는 단계로 없어서, Phase 흐름대로 따라가면 HTML 이 생성되지 않았음. **Phase 2.6 (PLAN) / Phase 3.5 (DONE)** 을 필수 단계로 명시하고 "Phase 순서 절대" 규칙에 추가. `reportFormat` opt-in 과 무관하게 PLAN/DONE 은 **md + slide-deck HTML + board 를 한 번에** 산출. (`skills/cp/SKILL.md`)
+
 ## [3.6.1] - 2026-05-21
 
 ### Fixed

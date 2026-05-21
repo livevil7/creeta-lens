@@ -238,6 +238,16 @@ Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
 - **Plan B Trigger**: 구체적 신호. "X 단계에서 Y 에러 발생 시" 형태.
 - **불필요한 섹션 생략**: small 작업에 Plan B / Pre-mortem 강제하지 않음 (단, 생략 사유는 명시).
 
+### Phase 2.6: HTML 보고서 + board 생성 (필수 — opt-in 없음)
+
+> **Phase 2.5 의 md 저장 직후 항상 수행한다.** 이 단계를 건너뛰면 `/cp` 가 md 만 남기고 끝나 버린다 — **금지**. `lens.config.json` 설정·`reportFormat` 과 무관하게 PLAN 모드는 **md + HTML + board 를 한 번에** 산출한다.
+
+1. 아래 **"HTML 보고서 뷰 + Task Board"** 섹션의 *작성 절차(1~6)* 대로 `docs/tasks/{id}.html` slide-deck(task 양식, 최대 6슬라이드)을 Claude 가 직접 생성.
+2. `docs/_shared.css` 없으면 `{lens}/templates/report-shared.css` 복사.
+3. `node {lens}/lib/board-builder.js {projectRoot}` 로 `docs/board_<repo>.html` 빌드.
+
+Phase 3(Pre-mortem)은 이 HTML 생성과 독립 — Pre-mortem 이 실패해도 md+HTML 은 이미 보존됨. (Pre-mortem 결과는 md 에 추가 후 board 를 한 번 더 재빌드하면 HTML 에도 반영하려면 `/cp html` 로 재생성.)
+
 ### Phase 3: Pre-mortem (Opus + Codex 병렬)
 
 Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적으로 리스크 분석** 을 수행합니다. 결과는 문서의 `## ⚠️ 사전 리스크` 섹션에 출처를 병기해 저장합니다.
@@ -530,6 +540,14 @@ Q5. 남은 작업이나 주의사항? (선택)
 {Q5 답변, 있을 시}
 ```
 
+### Phase 3.5: HTML 보고서 + board 생성 (필수 — opt-in 없음)
+
+> **Phase 3 의 history md 저장 직후 항상 수행한다.**
+
+1. "HTML 보고서 뷰 + Task Board" 섹션 절차대로 `docs/history/{id}.html` slide-deck(history 양식, 최대 8슬라이드) 생성.
+2. `docs/_shared.css` 없으면 배포.
+3. `node {lens}/lib/board-builder.js {projectRoot}` 로 board 재빌드.
+
 ### Phase 4: 정리
 
 1. `docs/tasks/`에서 원본 Task 파일 **삭제**
@@ -722,4 +740,5 @@ docs/
 - 사용자 언어로 응답 (한국어 우선)
 - 전문가 관점 — 주니어가 놓칠 통찰 제시
 - AskUserQuestion 필수 — 일반 텍스트로 선택지 물어보지 않음
-- Phase 순서 절대 — Goal (P0) → Plan A (P1) → Plan B (P2) → 문서 작성 (P2.5) → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). Goal 먼저, 방법은 그 다음.
+- Phase 순서 절대 — Goal (P0) → Plan A (P1) → Plan B (P2) → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6, 필수)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). Goal 먼저, 방법은 그 다음.
+- **PLAN/DONE 은 md 만 남기고 끝나면 안 된다** — Phase 2.6(PLAN) / Phase 3.5(DONE) 의 HTML+board 생성은 opt-in 이 아니라 필수. `reportFormat` 설정과 무관.
