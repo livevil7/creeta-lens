@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.6.4] - 2026-05-21
+
+범용 공개 배포 하드닝 — 하드코딩 경로/개인정보 제거 + cross-platform 버그 수정. 5개 스킬 + 스크립트 + manifest/template 전수 코드리뷰(병렬 4-에이전트) 결과 반영. 상세 계획: `docs/tasks/2026-05-21-public-distribution-hardening.md`.
+
+### Fixed (v3.6.4)
+
+- **`/cs` auto-commit author 하드코딩 제거 (B1)** — `git-sync-all.sh` 가 `-c user.name="livevil7" -c user.email="livevil7@gmail.com"` 로 작성자를 강제하던 것 제거. 이제 사용자 본인 git config 사용 (낯선 사용자 커밋이 저자에게 오귀속되던 문제). (`scripts/git-sync-all.sh`)
+- **stale repo URL 정정 (B2)** — `CreetaCorp/lens` (renamed, redirect 의존) → 실재 레포 `livevil7/creeta-lens`. plugin.json·marketplace.json·README 9곳. 마켓플레이스 *이름* `CreetaCorp` 와 설치키 `lens@CreetaCorp` 는 유지. (`.claude-plugin/*`, `README.md`)
+- **`upgrade.py --dry-run` 거짓 "nothing to do" (M3)** — dry-run 이 `git fetch` 를 건너뛰어 stale marketplace.json 을 읽던 문제. fetch 는 항상 수행(읽기 전용), pull/merge 만 dry-run 에서 skip. (`scripts/upgrade.py`)
+- **`upgrade.py` 하드코딩 `master` 브랜치 (M4)** — `git pull --ff-only origin master` → 현재 브랜치 동적 감지(`main` 기본 레포 호환). (`scripts/upgrade.py`)
+- **`/cs` push 타겟 하드코딩 (M5)** — pull 은 `@{u}` 에서, push 는 `origin` 고정이라 멀티 remote drift 발생. push 도 upstream 의 remote(`${upstream%%/*}`) 로. (`scripts/git-sync-all.sh`)
+- **개인 컨텍스트/끊긴 포인터/하드코딩 경로 제거 (N1~N6)** — 출하 skill·template 에서: `livevil-setting/docs/rules/coding-principles.md` 외부 포인터 → 프로젝트 `docs/rules/`; cs/SKILL.md 개인 레포명·workspace 문구 일반화; 예시 템플릿의 `livevil-contents`·`namane` → generic; codex-integration.md `/c/Users/ADMIN/.vscode` → `$HOME/.vscode`; "Codex GPT-5.2" → "Codex"; cp/SKILL.md `{lens}` placeholder → `${CLAUDE_PLUGIN_ROOT}`. (`skills/*`, `templates/*`, `docs/rules/codex-integration.md`)
+
+### Changed (v3.6.4)
+
+- **`/cs` 가 플러그인 마켓플레이스 clone 도 동기화 (M1)** — `git-sync-all.sh` 기본 ROOTS 에 `~/.claude/plugins/marketplaces` 추가 → 마켓플레이스 clone 이 더 이상 `/cs` 스캔 밖에서 stale 되지 않음. **pull-only 가드**: 마켓플레이스 경로는 fetch+ff-pull 만, auto-commit/push 절대 안 함(플러그인 자기 repo 보호). 개인 스캔루트(`$HOME/livevil-setting`, `$HOME/spotedcrypto-v2`)는 제거(M6). (`scripts/git-sync-all.sh`)
+- **`bump-version.sh` macOS(BSD sed) 호환 (M2)** — GNU/BSD `sed -i` 분기 감지(`SEDI` 배열)로 macOS 에서도 동작. (`scripts/bump-version.sh`)
+- **`/cp` PLAN 이 md-only 로 끝나는 구조적 결함 차단 (M7)** — Phase 5.0 진입 검사에 **산출물 게이트** 신설: `{id}.md`+`{id}.html`+`board_<repo>.html` 3종이 모두 있어야 Phase 5 진입. 완료된 PLAN = 원자적 3-파일 세트로 재정의. 반복되던 "필수" 경고를 게이트로 대체. (`skills/cp/SKILL.md`)
+
 ## [3.6.3] - 2026-05-21
 
 ### Fixed (v3.6.3)

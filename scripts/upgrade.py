@@ -332,14 +332,17 @@ def phase1_marketplace(ctx: Context) -> None:
         log_ok("working tree clean")
 
     log_step("Fetching origin")
-    if not ctx.dry_run:
-        run(["git", "fetch", "origin"], cwd=MARKETPLACE_DIR)
+    run(["git", "fetch", "origin"], cwd=MARKETPLACE_DIR)
     log_ok("fetched")
 
     log_step("Fast-forward pull")
     if not ctx.dry_run:
+        branch = run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=MARKETPLACE_DIR,
+        ).stdout.strip() or "main"
         pull = run(
-            ["git", "pull", "--ff-only", "origin", "master"],
+            ["git", "pull", "--ff-only", "origin", branch],
             cwd=MARKETPLACE_DIR,
             check=False,
         )

@@ -5,6 +5,13 @@
 
 set -e
 
+# Detect GNU vs BSD sed for cross-platform compatibility
+if sed --version >/dev/null 2>&1; then
+  SEDI=(-i)
+else
+  SEDI=(-i '')
+fi
+
 NEW_VERSION="$1"
 
 if [ -z "$NEW_VERSION" ]; then
@@ -44,46 +51,46 @@ echo "=== Updating 11 files ==="
 # skill banners stuck for several releases.
 
 # 1. .claude-plugin/plugin.json
-sed -i -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
+sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
 echo "[1/10] .claude-plugin/plugin.json"
 
 # 2. .claude-plugin/marketplace.json (version + ref)
-sed -i -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/marketplace.json
-sed -i -E "s/\"ref\": \"v[0-9]+\.[0-9]+\.[0-9]+\"/\"ref\": \"v$NEW_VERSION\"/" .claude-plugin/marketplace.json
+sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/marketplace.json
+sed "${SEDI[@]}" -E "s/\"ref\": \"v[0-9]+\.[0-9]+\.[0-9]+\"/\"ref\": \"v$NEW_VERSION\"/" .claude-plugin/marketplace.json
 echo "[2/10] .claude-plugin/marketplace.json"
 
 # 3. hooks/hooks.json
-sed -i -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/hooks.json
+sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/hooks.json
 echo "[3/10] hooks/hooks.json"
 
 # 4. hooks/session-start.js (multiple occurrences)
-sed -i -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/session-start.js
+sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/session-start.js
 echo "[4/10] hooks/session-start.js"
 
 # 5. skills/c/SKILL.md
-sed -i -E "s/Lens v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens v$NEW_VERSION/g" skills/c/SKILL.md
+sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens v$NEW_VERSION/g" skills/c/SKILL.md
 echo "[5/11] skills/c/SKILL.md"
 
 # 6. skills/cc/SKILL.md
-sed -i -E "s/Lens Multi v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Multi v$NEW_VERSION/g" skills/cc/SKILL.md
+sed "${SEDI[@]}" -E "s/Lens Multi v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Multi v$NEW_VERSION/g" skills/cc/SKILL.md
 echo "[6/11] skills/cc/SKILL.md"
 
 # 7. skills/cp/SKILL.md
-sed -i -E "s/Lens Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
+sed "${SEDI[@]}" -E "s/Lens Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
 echo "[7/11] skills/cp/SKILL.md"
 
 # 8. skills/cs/SKILL.md (banner + "currently X.Y.Z" prose)
-sed -i -E "s/Lens Sync v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Sync v$NEW_VERSION/g" skills/cs/SKILL.md
-sed -i -E "s/currently [0-9]+\.[0-9]+\.[0-9]+/currently $NEW_VERSION/g" skills/cs/SKILL.md
+sed "${SEDI[@]}" -E "s/Lens Sync v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Sync v$NEW_VERSION/g" skills/cs/SKILL.md
+sed "${SEDI[@]}" -E "s/currently [0-9]+\.[0-9]+\.[0-9]+/currently $NEW_VERSION/g" skills/cs/SKILL.md
 echo "[8/11] skills/cs/SKILL.md"
 
 # 9. CLAUDE.md (Current version + Updated date)
-sed -i -E "s/Current: \*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
-sed -i -E "s/Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Updated: $TODAY/" CLAUDE.md
+sed "${SEDI[@]}" -E "s/Current: \*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
+sed "${SEDI[@]}" -E "s/Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Updated: $TODAY/" CLAUDE.md
 echo "[9/11] CLAUDE.md"
 
 # 10. README.md (title)
-sed -i -E "s/^# Lens v[0-9]+\.[0-9]+\.[0-9]+/# Lens v$NEW_VERSION/" README.md
+sed "${SEDI[@]}" -E "s/^# Lens v[0-9]+\.[0-9]+\.[0-9]+/# Lens v$NEW_VERSION/" README.md
 echo "[10/11] README.md"
 
 # 10. CHANGELOG.md - prepend new section header (user fills in details).

@@ -1,20 +1,20 @@
 ---
 name: "cp"
-description: "Lens Plan v3.6.3 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
+description: "Lens Plan v3.6.4 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.6.3 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
+| cp | Lens Plan v3.6.4 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.6.3**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.6.4**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -76,7 +76,7 @@ You are **Lens Plan v3.6.3**, the documentation management engine for Claude Cod
 
 강한 성공 기준 = 독립 루프 가능. 약한 기준("작동하게 해줘") = 매번 확인 필요.
 
-> SoT: `~/.claude/CLAUDE.md` (전문 인라인) / `livevil-setting/docs/rules/coding-principles.md`.
+> SoT: `~/.claude/CLAUDE.md` (전문 인라인) / `docs/rules/coding-principles.md`.
 
 **/cp Pre-mortem과의 관계**: Phase 2.5 Pre-mortem은 Rule 1("Think Before Coding")의 부분 실현이다. 중복이 아니라 Pre-mortem 단계 자체가 Rule 1의 구체적 실행. 계획 작성 시 Rule 2~4는 추가 적용.
 
@@ -238,13 +238,13 @@ Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
 - **Plan B Trigger**: 구체적 신호. "X 단계에서 Y 에러 발생 시" 형태.
 - **불필요한 섹션 생략**: small 작업에 Plan B / Pre-mortem 강제하지 않음 (단, 생략 사유는 명시).
 
-### Phase 2.6: HTML 보고서 + board 생성 (필수 — opt-in 없음)
+### Phase 2.6: HTML 보고서 + board 생성 (필수 — Phase 5.0 산출물 게이트 강제)
 
-> **Phase 2.5 의 md 저장 직후 항상 수행한다.** 이 단계를 건너뛰면 `/cp` 가 md 만 남기고 끝나 버린다 — **금지**. `lens.config.json` 설정·`reportFormat` 과 무관하게 PLAN 모드는 **md + HTML + board 를 한 번에** 산출한다.
+> **Phase 2.5 의 md 저장 직후 항상 수행한다.** 이 단계는 옵션이 아니라 Phase 5 진입의 필수 조건 (산출물 게이트). 건너뛰면 Phase 5 에서 차단됨. 완료된 PLAN = {md, html, board} 의 원자적 3-파일 세트.
 
 1. 아래 **"HTML 보고서 뷰 + Task Board"** 섹션의 *작성 절차(1~6)* 대로 `docs/tasks/{id}.html` slide-deck(task 양식, 최대 6슬라이드)을 Claude 가 직접 생성.
-2. `docs/_shared.css` 없으면 `{lens}/templates/report-shared.css` 복사.
-3. `node {lens}/lib/board-builder.js {projectRoot}` 로 `docs/board_<repo>.html` 빌드.
+2. `docs/_shared.css` 없으면 `${CLAUDE_PLUGIN_ROOT}/templates/report-shared.css` 복사.
+3. `node ${CLAUDE_PLUGIN_ROOT}/lib/board-builder.js {projectRoot}` 로 `docs/board_<repo>.html` 빌드.
 
 Phase 3(Pre-mortem)은 이 HTML 생성과 독립 — Pre-mortem 이 실패해도 md+HTML 은 이미 보존됨. (Pre-mortem 결과는 md 에 추가 후 board 를 한 번 더 재빌드하면 HTML 에도 반영하려면 `/cp html` 로 재생성.)
 
@@ -313,7 +313,7 @@ Codex 호출 중 실패 (timeout, 인증 만료) 시 "Codex 호출 실패: {에�
 ### Claude Opus 관점 (세션 컨텍스트 기반)
 {Opus pre-mortem 응답 본문}
 
-### Codex GPT-5.2 관점 (독립 코드 분석)
+### Codex 관점 (독립 코드 분석)
 {Codex pre-mortem 응답 본문, 또는 "Codex 미설치 — 단일 모델 pre-mortem" 표기}
 
 ### Trigger 매핑 (Pre-mortem 결과 → Plan B 전환점)
@@ -357,6 +357,12 @@ N+2. [Plan A step 2] — execution level (status: pending)
 1. **Goal 게이트** — 동사+산출물 / 성공 기준 ≥1 / Done 명시
 2. **Plan B 게이트** — medium+ 면 필수, small 은 생략 사유 명시
 3. **Pre-mortem 게이트** — Blocker 키워드 발견 시 Modify 강제 모드
+4. **산출물 게이트** — PLAN 모드 진입 전, 세 개 산출물이 모두 존재하는지 검증:
+   - `docs/tasks/{id}.md` 존재하는가?
+   - `docs/tasks/{id}.html` 존재하는가?
+   - `docs/board_<repo>.html` 존재하는가?
+   
+   미충족 시 (html 또는 board 부재) Phase 2.6 으로 회귀해 생성 완료 후 재진입. 완료된 PLAN 의 정의 = 이 3개 파일의 원자적 집합.
 
 게이트 미통과 시 사유 표시하며 Phase 0 또는 Phase 2 로 회귀.
 
@@ -430,18 +436,18 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
 
 ### 작성 절차 (Claude 가 직접 — 의미 분석/재구성, 단순 복붙 금지)
 
-1. `{lens}/templates/report-conversion-spec.md` 를 **Read** — 양식 규칙·일관성 8규칙 흡수
+1. `${CLAUDE_PLUGIN_ROOT}/templates/report-conversion-spec.md` 를 **Read** — 양식 규칙·일관성 8규칙 흡수
 2. 양식별 reference 를 **Read**:
-   - task → `{lens}/templates/report-plan.example.html`
-   - history → `{lens}/templates/report-history.example.html`
+   - task → `${CLAUDE_PLUGIN_ROOT}/templates/report-plan.example.html`
+   - history → `${CLAUDE_PLUGIN_ROOT}/templates/report-history.example.html`
 3. md 의 Goal/Plan A/Plan B/Risks (PLAN) 또는 요약/결정/검증/후속 (DONE) 을 **의미 단위로 슬라이드 재구성**. 원문에 없는 수치 지어내기 금지.
 4. md 와 **같은 폴더에** HTML Write (`docs/tasks/{id}.html` 또는 `docs/history/{id}.html`). `<head>` 에 출처 메타 필수:
    - `<meta name="lens:source" content="docs/{tasks|history}/{id}.md">`
    - `<meta name="lens:source-hash" content="{md 내용 sha256 앞12자}">`
    - `<meta name="lens:builder" content="lens-cp-html">`
    - CSS 링크: `<link rel="stylesheet" href="../_shared.css">` (`_shared.css` 는 `docs/_shared.css` 에 위치)
-5. **자산 배포**: `docs/_shared.css` 가 없으면 `{lens}/templates/report-shared.css` 를 복사. **있으면 skip** (사용자 커스텀 보존).
-6. **board 갱신**: `node {lens}/lib/board-builder.js {projectRoot}` 실행. 빌더는 **idempotent** — 언제 재실행해도 안전.
+5. **자산 배포**: `docs/_shared.css` 가 없으면 `${CLAUDE_PLUGIN_ROOT}/templates/report-shared.css` 를 복사. **있으면 skip** (사용자 커스텀 보존).
+6. **board 갱신**: `node ${CLAUDE_PLUGIN_ROOT}/lib/board-builder.js {projectRoot}` 실행. 빌더는 **idempotent** — 언제 재실행해도 안전.
 
 ### Task Board
 
@@ -471,10 +477,10 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
 ### 실행 흐름
 
 1. `<md-path>` 의 md 파일을 **Read**.
-2. `{lens}/templates/report-conversion-spec.md` 를 **Read** — 양식 규칙 흡수.
+2. `${CLAUDE_PLUGIN_ROOT}/templates/report-conversion-spec.md` 를 **Read** — 양식 규칙 흡수.
 3. md 경로에서 폴더 판별 (`tasks` / `history`) → 양식별 reference **Read**:
-   - `docs/tasks/` 하위 → `{lens}/templates/report-plan.example.html`
-   - `docs/history/` 하위 → `{lens}/templates/report-history.example.html`
+   - `docs/tasks/` 하위 → `${CLAUDE_PLUGIN_ROOT}/templates/report-plan.example.html`
+   - `docs/history/` 하위 → `${CLAUDE_PLUGIN_ROOT}/templates/report-history.example.html`
    - 그 외 → task 양식 기본 적용
 4. md 내용을 **의미 단위로 슬라이드 재구성**. 원문에 없는 수치 지어내기 금지.
 5. md 와 **같은 폴더**에 HTML Write (`<md-path>` 와 동일한 basename + `.html`).
@@ -486,8 +492,8 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
    <meta name="lens:builder" content="lens-cp-html">
    <link rel="stylesheet" href="../_shared.css">
    ```
-7. **자산 배포**: `docs/_shared.css` 없으면 `{lens}/templates/report-shared.css` 복사. 있으면 skip.
-8. **board 갱신**: `node {lens}/lib/board-builder.js {projectRoot}` 실행.
+7. **자산 배포**: `docs/_shared.css` 없으면 `${CLAUDE_PLUGIN_ROOT}/templates/report-shared.css` 복사. 있으면 skip.
+8. **board 갱신**: `node ${CLAUDE_PLUGIN_ROOT}/lib/board-builder.js {projectRoot}` 실행.
 
 ---
 
@@ -546,7 +552,7 @@ Q5. 남은 작업이나 주의사항? (선택)
 
 1. "HTML 보고서 뷰 + Task Board" 섹션 절차대로 `docs/history/{id}.html` slide-deck(history 양식, 최대 8슬라이드) 생성.
 2. `docs/_shared.css` 없으면 배포.
-3. `node {lens}/lib/board-builder.js {projectRoot}` 로 board 재빌드.
+3. `node ${CLAUDE_PLUGIN_ROOT}/lib/board-builder.js {projectRoot}` 로 board 재빌드.
 
 ### Phase 4: 정리
 
@@ -740,5 +746,4 @@ docs/
 - 사용자 언어로 응답 (한국어 우선)
 - 전문가 관점 — 주니어가 놓칠 통찰 제시
 - AskUserQuestion 필수 — 일반 텍스트로 선택지 물어보지 않음
-- Phase 순서 절대 — Goal (P0) → Plan A (P1) → Plan B (P2) → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6, 필수)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). Goal 먼저, 방법은 그 다음.
-- **PLAN/DONE 은 md 만 남기고 끝나면 안 된다** — Phase 2.6(PLAN) / Phase 3.5(DONE) 의 HTML+board 생성은 opt-in 이 아니라 필수. `reportFormat` 설정과 무관.
+- Phase 순서 절대 — Goal (P0) → Plan A (P1) → Plan B (P2) → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6, Phase 5 진입 필수)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). Goal 먼저, 방법은 그 다음. **완료된 PLAN 의 정의 = {md, html, board} 원자적 3-파일 세트** (Phase 5.0 산출물 게이트 강제).

@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.6.3 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
+description: "Lens Multi v3.6.4 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.6.3 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.6.4 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.6.3**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.6.4**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, a Monitor agent tracks progress in real-time, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -80,7 +80,7 @@ You are **Lens Multi v3.6.3**, the parallel task execution engine for Claude Cod
 
 강한 성공 기준 = 독립 루프 가능. 약한 기준("작동하게 해줘") = 매번 확인 필요.
 
-> SoT: `~/.claude/CLAUDE.md` (전문 인라인) / `livevil-setting/docs/rules/coding-principles.md`.
+> SoT: `~/.claude/CLAUDE.md` (전문 인라인) / `docs/rules/coding-principles.md`.
 
 Leader · Worker(병렬) · Supervisor · QA — 모든 phase가 이 4규칙을 따른다. 특히 /cc는 N개 Worker가 병렬 dispatch되므로 **Rule 3(Surgical Changes)이 결정적**: 각 Worker는 본인 task 외 영역을 절대 건드리지 않는다. Worker dispatch 프롬프트에 동일 블록이 박혀 있음.
 
@@ -237,10 +237,10 @@ original_request: {원본 요청}
 
 **실행은 사용자 승인 없이 절대 시작하지 않습니다.**
 
-**AskUserQuestion** (header: "Lens Multi v3.6.3 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.6.4 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.6.3 — 실행 계획
+Lens Multi v3.6.4 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -411,7 +411,7 @@ Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, 및 설치된 MCP 도�
 
 멀티스텝 task면 짧은 계획 명시 (각 step에 verify 체크 동봉).
 
-상세: `livevil-setting/docs/rules/coding-principles.md`
+상세: `docs/rules/coding-principles.md`
 
 ## 실행 규칙
 - 실제 작업을 수행합니다 — 설명만 하지 않음
@@ -542,7 +542,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.6.3 — 반복 {N}/5
+Lens Multi v3.6.4 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -575,7 +575,7 @@ Lens Multi v3.6.3 — 반복 {N}/5
 - **Rule 3 (Surgical)**: 수정 범위 = `fix_instructions` 항목들. 이전에 통과한 부분은 절대 건드리지 마라.
 - **Rule 4 (Goal-Driven)**: `fix_instructions`의 각 항목 = 명시적 성공 기준. 완료 후 self-check.
 
-상세: `livevil-setting/docs/rules/coding-principles.md`
+상세: `docs/rules/coding-principles.md`
 ```
 
 그 후 → **Phase 4 (Supervisor 재검토)**
@@ -683,7 +683,7 @@ Lens Multi v3.6.3 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.6.3 — 최종 결과                       ║
+║   Lens Multi v3.6.4 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -824,7 +824,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.6.3 — 최종 결과
+Lens Multi v3.6.4 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 

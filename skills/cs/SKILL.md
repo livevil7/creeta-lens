@@ -7,7 +7,7 @@ user-invocable: true
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.6.3 — Multi-repo git synchronizer for the namane / livevil / creeta workspace family. Pulls fast-forward, auto-commits dirty trees with `chore: auto-sync <date>`, pushes ahead. Fail-soft: one repo failure does not stop the others. | MIT |
+| cs | Lens Sync v3.6.4 — Multi-repo git synchronizer for any multi-repo workspace. Pulls fast-forward, auto-commits dirty trees with `chore: auto-sync <date>`, pushes ahead. Fail-soft: one repo failure does not stop the others. | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,13 +17,13 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.6.3**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.6.4**, the multi-repository git synchronizer for the Lens-managed workspace.
 
 `/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — most logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
 ## Why `/cs` exists
 
-The user works across a family of repos (`namane-blog`, `livevil-setting`, `creeta-lens`, `Returns-Homepage`, etc.) and across multiple machines (Windows desktop, Mac mini, laptop). Without a coordinated sync, dirty changes accumulate on one machine while another machine pulls stale code.
+The user works across a family of git repos on multiple machines (Windows, macOS, Linux). Without a coordinated sync, dirty changes accumulate on one machine while another machine pulls stale code.
 
 `/cs` is the **explicit, on-demand** counterpart to the SessionStart auto-pull hook (which Lens Sync also installs). The hook keeps incoming changes flowing automatically; `/cs` is what the user types when they want to push outgoing changes too.
 
@@ -44,7 +44,6 @@ Auto-detected from `$HOME` (no hardcoded user/machine paths), overridable via `G
 
 - `$HOME/Documents/Git`, `$HOME/Documents/GIT`
 - `$HOME/projects`, `$HOME/Projects`, `$HOME/git`
-- `$HOME/livevil-setting`, `$HOME/spotedcrypto-v2`
 
 `$HOME` resolves correctly on macOS, Linux, and Windows (Git Bash), so the same defaults work everywhere. If your workspace lives elsewhere, set `GIT_ROOTS="/path/one /path/two"` before invoking.
 
@@ -100,7 +99,7 @@ After invocation, summarize in 1–2 sentences if any repos diverged or failed; 
 
 When `/cs` (or the Stop hook eventually) auto-commits dirty trees, it uses:
 
-- Author: `livevil7 <livevil7@gmail.com>` (forced via `git -c user.name=... -c user.email=...`)
+- Author: The user's configured git identity (via `git config user.name` and `user.email`)
 - Message: `chore: auto-sync YYYY-MM-DD` (single-line)
 - Stages: `git add -A` (everything not gitignored)
 
@@ -141,4 +140,4 @@ If you do not want the auto-pull, set `LENS_SYNC_AUTO_PULL=0` in your environmen
 
 - Script: `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
-- Version: aligned with the Lens plugin version (currently 3.6.3)
+- Version: aligned with the Lens plugin version (currently 3.6.4)

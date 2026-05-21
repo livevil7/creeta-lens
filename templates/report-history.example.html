@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Publish date restore — namane × Ghost · 보고서</title>
+<title>Publish date restore — Blog × Ghost CMS · 보고서</title>
 <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <link rel="stylesheet" href="_shared.css">
 </head>
@@ -22,12 +22,12 @@
     <span class="dot">·</span>
     <span class="badge">Done</span>
     <span class="dot">·</span>
-    <span>namane × Ghost</span>
+    <span>Blog × Ghost CMS</span>
   </div>
 
   <h1 class="h-title">Publish date restore — imweb 원본 발행일을 Ghost에 복원</h1>
   <p class="lede">
-    Imweb 원본 블로그의 실제 발행일을 매칭해 namane Ghost 블로그의 모든 발행일을
+    Imweb 원본 블로그의 실제 발행일을 매칭해 Ghost 블로그의 모든 발행일을
     본래 시점으로 복원한 일회성 데이터 복구 작업.
   </p>
 
@@ -40,7 +40,7 @@
   </div>
 
   <div class="footer-meta">
-    <span>livevil-contents / docs / reports</span>
+    <span>my-project / docs / reports</span>
     <span>2026-05-13-publish-date-restore</span>
   </div>
 </section>
@@ -143,8 +143,8 @@
     <div class="step">
       <div class="n">2</div>
       <h3>Fetch</h3>
-      <p class="what">Ghost Admin API로 namane.ghost.io 글 메타 수집. <strong>427 record</strong>를 jsonl로 저장.</p>
-      <div class="files"><span class="nm">fetch_ghost_posts.py</span><br>→ ghost_namane_posts.jsonl</div>
+      <p class="what">Ghost Admin API로 blog.ghost.io 글 메타 수집. <strong>427 record</strong>를 jsonl로 저장.</p>
+      <div class="files"><span class="nm">fetch_ghost_posts.py</span><br>→ ghost_posts.jsonl</div>
     </div>
     <div class="step">
       <div class="n">3</div>
@@ -265,7 +265,7 @@
         <li><span>imweb_en_raw.txt</span><span class="meta">29 lines</span></li>
         <li><span>imweb_ja_raw.txt</span><span class="meta">54 lines</span></li>
         <li><span>imweb_originals.jsonl</span><span class="meta">83 records</span></li>
-        <li><span>ghost_namane_posts.jsonl</span><span class="meta">427 records</span></li>
+        <li><span>ghost_posts.jsonl</span><span class="meta">427 records</span></li>
         <li><span>publish_date_diff.tsv</span><span class="meta">107 clusters</span></li>
       </ul>
     </div>
@@ -276,7 +276,7 @@
       </ul>
       <p class="note"><strong>역방향 PUT</strong>으로 모든 변경 복구 가능한 trail.</p>
       <p class="note" style="margin-top:0; border-top:none; padding-top:0;">
-        원격 변경 — <strong>namane.ghost.io의 172 posts</strong>의 <code>published_at</code>이 2023-12-28 ~ 2026-03-20 사이로 분포.
+        원격 변경 — <strong>blog.ghost.io의 172 posts</strong>의 <code>published_at</code>이 2023-12-28 ~ 2026-03-20 사이로 분포.
       </p>
     </div>
   </div>
@@ -313,7 +313,7 @@
 
   <div class="signature">
     <div class="quote">일회성 작업에서는 정확도보다 투명성, 알고리즘 정교화보다 명시적 처리.</div>
-    <div class="right">livevil-contents · namane Ghost<br>2026-05-13</div>
+    <div class="right">my-project · task system<br>2026-05-13</div>
   </div>
 </section>
 

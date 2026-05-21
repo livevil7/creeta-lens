@@ -38,7 +38,7 @@ command -v codex
 PATH에 없을 경우, VSCode ChatGPT 확장에 포함된 바이너리를 탐색한다.
 
 ```bash
-ls /c/Users/ADMIN/.vscode/extensions/openai.chatgpt-*/bin/windows-x86_64/codex.exe 2>/dev/null | head -1
+ls $HOME/.vscode/extensions/openai.chatgpt-*/bin/windows-x86_64/codex.exe 2>/dev/null | head -1
 ```
 
 출력된 절대경로를 `CODEX_BIN` 변수에 저장하여 이후 호출에 사용한다.
@@ -77,7 +77,7 @@ codex exec --skip-git-repo-check "프롬프트 내용"
 ### Windows 환경 호출 예
 
 ```bash
-CODEX_BIN=$(ls /c/Users/ADMIN/.vscode/extensions/openai.chatgpt-*/bin/windows-x86_64/codex.exe 2>/dev/null | head -1)
+CODEX_BIN=$(ls $HOME/.vscode/extensions/openai.chatgpt-*/bin/windows-x86_64/codex.exe 2>/dev/null | head -1)
 "$CODEX_BIN" exec --skip-git-repo-check "프롬프트 내용"
 ```
 

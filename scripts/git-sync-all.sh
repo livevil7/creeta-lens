@@ -32,8 +32,7 @@ else
     "$HOME/projects"
     "$HOME/Projects"
     "$HOME/git"
-    "$HOME/livevil-setting"
-    "$HOME/spotedcrypto-v2"
+    "$HOME/.claude/plugins/marketplaces"
   )
 fi
 
@@ -41,7 +40,7 @@ fi
 REPOS=()
 for root in "${ROOTS[@]}"; do
   [ -d "$root" ] || continue
-  # 루트 자체가 repo일 수도 있음 (예: ~/livevil-setting)
+  # 루트 자체가 repo일 수도 있음
   if [ -d "$root/.git" ]; then
     REPOS+=("$root")
   fi
@@ -134,26 +133,34 @@ for repo in "${REPOS[@]}"; do
 
   # ── PUSH 단계 ─────────────────────────
   if [ "$ACTION" = "push" ] || [ "$ACTION" = "sync" ]; then
-    dirty=$(git -C "$repo" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    # marketplace repos는 PULL-ONLY (push 건너뜀)
+    case "$repo" in
+      */.claude/plugins/marketplaces/*)
+        # marketplace는 fetch + pull만 수행, push는 안 함
+        ;;
+      *)
+        dirty=$(git -C "$repo" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 
-    # dirty 있으면 자동 commit
-    if [ "$dirty" != "0" ]; then
-      git -C "$repo" add -A
-      commit_msg="chore: auto-sync $DATE_ISO"
-      git -C "$repo" -c user.name="livevil7" -c user.email="livevil7@gmail.com" \
-        commit -m "$commit_msg" --quiet 2>/dev/null || repo_err="commit failed"
-    fi
+        # dirty 있으면 자동 commit
+        if [ "$dirty" != "0" ]; then
+          git -C "$repo" add -A
+          commit_msg="chore: auto-sync $DATE_ISO"
+          git -C "$repo" commit -m "$commit_msg" --quiet 2>/dev/null || repo_err="commit failed (git user.name/email 미설정 확인)"
+        fi
 
-    # ahead (방금 커밋한 것 포함) 있으면 push
-    ahead=$(git -C "$repo" rev-list --count @{u}..HEAD 2>/dev/null || echo "0")
-    if [ -z "$repo_err" ] && [ "$ahead" != "0" ]; then
-      if git -C "$repo" push --quiet origin HEAD 2>&1; then
-        pushed+=("$name (+$ahead)")
-        did_push=true
-      else
-        repo_err="push failed"
-      fi
-    fi
+        # ahead (방금 커밋한 것 포함) 있으면 push
+        ahead=$(git -C "$repo" rev-list --count @{u}..HEAD 2>/dev/null || echo "0")
+        if [ -z "$repo_err" ] && [ "$ahead" != "0" ]; then
+          upstream_remote="${upstream%%/*}"
+          if git -C "$repo" push --quiet "$upstream_remote" HEAD 2>&1; then
+            pushed+=("$name (+$ahead)")
+            did_push=true
+          else
+            repo_err="push failed"
+          fi
+        fi
+        ;;
+    esac
   fi
 
   if [ -n "$repo_err" ]; then

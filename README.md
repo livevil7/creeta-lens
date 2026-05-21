@@ -1,4 +1,4 @@
-# Lens v3.6.3
+# Lens v3.6.4
 
 **Never wonder which plugin to use again.**
 
@@ -45,8 +45,8 @@ Select a skill and Lens runs it immediately.
 Clone the repo and load it with `--plugin-dir`:
 
 ```bash
-git clone https://github.com/CreetaCorp/lens.git
-claude --plugin-dir ./lens
+git clone https://github.com/livevil7/creeta-lens.git
+claude --plugin-dir ./creeta-lens
 ```
 
 Then use `/lens:c` inside Claude Code.
@@ -57,7 +57,7 @@ Copy the skill file to your user-level commands for a shorter `/c` command:
 
 ```bash
 mkdir -p ~/.claude/commands
-curl -o ~/.claude/commands/c.md https://raw.githubusercontent.com/CreetaCorp/lens/main/skills/c/SKILL.md
+curl -o ~/.claude/commands/c.md https://raw.githubusercontent.com/livevil7/creeta-lens/main/skills/c/SKILL.md
 ```
 
 Restart Claude Code, then use `/c` directly.
