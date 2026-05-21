@@ -600,7 +600,10 @@ code {
     const cmd = "/cp html docs/" + doc.mdPath;
     const ok = () => toast("Command copied — paste into Claude Code:", cmd);
     const fail = () => openModal(cmd);
-    if (navigator.clipboard && navigator.clipboard.writeText) {
+    // file:// is not a secure context — navigator.clipboard is blocked there and
+    // writeText can hang silently. Gate on isSecureContext so file:// goes straight
+    // to the modal (which shows the command for manual copy).
+    if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(cmd).then(ok, fail);
     } else {
       fail();

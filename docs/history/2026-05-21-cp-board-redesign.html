@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lens v3.6.0 — /cp Taskboard 전면 재설계 · 보고서</title>
+<meta name="lens:source" content="docs/history/2026-05-21-cp-board-redesign.md">
+<meta name="lens:source-hash" content="faecddac252a">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">07</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 07 · COVER</div>
+  <div class="meta">
+    <span>2026-05-21</span>
+    <span class="dot">·</span>
+    <span class="badge">Done</span>
+    <span class="dot">·</span>
+    <span>creeta-lens · /cp</span>
+  </div>
+
+  <h1 class="h-title">Lens v3.6.0 — /cp Taskboard 전면 재설계</h1>
+  <p class="lede">
+    <code>docs/{tasks,history,rules}</code> 3폴더를 직접 인덱싱하는 단일 라이트 보드
+    <strong>board_creeta-lens.html</strong>로 전환. md-only 문서엔 Claude 재생성을 거는
+    "convert to html" 버튼. <code>reports/</code> 폐지(비파괴).
+  </p>
+
+  <div class="hero">
+    <div class="num">3.6.0<span class="unit">shipped · /lens-upgrade exit 0</span></div>
+    <div class="caption">
+      commit <strong>c48fcf8</strong> + tag <strong>v3.6.0</strong> push →
+      <code>claude plugin list</code> = v3.6.0. 성공기준 <strong>7/7</strong> 검증.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-05-21-cp-board-redesign</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 07 · AT A GLANCE</div>
+  <h2 class="title">한눈에</h2>
+  <p class="sub">전면 재설계 — 데이터 계약(builder) → 템플릿 → SKILL → 배포. Plan A 그대로, 전환 없음.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">success criteria</div>
+      <div class="v good">7/7</div>
+      <div class="desc">QA 6개 + 재배포 1개 모두 검증.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">folders unified</div>
+      <div class="v">3</div>
+      <div class="desc">tasks · history · rules → 단일 board.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">version</div>
+      <div class="v accent">3.6.0</div>
+      <div class="desc">5.0 → 6.0, board 모델 breaking.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">bug fixed</div>
+      <div class="v warn">1</div>
+      <div class="desc">$-pattern 페이로드 누출 (함수 치환).</div>
+    </div>
+    <div class="kpi">
+      <div class="l">files changed</div>
+      <div class="v">10</div>
+      <div class="desc">builder·template·SKILL·config·버전 5종.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">deploy</div>
+      <div class="v good">OK</div>
+      <div class="desc">push + /lens-upgrade exit 0.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Problem -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 07 · PROBLEM</div>
+  <h2 class="title">왜 했나</h2>
+  <p class="sub">기존 보드는 reports/만 인덱싱하는 opt-in. 사용자는 3폴더 통합 + md→html 전환을 원함.</p>
+
+  <div class="compare" style="margin-top:24px">
+    <div class="panel warn">
+      <h3>Before (v3.5.0)</h3>
+      <p><code>docs/reports/*.html</code>만 스캔. reportFormat: html <strong>opt-in</strong>. rules 미포함. md→html 수단 없음.</p>
+    </div>
+    <div class="panel good">
+      <h3>After (v3.6.0)</h3>
+      <p><code>docs/{tasks,history,rules}</code> 직접 스캔 → 단일 <code>board_&lt;repo&gt;.html</code> <strong>기본 생성</strong>. md-only엔 "convert to html" 버튼.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. How it works -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 07 · HOW IT WORKS</div>
+  <h2 class="title">동작</h2>
+  <p class="sub">정적 file:// 3대 제약(폴더 못 읽음·Claude 못 부름·파일 못 씀)을 설계 전제로.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">1</div>
+      <h3>build</h3>
+      <div class="what"><code>board-builder.js</code>가 3폴더 md+html 스캔, md 본문 inline(escape·40KB 캡·stale 해시) → <code>board_&lt;repo&gt;.html</code>.</div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <h3>view</h3>
+      <div class="what">카드 클릭 → slide-over. html=iframe 슬라이드 데크 / md-only=원본(textContent, XSS-safe) + 전환버튼.</div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <h3>convert</h3>
+      <div class="what">전환버튼 → <code>/cp html docs/&lt;경로&gt;</code> 클립보드 복사 → 붙여넣기 → Claude가 슬라이드 html 생성 + 보드 재빌드.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Decisions -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 07 · DECISIONS</div>
+  <h2 class="title">주요 결정</h2>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec"><strong>전환 = Claude 재생성 요청</strong> — 정적 버튼만으론 슬라이드 데크 품질 불가. 클립보드로 명령 전달.</div>
+    <div class="dec"><strong>전면 재설계 + 비파괴</strong> — reports/ 폐지하되 기존 reports/·board.html 삭제 안 함.</div>
+    <div class="dec"><strong>XSS = escape + textContent만</strong> — innerHTML/마크다운 파싱 금지 → 라이브러리 불필요(단순성).</div>
+    <div class="dec"><strong>라이트 보드 클론</strong> — 다크 초안 반려 후 livevil-contents 기준 보드를 베이스로. Rules는 보라 액센트 참조 구분.</div>
+  </div>
+</section>
+
+<!-- 6. Validation -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 07 · VALIDATION</div>
+  <h2 class="title">검증</h2>
+  <p class="sub">코드 검토가 아니라 실제 실행·브라우저로 증명.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">성공기준 7개 전부 도구로 직접 검증.</div>
+    <ol>
+      <li class="done"><h4>builder</h4><div class="det"><code>node board-builder.js</code> → 19 docs (tasks=3 history=11 rules=5).</div></li>
+      <li class="done"><h4>브라우저</h4><div class="det">라이트 3열, html→iframe, md-only→원본+Convert(클립보드 토스트), 콘솔 에러 0.</div></li>
+      <li class="done"><h4>XSS</h4><div class="det"><code>&lt;script&gt;</code> 픽스처 → raw <code>&lt;/script&gt;</code>=1(보드 자체뿐), escape+textContent 미실행.</div></li>
+      <li class="done"><h4>버그 픽스</h4><div class="det">$-pattern 페이로드 누출 → 함수 치환으로 수정 후 콘솔 에러 0.</div></li>
+      <li class="done"><h4>배포</h4><div class="det">push c48fcf8 + tag v3.6.0 → /lens-upgrade exit 0 → plugin list v3.6.0.</div></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 7. Files + What's next -->
+<section class="slide" id="next">
+  <div class="page-no">07 / 07 · FILES & NEXT</div>
+  <h2 class="title">변경 파일 · 다음</h2>
+
+  <div class="files-grid" style="margin-top:20px">
+    <div class="file-card"><code>lib/board-builder.js</code><span>schema v3 + $ 버그 픽스</span></div>
+    <div class="file-card"><code>templates/board.template.html</code><span>라이트 3열 + slide-over</span></div>
+    <div class="file-card"><code>skills/cp/SKILL.md</code><span>CONVERT 모드 + reports/ 폐기</span></div>
+    <div class="file-card"><code>report-conversion-spec.md</code><span>../_shared.css</span></div>
+    <div class="file-card"><code>lens.config.json</code><span>buildBoard: true</span></div>
+    <div class="file-card"><code>plugin·marketplace·CLAUDE·README·CHANGELOG</code><span>v3.6.0</span></div>
+  </div>
+
+  <div class="next-grid" style="margin-top:20px">
+    <div class="next"><div class="l">후속</div><h3>Claude Code 재시작</h3><p>새 v3.6.0 스킬 로드. 캐시 3.5.0/3.3.1 정리.</p></div>
+    <div class="next"><div class="l">보류</div><h3>creeta-homepage Lens 카피</h3><p>v3.5→현행 갱신 계획서 대기 중.</p></div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">정적 보드는 굽고, 전환은 클립보드로 Claude에 명령을 넘긴다 — file:// 3대 제약의 해답.</div>
+    <div class="right">creeta-lens · /cp 재설계<br>2026-05-21</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

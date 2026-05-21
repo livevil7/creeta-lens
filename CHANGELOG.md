@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.6.1] - 2026-05-21
+
+### Fixed
+
+- **Board "convert to html" 버튼 file:// 먹통 수정** — `navigator.clipboard`는 보안 컨텍스트(https/localhost)에서만 동작하는데, 기존 코드가 `window.isSecureContext`를 확인하지 않아 `file://`에서 토스트도 모달도 안 뜨는 문제. `isSecureContext` 게이트 추가 → `file://`에선 곧바로 "수동 복사" 모달로 폴백. (`templates/board.template.html`)
+
 ## [3.6.0] - 2026-05-21
 
 ### Added (v3.6.0)

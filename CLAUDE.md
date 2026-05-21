@@ -4,9 +4,10 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.6.0**
+- Current: **v3.6.1**
 - Updated: 2026-05-21
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.6.1 fix: board "convert to html" 버튼이 `file://`(비보안 컨텍스트)에서 clipboard 차단 시 수동복사 모달로 폴백 (`isSecureContext` 게이트). 상세: `CHANGELOG.md`.
 - v3.6.0 breaking: `/cp` board 전면 재설계 — `docs/{tasks,history,rules}/` 3-폴더 통합 인덱스 `board_<repo>.html` 생성 (schema v3), `/cp html <md>` CONVERT 모드 신설, `docs/reports/` 폴더 폐지 (비파괴적: 기존 reports/ + board.html 그대로 보존). 상세: `CHANGELOG.md`.
 - v3.4.0 breaking: plan 문서가 Goal-first 구조로 전환 (`Goal → Plan A → Plan B → Risks → Progress → Status`). `/cc` 는 Goal-aware 실행 엔진으로 격상 (SUCCESS_CRITERIA 미달 시 done 차단, Plan A↔B 사용자 confirm 전환). 상세: `CHANGELOG.md`.
 
