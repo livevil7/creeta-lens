@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lens 범용 공개 배포 하드닝 · 완료 보고서</title>
+<meta name="lens:source" content="docs/history/2026-05-21-public-distribution-hardening.md">
+<meta name="lens:source-hash" content="492c0ba41024">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">08</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 08 · COVER</div>
+  <div class="meta">
+    <span>2026-05-21</span>
+    <span class="dot">·</span>
+    <span class="badge">Done</span>
+    <span class="dot">·</span>
+    <span>v3.6.4 · plugin distribution</span>
+  </div>
+
+  <h1 class="h-title">Lens 범용 공개 배포 하드닝 — 하드코딩·개인정보 제거 + cross-platform 버그 수정</h1>
+  <p class="lede">
+    낯선 사용자가 받아 써도 개인 identity 노출·끊긴 포인터·플랫폼 깨짐이 없도록 정리.
+    병렬 4-에이전트 리뷰 → Karpathy 필터 → 6워커 병렬 수정 → QA 실측 → <strong>v3.6.4</strong> 릴리스.
+  </p>
+
+  <div class="hero">
+    <div class="num">15<span class="unit">fixes shipped</span></div>
+    <div class="caption">
+      raw <strong>~70건</strong> 발견 → <strong>15건</strong> 채택(BLOCKER 2·MAJOR 7·MINOR 6),
+      speculative <strong>9건</strong> 거부. 7개 성공기준 전부 실측 PASS.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-05-21-public-distribution-hardening</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 08 · AT A GLANCE</div>
+  <h2 class="title">숫자로 본 결과</h2>
+  <p class="sub">리뷰·필터·실행·검증·릴리스 한 사이클. 6개 지표.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">fixes shipped</div>
+      <div class="v">15</div>
+      <div class="desc">BLOCKER 2 · MAJOR 7 · MINOR 6. 전부 surgical.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">review agents</div>
+      <div class="v accent">4</div>
+      <div class="desc">skill · script · JS/hooks · config/template 병렬.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">rejected (speculative)</div>
+      <div class="v good">9</div>
+      <div class="desc">env var 남발·엔터프라이즈 가정 등 Rule 2 위반 제외.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">QA criteria passed</div>
+      <div class="v good">7 / 7</div>
+      <div class="desc">grep 0건 + 문법 + 구조 + /lens-upgrade 실측.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">parallel workers</div>
+      <div class="v">6</div>
+      <div class="desc">파일 소유권 분리 → 충돌 0.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">released</div>
+      <div class="v accent">v3.6.4</div>
+      <div class="desc">commit fbf6c46 → tag → origin → /lens-upgrade 검증.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Problem -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 08 · PROBLEM</div>
+  <h2 class="title">받아서 쓰면 새거나 깨졌다</h2>
+  <p class="sub">범용 배포 목표인데 저자의 흔적과 플랫폼 가정이 곳곳에 박혀 있었다.</p>
+
+  <div class="compare">
+    <div class="panel warn">
+      <div class="ph"><span class="tag">Before</span><h3>개인 흔적 · 깨짐</h3></div>
+      <div class="post-list">
+        <div class="post-row"><span>/cs commit author</span><span class="pd">livevil7 강제</span></div>
+        <div class="post-row"><span>repo URL</span><span class="pd">CreetaCorp/lens (redirect)</span></div>
+        <div class="post-row"><span>bump-version.sh</span><span class="pd">macOS sed 깨짐</span></div>
+        <div class="post-row"><span>/cp PLAN</span><span class="pd">md만 남기고 종료</span></div>
+        <div class="post-row"><span>skill 문서</span><span class="pd">끊긴 외부 포인터</span></div>
+      </div>
+      <p class="note">낯선 사용자 커밋이 저자에게 오귀속되고, 마켓플레이스는 stale, 문서 포인터는 깨짐.</p>
+    </div>
+    <div class="panel good">
+      <div class="ph"><span class="tag">After</span><h3>중립 · 이식 가능</h3></div>
+      <div class="post-list">
+        <div class="post-row"><span>/cs commit author</span><span class="pd">사용자 git config</span></div>
+        <div class="post-row"><span>repo URL</span><span class="pd">livevil7/creeta-lens</span></div>
+        <div class="post-row"><span>bump-version.sh</span><span class="pd">GNU/BSD 분기</span></div>
+        <div class="post-row"><span>/cp PLAN</span><span class="pd">md+html+board 게이트</span></div>
+        <div class="post-row"><span>skill 문서</span><span class="pd">프로젝트 상대경로</span></div>
+      </div>
+      <p class="note">grep로 개인경로·identity·프로젝트명 0건 검증. 양 플랫폼 동작.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. How it works -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 08 · PIPELINE</div>
+  <h2 class="title">한 사이클이 한 일</h2>
+  <p class="sub">리뷰 → 필터 → 병렬 수정 → 실측 QA → 릴리스. 각 단계 사람이 검토 가능.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">1</div>
+      <h3>병렬 리뷰</h3>
+      <div class="what">4-에이전트가 skill·script·JS·config/template 전수. raw <strong>~70건</strong> 발견(file:line + 근거).</div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <h3>Karpathy 필터</h3>
+      <div class="what">배포 안전성 직결 <strong>15건</strong> 채택, speculative <strong>9건</strong> 거부. 과진단(stat dedup)도 실측 후 정정.</div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <h3>6워커 병렬</h3>
+      <div class="what">파일 소유권 분리(충돌 0). git-sync/upgrade/manifest/cp/skills/templates 동시 수정.</div>
+    </div>
+    <div class="step">
+      <div class="n">4</div>
+      <h3>실측 QA</h3>
+      <div class="what">grep·bash -n·ast.parse·구조 검사로 7기준 검증. 워커 누락 3건 적발·수정.</div>
+    </div>
+    <div class="step">
+      <div class="n">5</div>
+      <h3>릴리스</h3>
+      <div class="what">v3.6.4 commit → tag → origin push → GitHub release → <code>/lens-upgrade</code> 설치 검증.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Decisions -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 08 · KEY DECISIONS</div>
+  <h2 class="title">왜 이렇게 했나</h2>
+  <p class="sub">범용 배포 = "내 흔적이 한 톨도 안 새는가". 안전성 직결만, 나머지는 거부.</p>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec"><div class="n">01</div><div><h3>Karpathy Rule 2로 강하게 필터</h3><p>env var 남발·엔터프라이즈 가정 등 <strong>요청 안 한 유연화 9건 거부</strong>. 배포 안전성과 무관한 speculative 변경 배제.</p></div></div>
+    <div class="dec"><div class="n">02</div><div><h3>marketplace 이름은 유지</h3><p><code>"name":"CreetaCorp"</code>·설치키 <code>lens@CreetaCorp</code>는 식별자라 보존. stale repo URL만 <code>livevil7/creeta-lens</code>로.</p></div></div>
+    <div class="dec"><div class="n">03</div><div><h3>M1 마켓플레이스 = pull-only</h3><p><code>/cs</code>가 플러그인 자기 repo로 push하면 위험 → marketplace 경로는 <strong>fetch+ff-pull만</strong> 가드.</p></div></div>
+    <div class="dec"><div class="n">04</div><div><h3>M7 = 소프트 경고 → 하드 게이트</h3><p>"필수" 문구 반복은 결함의 증상. <strong>Phase 5.0 산출물 게이트</strong>로 md-only 종료를 구조적 차단.</p></div></div>
+    <div class="dec"><div class="n">05</div><div><h3>creetacorp 푸시 제외</h3><p>origin으로 redirect되는 동일 레포 → <strong>origin만 푸시</strong>. 의문 제기된 remote 안 건드림.</p></div></div>
+    <div class="dec"><div class="n">06</div><div><h3>과진단 정정</h3><p>에이전트가 BLOCKER로 본 "Windows stat dedup 깨짐"은 <strong>실측 결과 정상</strong> → 제외.</p></div></div>
+  </div>
+</section>
+
+<!-- 6. Validation -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 08 · VALIDATION</div>
+  <h2 class="title">텍스트 아닌 실제 명령으로</h2>
+  <p class="sub">QA는 "통과한 것 같음" 금지 — 도구로 7기준 직접 증명. 전부 PASS.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">grep 0건 검증 + 문법 + 구조 + 실제 업그레이드 1회.</div>
+    <ol>
+      <li><h4>개인 흔적 grep 0건</h4><div class="det">강제 commit identity / <code>/c/Users·C:/Users·/Users/user</code> / <code>livevil-setting·spotedcrypto·livevil-contents·namane·GPT-5.2</code> 모두 0 (CHANGELOG·history 제외).</div></li>
+      <li><h4>repo URL · 문법</h4><div class="det"><code>CreetaCorp/lens</code> repo URL 0건(name만 잔존). <code>bash -n</code>·<code>ast.parse</code> 전부 OK.</div></li>
+      <li><h4>구조 검사</h4><div class="det"><code>/cs</code> 마켓플레이스 root + pull-only 가드, <code>/cp</code> Phase 5.0 산출물 게이트 존재 확인.</div></li>
+      <li><h4>/lens-upgrade 실측</h4><div class="det">마켓플레이스가 origin에서 v3.6.4 pull → 설치 → <strong>registry 1 entry · plugin list = v3.6.4</strong>. 워커 누락 3건도 QA가 적발·수정.</div></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 7. Files -->
+<section class="slide" id="files">
+  <div class="page-no">07 / 08 · ARTIFACTS</div>
+  <h2 class="title">변경 파일 (23, commit fbf6c46)</h2>
+  <p class="sub">스크립트 3 · manifest/README 3 · 스킬 4 · 템플릿/docs 5 · 기타.</p>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <div class="gh"><h3>Scripts</h3><span class="cnt">3</span></div>
+      <ul>
+        <li><span>git-sync-all.sh</span><span class="meta">B1·M1·M5·M6</span></li>
+        <li><span>upgrade.py</span><span class="meta">M3·M4</span></li>
+        <li><span>bump-version.sh</span><span class="meta">M2</span></li>
+      </ul>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Skills</h3><span class="cnt">4</span></div>
+      <ul>
+        <li><span>cp/SKILL.md</span><span class="meta">M7·N1·N6</span></li>
+        <li><span>c · cc · cs/SKILL.md</span><span class="meta">N1·N2·N4</span></li>
+      </ul>
+      <p class="note">M7 산출물 게이트 + 개인 컨텍스트·{lens} placeholder 제거.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Manifest · Templates · docs</h3><span class="cnt">9</span></div>
+      <ul>
+        <li><span>plugin.json · marketplace.json · README</span><span class="meta">B2</span></li>
+        <li><span>templates/*.html · report-shared.css</span><span class="meta">N3</span></li>
+        <li><span>codex-integration.md</span><span class="meta">N5</span></li>
+      </ul>
+      <p class="note">+ .gitignore(.agents/) · CHANGELOG · CLAUDE.md · hooks · task 문서.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8. Next -->
+<section class="slide" id="next">
+  <div class="page-no">08 / 08 · WHAT'S NEXT</div>
+  <h2 class="title">남은 일</h2>
+  <p class="sub">릴리스는 끝났지만 후속 3가지.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">Action · A</div>
+      <h3>Claude Code 재시작</h3>
+      <p>현재 세션은 캐시 <strong>v3.6.3</strong>로 동작. 재시작해야 v3.6.4 로드.</p>
+    </div>
+    <div class="next">
+      <div class="l">Action · B</div>
+      <h3>stale task 2건 archive</h3>
+      <p><code>2026-05-16-cp-goal-first</code>(v3.4.0)·<code>2026-05-20-cp-html-reports</code>(v3.6.0)는 shipped인데 미archive. 별도 <code>/cp done</code>으로 정리 가능.</p>
+    </div>
+    <div class="next">
+      <div class="l">Action · C</div>
+      <h3>메모리 반영됨</h3>
+      <p><code>/cp</code> 필수 단계(HTML+board) 건너뛰기 금지를 feedback 메모리에 기록(세션 중 2회 발생).</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">범용 배포의 기준은 "내 흔적이 한 톨도 남에게 새지 않는가"다. grep 0건이 곧 done.</div>
+    <div class="right">creeta-lens · docs/history<br>2026-05-21 · v3.6.4</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>
