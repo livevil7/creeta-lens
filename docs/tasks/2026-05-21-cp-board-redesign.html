@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>/cp Taskboard 전면 재설계 · 보고서</title>
+<meta name="lens:source" content="docs/tasks/2026-05-21-cp-board-redesign.md">
+<meta name="lens:source-hash" content="d75b3bc07b62">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">06</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 06 · COVER</div>
+  <div class="meta">
+    <span>2026-05-21</span>
+    <span class="dot">·</span>
+    <span class="badge task">Task</span>
+    <span class="dot">·</span>
+    <span>creeta-lens · /cp</span>
+  </div>
+
+  <h1 class="h-title">/cp Taskboard 전면 재설계 — 폴더 직접 인덱싱 + Claude 전환 버튼</h1>
+  <p class="lede">
+    현재 보드는 <code>docs/reports/*.html</code>만 인덱싱하는 opt-in 기능.
+    이를 <strong>docs/{tasks,history,rules} 세 폴더의 md·html을 한 화면에서 보는
+    단일 보드</strong>로 기본 전환하고, md-only 문서엔 "html로 전환" 버튼을 단다.
+  </p>
+
+  <div class="hero">
+    <div class="num">3<span class="unit">folders → 1 board</span></div>
+    <div class="caption">
+      tasks · history · rules를 <strong>board_creeta-lens.html</strong> 하나로 통합.
+      전환 버튼은 정적 file:// 제약상 <strong>Claude 재생성 요청</strong> 방식.
+      <code>reports/</code> 중간단계 폐기, 버전 3.5.0 → 3.6.0.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / reports</span>
+    <span>2026-05-21-cp-board-redesign</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 06 · AT A GLANCE</div>
+  <h2 class="title">계획 규모</h2>
+  <p class="sub">7개 단계로 분해. builder → template → SKILL 순. 정적 file:// 3대 제약을 설계 전제로 고정.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">success criteria</div>
+      <div class="v">6</div>
+      <div class="desc">board 생성부터 /lens-upgrade 버전 일치까지 검증 가능 기준.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">plan steps</div>
+      <div class="v accent">7</div>
+      <div class="desc">스캐너 재작성 → 템플릿 → SKILL → CSS 정합 → config → 마이그레이션 → 재배포.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">folders unified</div>
+      <div class="v">3</div>
+      <div class="desc">tasks · history · rules를 단일 board에서 동시 표시.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">file:// 제약</div>
+      <div class="v warn">3</div>
+      <div class="desc">폴더 못 읽음 · Claude 호출 불가 · 파일 쓰기 불가.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">pre-mortem 모델</div>
+      <div class="v">2</div>
+      <div class="desc">Opus(세션) + Codex(독립). 치명 리스크 = md inline XSS.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">version</div>
+      <div class="v accent">3.6.0</div>
+      <div class="desc">board 모델 breaking. reports/ 비파괴 보존.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Goal -->
+<section class="slide" id="goal">
+  <div class="page-no">03 / 06 · GOAL</div>
+  <h2 class="title">목표 — 검증 가능한 결과물</h2>
+  <p class="sub">단순 viewer가 아니라, 세 폴더의 문서를 한 화면에서 보고 md→html 전환까지 거는 단일 보드.</p>
+
+  <div class="goal-list" style="margin-top:24px">
+    <div class="goal"><div class="box"></div><div class="t"><strong>board-builder 재작성</strong> — <code>docs/{tasks,history,rules}</code>의 md+html 직접 스캔 → 단일 <code>board_creeta-lens.html</code> 생성, tasks/history/rules 카운트 출력.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>3폴더 통합 뷰</strong> — file://로 열면 세 폴더의 md·html 문서가 모두 카드로 표시.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>뷰어 분기</strong> — html 클릭 → 슬라이드 데크 iframe / md-only 클릭 → 원본 + "전환" 버튼.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>전환 버튼</strong> — 클릭 시 <code>/cp html &lt;경로&gt;</code> 클립보드 복사 + 토스트 (Claude 재생성 요청).</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>CONVERT 모드</strong> — <code>/cp html &lt;md&gt;</code> → 같은 폴더에 슬라이드 데크 html 생성 + 보드 재빌드.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>재배포 검증</strong> — 소스 수정 후 <code>/lens-upgrade</code> → 캐시 버전 일치 (캐시는 휘발, 소스가 SoT).</div></div>
+  </div>
+</section>
+
+<!-- 4. Plan -->
+<section class="slide" id="plan">
+  <div class="page-no">04 / 06 · PLAN</div>
+  <h2 class="title">7개 단계 (Plan A)</h2>
+  <p class="sub">데이터 계약 먼저 확정 → 템플릿/SKILL이 그 위에. 거꾸로 하면 재작업.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">1</div>
+      <h3>스캐너 재작성</h3>
+      <div class="what"><code>board-builder.js</code>: 3폴더 md+html 스캔, basename 페어링, repo명 도출, md inline(escape·40KB 캡·stale 유지), schema v3.</div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <h3>board 템플릿</h3>
+      <div class="what">3폴더 그룹 + 뷰어 pane. md는 <strong>escape+<code>&lt;pre&gt;</code>+textContent</strong>(XSS 차단). 전환버튼 클립보드 + 실패 모달.</div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <h3>SKILL.md</h3>
+      <div class="what">신규 <code>/cp html &lt;file&gt;</code> CONVERT 모드. 보드 기본 생성(opt-in 해제), <code>board_&lt;repo&gt;.html</code>, reports/ 폐기. builder idempotent.</div>
+    </div>
+    <div class="step">
+      <div class="n">4</div>
+      <h3>CSS 경로 정합</h3>
+      <div class="what">html이 폴더에 흩어지므로 <code>_shared.css</code> 위치/상대경로 단일화. conversion-spec 동기.</div>
+    </div>
+    <div class="step">
+      <div class="n">5</div>
+      <h3>config 연동</h3>
+      <div class="what"><code>lens.config.json</code> buildBoard 기본 ON, reportFormat 재정의. plan-manager의 reports/ 가정 갱신.</div>
+    </div>
+    <div class="step">
+      <div class="n">6</div>
+      <h3>마이그레이션 + 버전</h3>
+      <div class="what">reports/ <strong>비파괴</strong> 보존(하드삭제 금지). 3.5.0 → 3.6.0, CHANGELOG 마이그레이션 노트.</div>
+    </div>
+    <div class="step">
+      <div class="n">7</div>
+      <h3>검증 + 재배포</h3>
+      <div class="what">성공기준 6개 수기 검증 → 커밋 → <code>/lens-upgrade</code> → <code>claude plugin list</code> 버전 확인.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Risks -->
+<section class="slide" id="risks">
+  <div class="page-no">05 / 06 · RISKS</div>
+  <h2 class="title">사전 리스크</h2>
+  <p class="sub">Opus(세션 컨텍스트) + Codex(독립 분석). data-loss급 Blocker 없음 — 모두 설계 제약·신규 step으로 흡수.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">Codex · 치명</div>
+      <h3>md inline XSS</h3>
+      <p>md에 <code>script</code>·<code>iframe</code>·<code>onerror</code> 섞이면 file:// 보드에서도 임의 JS 실행. → md는 <strong>escape+textContent만</strong>, innerHTML/파싱 금지.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">Codex · UX</div>
+      <h3>전환 버튼 silent 실패</h3>
+      <p>file://·비보안·권한·제스처로 클립보드 차단 시 복사 실패인데 변환된 줄 오해. → <strong>성공/실패 토스트 + 실패 모달</strong>(수동 복사).</p>
+    </div>
+    <div class="next warn">
+      <div class="l">Codex · 호환</div>
+      <h3>reports/ 폐기 충격</h3>
+      <p>기존 reports 링크/automation 404·카드 누락. → <strong>하드 삭제 금지</strong>, 비파괴 보존 + 선택적 마이그레이션 안내.</p>
+    </div>
+    <div class="next">
+      <div class="l">Opus · 원칙</div>
+      <h3>md = SoT 유지</h3>
+      <p>board에 md inline해도 board는 파생 스냅샷. 진실은 디스크. <strong>stale 해시 감지 보존</strong> — inline이 디스크와 어긋나면 stale 표시.</p>
+    </div>
+    <div class="next">
+      <div class="l">Codex · 성능</div>
+      <h3>대용량 md inline</h3>
+      <p>큰 md를 통째 inline하면 board 비대. → 40KB 초과 truncate + "원본 열기" 링크.</p>
+    </div>
+    <div class="next">
+      <div class="l">Opus · 단순성</div>
+      <h3>마크다운 라이브러리 불필요</h3>
+      <p>"보기 좋은" 렌더는 Claude 생성 html의 몫. board의 md뷰는 escape 텍스트로 충분 — XSS 차단과 단순성 동시 달성.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Resume -->
+<section class="slide" id="resume">
+  <div class="page-no">06 / 06 · RESUME</div>
+  <h2 class="title">재개 포인트</h2>
+  <p class="sub">다음 세션 진입 시 여기부터. 데이터 계약(builder 출력 schema)이 모든 후속의 전제.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">step 1(board-builder 데이터 모델)을 먼저 확정해야 template·SKILL이 그 위에 올라간다. 구현 타깃은 creeta-lens 소스 — 캐시 수정은 휘발.</div>
+    <ol>
+      <li class="todo">
+        <h4>step 1 — board-builder.js 재작성</h4>
+        <div class="det">3폴더 md+html 스캔 → schema v3. <code>node lib/board-builder.js</code>로 board_creeta-lens.html 생성 확인.</div>
+      </li>
+      <li class="todo">
+        <h4>step 2 — board.template.html 재작성</h4>
+        <div class="det">XSS-safe md뷰(escape+pre) + 전환버튼. <code>&lt;script&gt;</code> 포함 픽스처로 미실행 확인.</div>
+      </li>
+    </ol>
+  </div>
+
+  <div class="signature">
+    <div class="quote">정적 file://는 폴더를 못 읽고 Claude를 못 부른다 — 그래서 board는 굽고, 전환은 클립보드로 명령을 넘긴다.</div>
+    <div class="right">creeta-lens · /cp 재설계<br>2026-05-21</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

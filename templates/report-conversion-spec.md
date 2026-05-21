@@ -1,6 +1,6 @@
 # Reports HTML 변환 규칙 (conversion spec)
 
-> lens cp 가 만드는 모든 `docs/reports/*.html` 보고서는 이 규칙을 따른다. 일관성의 단일 기준.
+> lens cp 가 만드는 모든 slide-deck HTML 보고서는 이 규칙을 따른다. 일관성의 단일 기준.
 > **reference 구현 (작성 전 반드시 Read):**
 > - history 양식 (완료 보고서, 8슬라이드): `report-history.example.html`
 > - task 양식 (계획 보고서, 6슬라이드): `report-plan.example.html`
@@ -16,11 +16,11 @@
 
 ## 파일 규칙
 
-- **파일명**: `{YYYY-MM-DD}-{slug}.html` — 원본 md 파일명과 동일 (확장자만 .html).
-- **CSS**: 인라인 금지. `<link rel="stylesheet" href="_shared.css">` 만 사용.
+- **파일명**: `{YYYY-MM-DD}-{slug}.html` — 원본 md 파일명과 동일 (확장자만 .html). md 파일 **바로 옆**에 저장 (`docs/tasks/` 또는 `docs/history/`).
+- **CSS**: 인라인 금지. `<link rel="stylesheet" href="../_shared.css">` 만 사용. (`_shared.css`는 `docs/_shared.css` 위치, slide-deck html 에서 `../`로 참조).
 - **폰트**: Pretendard CDN link (reference의 head 그대로 복사).
 - **JS**: 하단 progress rail + crumb 스크립트만 (reference 그대로). 그 외 JS 금지.
-- **self-contained 아님**: `_shared.css`와 같은 폴더(`reports/`)에 있어야 동작.
+- **self-contained 아님**: `docs/_shared.css`가 있어야 동작. board는 `docs/board_<repo>.html`에 생성됨.
 
 ## 공통 head (복사해서 사용)
 
@@ -32,7 +32,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{제목} · 보고서</title>
 <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="_shared.css">
+<link rel="stylesheet" href="../_shared.css">
 </head>
 ```
 

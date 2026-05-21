@@ -10,5 +10,5 @@
   "saveSynthesisResults": true,
   "resultsDir": null,
   "reportFormat": "md",
-  "buildBoard": false
+  "buildBoard": true
 }

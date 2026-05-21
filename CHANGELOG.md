@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.6.0] - 2026-05-21
+
+### Added (v3.6.0)
+
+- **3-folder board `board_<repo>.html`** — `lib/board-builder.js` (schema v3) 재작성. `docs/tasks/`, `docs/history/`, `docs/rules/` 세 폴더를 단일 뷰로 통합 인덱스. `.md`+`.html` basename 페어링, md 텍스트 인라인(40KB cap), `lens:source-hash` stale 감지. 보드명은 git remote / 디렉토리명에서 자동 추출 (`board_<repo>.html`).
+- **`/cp html <md-path>` CONVERT 모드** — md 파일 옆에 슬라이드덱 HTML을 생성(`docs/tasks/` 또는 `docs/history/`), 이후 board 자동 재빌드. 이전에는 md-only 문서였던 것을 HTML 뷰로 변환하는 명시적 진입점.
+- **md-only 문서 raw 렌더링** — html 파일이 없는 md 문서는 board에서 raw md를 textContent로 표시(XSS-safe) + "convert to html" 버튼(클립보드에 `/cp html docs/<folder>/<id>.md` 복사)으로 안내.
+
+### Changed (v3.6.0)
+
+- **Board 기본 생성(default-on)** — 이전: `reportFormat: "html"` opt-in 시에만 생성. 이제 `/cp` PLAN/DONE 실행 시 항상 `board_<repo>.html` 재빌드.
+- **슬라이드덱 HTML 위치 변경** — `docs/reports/{id}.html` → md 파일과 동일 폴더(`docs/tasks/` 또는 `docs/history/`) 내 생성.
+- **`_shared.css` 이동** — `templates/report-shared.css` → `docs/_shared.css`. 보드 및 슬라이드덱이 `../docs/_shared.css` 없이 동일 폴더 기준 참조.
+
+### Removed / Breaking (v3.6.0)
+
+- **`docs/reports/` 중간 폴더 폐지** — 신규 빌더는 `docs/reports/` 를 생성하거나 읽지 않음. **비파괴적 마이그레이션**: 기존 `docs/reports/*.html` 및 `docs/board.html` 은 삭제·수정되지 않음(새 보드 파일명 `board_<repo>.html` 이 달라 공존). 사용자가 직접 html 파일을 해당 폴더로 이동하면 신규 board 에 편입됨.
+
+### Security (v3.6.0)
+
+- **md textContent 렌더링 — XSS-safe** — board 내 md-only 문서는 `innerHTML` 없이 `textContent` 로 삽입. 외부 html 뷰는 `<iframe>` sandbox 격리.
+
 ## [3.5.0] - 2026-05-20
 
 ### Added (v3.5.0)
