@@ -4,7 +4,7 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.6.2**
+- Current: **v3.6.3**
 - Updated: 2026-05-21
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.6.2 fix: `/cp` PLAN/DONE 흐름에 HTML 보고서+board 생성을 **필수 Phase(2.6 / 3.5)** 로 박음 — 부록 섹션에만 있어 md 만 나오던 문제 해결. `reportFormat` opt-in 무관, 한 번에 md+HTML+board 산출. 상세: `CHANGELOG.md`.

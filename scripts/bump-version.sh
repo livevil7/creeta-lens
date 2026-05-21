@@ -36,11 +36,12 @@ fi
 
 TODAY=$(date +%Y-%m-%d)
 
-echo "=== Updating 10 files ==="
+echo "=== Updating 11 files ==="
 
-# Regex patterns match ANY v[0-9].[0-9].[0-9] so hardcoded stale versions
-# get caught even when they drift from $CURRENT (e.g. v3.1.0 left behind
-# after a bump that only touched plugin.json).
+# Regex patterns match ANY v MAJOR.MINOR(.PATCH)? — the patch segment is
+# optional so 2-part banners (e.g. "Lens v3.1", "Lens Multi v3.4") are caught
+# too. Earlier 3-part-only patterns silently skipped those, leaving the c/cc/cs
+# skill banners stuck for several releases.
 
 # 1. .claude-plugin/plugin.json
 sed -i -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
@@ -60,25 +61,30 @@ sed -i -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/session-st
 echo "[4/10] hooks/session-start.js"
 
 # 5. skills/c/SKILL.md
-sed -i -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" skills/c/SKILL.md
-echo "[5/10] skills/c/SKILL.md"
+sed -i -E "s/Lens v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens v$NEW_VERSION/g" skills/c/SKILL.md
+echo "[5/11] skills/c/SKILL.md"
 
 # 6. skills/cc/SKILL.md
-sed -i -E "s/Lens Multi v[0-9]+\.[0-9]+\.[0-9]+/Lens Multi v$NEW_VERSION/g" skills/cc/SKILL.md
-echo "[6/10] skills/cc/SKILL.md"
+sed -i -E "s/Lens Multi v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Multi v$NEW_VERSION/g" skills/cc/SKILL.md
+echo "[6/11] skills/cc/SKILL.md"
 
 # 7. skills/cp/SKILL.md
-sed -i -E "s/Lens Plan v[0-9]+\.[0-9]+\.[0-9]+/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
-echo "[7/10] skills/cp/SKILL.md"
+sed -i -E "s/Lens Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
+echo "[7/11] skills/cp/SKILL.md"
 
-# 8. CLAUDE.md (Current version + Updated date)
+# 8. skills/cs/SKILL.md (banner + "currently X.Y.Z" prose)
+sed -i -E "s/Lens Sync v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Sync v$NEW_VERSION/g" skills/cs/SKILL.md
+sed -i -E "s/currently [0-9]+\.[0-9]+\.[0-9]+/currently $NEW_VERSION/g" skills/cs/SKILL.md
+echo "[8/11] skills/cs/SKILL.md"
+
+# 9. CLAUDE.md (Current version + Updated date)
 sed -i -E "s/Current: \*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
 sed -i -E "s/Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Updated: $TODAY/" CLAUDE.md
-echo "[8/10] CLAUDE.md"
+echo "[9/11] CLAUDE.md"
 
-# 9. README.md (title)
+# 10. README.md (title)
 sed -i -E "s/^# Lens v[0-9]+\.[0-9]+\.[0-9]+/# Lens v$NEW_VERSION/" README.md
-echo "[9/10] README.md"
+echo "[10/11] README.md"
 
 # 10. CHANGELOG.md - prepend new section header (user fills in details).
 # Uses awk because git-bash sed can choke on multi-line substitutions.
@@ -95,7 +101,7 @@ NR==1 {
 }
 { print }
 ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
-echo "[10/10] CHANGELOG.md (template added - fill in details)"
+echo "[11/11] CHANGELOG.md (template added - fill in details)"
 
 echo ""
 echo "=== Verification ==="
@@ -109,11 +115,12 @@ COUNT=$(grep -rl "v$NEW_VERSION\|\"$NEW_VERSION\"" \
   skills/c/SKILL.md \
   skills/cc/SKILL.md \
   skills/cp/SKILL.md \
+  skills/cs/SKILL.md \
   CLAUDE.md \
   README.md \
   CHANGELOG.md 2>/dev/null | wc -l)
 
-echo "Files with v$NEW_VERSION: $COUNT/10"
+echo "Files with v$NEW_VERSION: $COUNT/11"
 
 # Check stale version remnants — any v[0-9].[0-9].[0-9] that is NOT the new
 # version, across version-bearing files (excludes CHANGELOG and docs/history

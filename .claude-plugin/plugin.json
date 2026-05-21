@@ -1,6 +1,6 @@
 {
   "name": "lens",
-  "version": "3.6.2",
+  "version": "3.6.3",
   "description": "Skill navigator + multi-repo git sync for Claude Code. Scans plugins (Skills, MCP, LSP), recommends best match in 8 languages, executes with /c, /cc, /cp. Multi-repo sync with /cs (auto-pull on session start, push on demand).",
   "author": {
     "name": "Lens",

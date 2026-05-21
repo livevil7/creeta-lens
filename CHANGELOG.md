@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.6.3] - 2026-05-21
+
+### Fixed (v3.6.3)
+
+- **`/cs` workspace-root 문서가 거짓 절대경로를 안내하던 문제** — `skills/cs/SKILL.md` 의 "Workspace roots" 가 Windows 기본값을 `/c/Users/ADMIN/Documents/GIT` 로 하드코딩 표기했으나, 실제 `git-sync-all.sh` 는 `$HOME` 기반 후보(`$HOME/Documents/Git` 등)를 자동 탐지하며 그런 경로를 쓰지 않음. 잘못된 문서를 믿고 불필요하게 `GIT_ROOTS` 를 넘기게 되는 혼란 유발. 실제 `$HOME` 기반 자동 탐지 동작에 맞게 정정 (코드 변경 없음, 문서 drift 수정). (`skills/cs/SKILL.md`)
+- **skill 배너 버전이 여러 릴리스 동안 stale 했던 문제** — `bump-version.sh` 의 치환 정규식이 3-part(`vX.Y.Z`)만 매칭해서, 2-part 배너(`Lens v3.1`, `Lens Multi v3.4`, `Lens Plan v3.5`, `Lens Sync v3.2`)는 매 릴리스마다 조용히 건너뛰어졌음. 4개 skill 배너를 모두 v3.6.3 으로 정렬. (`skills/{c,cc,cp,cs}/SKILL.md`)
+
+### Changed (v3.6.3)
+
+- **`bump-version.sh` 재발 방지 강화** — (1) 치환 정규식의 patch 세그먼트를 optional(`vX.Y(.Z)?`)로 바꿔 2-part 배너도 잡도록 함, (2) 빠져 있던 `skills/cs/SKILL.md` 를 bump 대상(10→11 files)에 추가 (banner + "currently X.Y.Z" prose). (`scripts/bump-version.sh`)
+
 ## [3.6.2] - 2026-05-21
 
 ### Fixed
