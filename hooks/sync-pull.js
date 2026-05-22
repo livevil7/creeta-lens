@@ -2,10 +2,13 @@
 /**
  * Lens Sync — SessionStart auto-pull hook.
  *
- * Runs `git-sync-all.sh pull` on session start to bring incoming changes from
- * other machines. Push is NOT automatic — that requires explicit /cs invocation.
+ * OFF by default. When enabled, runs `git-sync-all.sh pull` on session start to
+ * bring in changes pushed from other machines. Push is NEVER automatic — that
+ * requires explicit /cs invocation.
  *
- * Opt-out: set LENS_SYNC_AUTO_PULL=0 in env.
+ * Opt-in: set LENS_SYNC_AUTO_PULL=1 in env. Default (unset) skips the pull so a
+ * slow multi-repo fetch can never delay session startup. Explicit `/cs pull`
+ * runs git-sync-all.sh directly and is unaffected by this gate.
  *
  * Cross-platform: resolves Bash path for Windows (Git for Windows), macOS, Linux.
  *
@@ -25,8 +28,9 @@ function log(msg) {
   process.stderr.write(`[lens-sync] ${msg}\n`);
 }
 
-if (process.env.LENS_SYNC_AUTO_PULL === "0") {
-  log("auto-pull disabled by LENS_SYNC_AUTO_PULL=0");
+const optIn = process.env.LENS_SYNC_AUTO_PULL;
+if (optIn !== "1" && optIn !== "true") {
+  log("auto-pull off by default (set LENS_SYNC_AUTO_PULL=1 to enable; /cs pull is unaffected)");
   process.exit(0);
 }
 
