@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.6.5] - 2026-05-22
+
+SessionStart auto-pull 을 기본 OFF(opt-in)로 전환 — 느린 멀티레포 fetch 가 세션 시작을 지연/중단시키던 root cause 차단.
+
+### Changed (v3.6.5)
+
+- **SessionStart auto-pull 기본 OFF (opt-in 전환)** — `LENS_SYNC_AUTO_PULL` 의 의미가 opt-out(`=0` 으로 끔, 기본 ON)에서 opt-in(`=1`/`true` 로 켬, 기본 OFF)으로 바뀜. 기본 세션 시작 경로에서 git fetch/pull 네트워크 I/O 를 완전히 제거. 명시적 `/cs pull` 은 이 게이트와 무관하게 동작하므로 on-demand sync 는 그대로 가능. 자동 sync 가 필요하면 env 에 `LENS_SYNC_AUTO_PULL=1` 설정. (`hooks/sync-pull.js`)
+- **auto-pull 을 기본 동작처럼 설명하던 문서 정정** — opt-in 으로 표기 통일: `plugin.json`·`marketplace.json` description, `skills/cs/SKILL.md` 3곳(Why /cs · Hook complement · Relationship). (`.claude-plugin/*`, `skills/cs/SKILL.md`)
+
+### Fixed (v3.6.5)
+
+- **세션 시작 지연/중단 root cause** — SessionStart 의 sync-pull hook 이 워크스페이스 전 repo(약 23개)를 동기적으로 pull 하면서 cold start 가 ~59.6s 까지 도달, host(VS Code Claude Code 확장)의 세션 초기화 예산(~60s)을 거의 초과해 시작이 지연/중단되던 문제. hook timeout 은 90s 로 잡혀 있어 init 예산을 넘길 수 있었음. 기본 OFF 전환으로 시작 경로의 무제한 네트워크 I/O 자체를 제거해 해결(timeout 값 자체는 opt-in pull 을 위해 90s 유지). (`hooks/sync-pull.js`, `hooks/hooks.json`)
+
 ## [3.6.4] - 2026-05-21
 
 범용 공개 배포 하드닝 — 하드코딩 경로/개인정보 제거 + cross-platform 버그 수정. 5개 스킬 + 스크립트 + manifest/template 전수 코드리뷰(병렬 4-에이전트) 결과 반영. 상세 계획: `docs/tasks/2026-05-21-public-distribution-hardening.md`.

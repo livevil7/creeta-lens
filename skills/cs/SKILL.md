@@ -7,7 +7,7 @@ user-invocable: true
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.6.4 — Multi-repo git synchronizer for any multi-repo workspace. Pulls fast-forward, auto-commits dirty trees with `chore: auto-sync <date>`, pushes ahead. Fail-soft: one repo failure does not stop the others. | MIT |
+| cs | Lens Sync v3.6.5 — Multi-repo git synchronizer for any multi-repo workspace. Pulls fast-forward, auto-commits dirty trees with `chore: auto-sync <date>`, pushes ahead. Fail-soft: one repo failure does not stop the others. | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,7 +17,7 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.6.4**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.6.5**, the multi-repository git synchronizer for the Lens-managed workspace.
 
 `/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — most logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
@@ -25,7 +25,7 @@ You are **Lens Sync v3.6.4**, the multi-repository git synchronizer for the Lens
 
 The user works across a family of git repos on multiple machines (Windows, macOS, Linux). Without a coordinated sync, dirty changes accumulate on one machine while another machine pulls stale code.
 
-`/cs` is the **explicit, on-demand** counterpart to the SessionStart auto-pull hook (which Lens Sync also installs). The hook keeps incoming changes flowing automatically; `/cs` is what the user types when they want to push outgoing changes too.
+`/cs` is the **explicit, on-demand** counterpart to the SessionStart auto-pull hook (which Lens Sync also installs, **off by default**). When enabled with `LENS_SYNC_AUTO_PULL=1`, the hook keeps incoming changes flowing automatically; `/cs` is what the user types when they want to pull on demand or push outgoing changes too.
 
 ## What it does
 
@@ -120,9 +120,9 @@ Common failure modes and what they mean:
 
 ## Hook complement
 
-Lens Sync also registers a `SessionStart` hook that runs **`/cs pull` automatically** at the start of every session. This means incoming changes from other machines are always picked up before you start working. Outgoing changes still require explicit `/cs` (or `/cs push`) — there is no auto-push in this version.
+Lens Sync also registers a `SessionStart` hook that can run **`/cs pull` automatically** at the start of every session, so incoming changes from other machines are picked up before you start working. Outgoing changes always require explicit `/cs` (or `/cs push`) — there is no auto-push.
 
-If you do not want the auto-pull, set `LENS_SYNC_AUTO_PULL=0` in your environment.
+This hook is **off by default** so a slow multi-repo fetch can never delay session startup. To enable it, set `LENS_SYNC_AUTO_PULL=1` in your environment. Explicit `/cs pull` works regardless of this setting.
 
 ## When NOT to use /cs
 
@@ -134,10 +134,10 @@ If you do not want the auto-pull, set `LENS_SYNC_AUTO_PULL=0` in your environmen
 
 - `/c` (single execution) and `/cc` (parallel execution) are about *running tasks*. `/cs` is about *synchronizing source code state*.
 - `/cp` writes plan documents. `/cs` does not touch documents — it just syncs whatever is on disk.
-- The SessionStart auto-pull is a passive partner of `/cs`. They share the same `git-sync-all.sh` script.
+- The SessionStart auto-pull (opt-in via `LENS_SYNC_AUTO_PULL=1`) is a passive partner of `/cs`. They share the same `git-sync-all.sh` script.
 
 ## Implementation pointer
 
 - Script: `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
-- Version: aligned with the Lens plugin version (currently 3.6.4)
+- Version: aligned with the Lens plugin version (currently 3.6.5)
