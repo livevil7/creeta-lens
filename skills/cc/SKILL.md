@@ -172,6 +172,10 @@ original_request: {원본 요청}
 - [ ] {기준 1}
 - [ ] {기준 2}
 
+[VERIFICATION — 각 기준의 확인 방법, Phase 6 QA 가 그대로 실행]
+| 성공 기준 | 검증 방법 | 기대 결과 |
+| {기준 1} | {명령/액션} | {pass 판정} |
+
 [CURRENT_PATH] Plan A
 [PLAN_A_STEPS] {Plan A 체크리스트}
 [PLAN_A_FAILURE_TRIGGERS] {막힐 수 있는 지점}
@@ -199,6 +203,7 @@ original_request: {원본 요청}
 - Goal 자체는 `/cc` 가 **수정 권한 없음** — 약하다고 판단되면 사용자에게 "Goal 재정의 권장 — /cp Modify" 회신
 - SUCCESS_CRITERIA 는 Phase 6 QA 의 직접 검증 대상
 - Plan A↔B 전환은 plan 문서의 `## 진행상황` 의 `현재 경로` 항목만 갱신, Goal 은 건드리지 않음
+- **네이티브 /goal 호환 (필수)**: 본 실행이 사용자의 네이티브 클로드 코드 `/goal` 하에서 돌 수 있다. `/goal` 평가자(기본 Haiku)는 **도구를 못 쓰고 대화에 드러난 내용만** 본다 — 파일을 직접 읽거나 테스트를 직접 돌리지 않는다. 따라서 Phase 6 QA 최종 보고에 **각 SUCCESS_CRITERIA 별 증거를 transcript 에 명시**한다: 명령 출력·exit code·파일 상태·검증 시나리오 결과. 증거 없이 "달성"만 적으면 외부 평가자가 미달로 판정해 불필요한 재시도 턴이 발생한다. (핸드오프/직접 호출 무관하게 적용 — 증거 기반 보고는 standalone `/cc` 품질도 높인다.)
 
 ---
 
@@ -606,8 +611,12 @@ Lens Multi v3.6.5 — 반복 {N}/5
 - [ ] {기준 2}
 ...
 
+## VERIFICATION (plan 문서의 검증 방법 — 있으면 그대로 실행)
+| 성공 기준 | 검증 방법 | 기대 결과 |
+| {기준 1} | {명령/액션} | {pass 판정} |
+
 각 SUCCESS_CRITERIA 항목에 대해:
-1. 어떤 도구로 검증 가능한지 결정 (Bash/Read/Glob/curl/Playwright 등)
+1. VERIFICATION 에 검증 방법이 명시돼 있으면 **그대로 실행**, 없으면 어떤 도구로 검증할지 결정 (Bash/Read/Glob/curl/Playwright 등)
 2. 실제 명령 실행
 3. 결과를 evidence 로 기록
 4. pass/fail 판정

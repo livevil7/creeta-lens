@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.7.0] - 2026-05-23
+
+네이티브 Claude Code `/goal` 연동 + plan 문서에 `✅ 검증(Verification)` 섹션 신설(필수). Goal 이 "무엇을(성공 기준)"에 더해 "어떻게 검증하나(방법·기대 결과)"까지 정의하도록 강제 — 이 표가 `/cc` QA 의 실행 절차이자 네이티브 `/goal` 평가자의 증거 소스로 연결된다.
+
+### Added (v3.7.0)
+
+- **`✅ 검증 (Verification)` 섹션 — plan 문서 필수 구조** — 각 성공 기준을 `검증 방법(명령/액션)` + `기대 결과(pass 판정)` 표로 정의. `lib/plan-manager.js` `generatePlanContent()` 가 Goal 직후 표 생성(8개 언어 헤더 `verification`/`vCriterion`/`vMethod`/`vExpected`), `goal.verification = [{criterion, method, expected}]` 데이터 필드 신설. 미제공 시 `successCriteria` 로 폴백 행 생성. (`lib/plan-manager.js`, `skills/cp/SKILL.md`)
+- **`REQUIRED_SECTIONS` 에 `Verification` 추가 + 다국어 `SECTION_ALIASES`** — `validatePlanStructure()` 가 검증 섹션 누락을 차단. `/cp` Phase 0 Goal 게이트도 3→4 조건(각 기준에 검증 방법 정의)으로 강화, 핸드오프 페이로드에 `[VERIFICATION]` 블록 추가(cp↔cc 양방향). (`lib/plan-manager.js`, `skills/cp/SKILL.md`, `skills/cc/SKILL.md`)
+- **네이티브 `/goal` 연동 (Claude Code v2.1.139+)** — `/cp` Execute 시 SUCCESS_CRITERIA 로 조립한 `/goal … or stop after N turns` 명령 한 줄을 출력해 사용자가 harness-강제 실행을 선택 가능. `/cc` 는 SlashCommand 도구 부재로 자동 실행 불가 → 출력+안내 방식. 기존 Skill-도구 핸드오프는 그대로(추가 옵션, 비대체). (`skills/cp/SKILL.md`)
+- **`/cc` 네이티브 `/goal` 호환 — 증거 transcript 명시 의무** — `/goal` 평가자(Haiku)는 도구 없이 대화 내용만 판정하므로, Phase 6 QA 가 각 SUCCESS_CRITERIA 의 증거(명령 출력·exit code·파일 상태)를 transcript 에 남기고 `[VERIFICATION]` 의 검증 방법을 그대로 실행하도록 규정. (`skills/cc/SKILL.md`)
+
+### Fixed (v3.7.0)
+
+- **`validatePlanStructure()` placeholder 오판 (검증 명령 회귀 방지)** — 미완성 템플릿 토큰 탐지 정규식 `/\{[a-z_]+\}/i` 가 검증 방법의 `curl -w %{http_code}`·`${VAR}` 같은 shell/curl 문법을 "미해결 placeholder" 로 오판하던 문제. negative lookbehind `(?<![%$])` 로 제외. 실제 누락 토큰(`{slug}` 등)은 계속 탐지. (`lib/plan-manager.js`)
+
+### Compatibility (v3.7.0)
+
+- 기존 v3.4–3.6 형식 plan 문서(검증 섹션 없음)는 `validatePlanStructure()` 에서 `missing: ['Verification']` 반환 — v3.4.0 전례와 동일한 advisory(하드 블록 아님). 신규 문서 또는 `/cp Modify` 로 검증 섹션 추가 시 통과. 코드 생성기는 `verification` 미제공 시 `successCriteria` 로 폴백 행을 만들어 섹션 자체는 항상 존재.
+
 ## [3.6.5] - 2026-05-22
 
 SessionStart auto-pull 을 기본 OFF(opt-in)로 전환 — 느린 멀티레포 fetch 가 세션 시작을 지연/중단시키던 root cause 차단.

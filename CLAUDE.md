@@ -4,9 +4,10 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.6.5**
-- Updated: 2026-05-22
+- Current: **v3.7.0**
+- Updated: 2026-05-23
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.7.0 feat: plan 문서에 `✅ 검증(Verification)` 섹션 신설(필수, `REQUIRED_SECTIONS`) — 각 성공 기준의 검증 방법+기대 결과 표. 네이티브 Claude Code `/goal` 연동(`/cp` 가 `/goal` 명령 emit, `/cc` 가 증거를 transcript 에 명시). placeholder 정규식이 `%{}`/`${}` 오판하던 회귀 수정. 상세: `CHANGELOG.md`.
 - v3.6.2 fix: `/cp` PLAN/DONE 흐름에 HTML 보고서+board 생성을 **필수 Phase(2.6 / 3.5)** 로 박음 — 부록 섹션에만 있어 md 만 나오던 문제 해결. `reportFormat` opt-in 무관, 한 번에 md+HTML+board 산출. 상세: `CHANGELOG.md`.
 - v3.6.1 fix: board "convert to html" 버튼이 `file://`(비보안 컨텍스트)에서 clipboard 차단 시 수동복사 모달로 폴백 (`isSecureContext` 게이트). 상세: `CHANGELOG.md`.
 - v3.6.0 breaking: `/cp` board 전면 재설계 — `docs/{tasks,history,rules}/` 3-폴더 통합 인덱스 `board_<repo>.html` 생성 (schema v3), `/cp html <md>` CONVERT 모드 신설, `docs/reports/` 폴더 폐지 (비파괴적: 기존 reports/ + board.html 그대로 보존). 상세: `CHANGELOG.md`.
