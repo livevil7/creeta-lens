@@ -7,7 +7,7 @@ user-invocable: true
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.6.5 — Multi-repo git synchronizer for any multi-repo workspace. Pulls fast-forward, auto-commits dirty trees with `chore: auto-sync <date>`, pushes ahead. Fail-soft: one repo failure does not stop the others. | MIT |
+| cs | Lens Sync v3.7.0 — Multi-repo git synchronizer for any multi-repo workspace. Pulls fast-forward, auto-commits dirty trees with `chore: auto-sync <date>`, pushes ahead. Fail-soft: one repo failure does not stop the others. | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,7 +17,7 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.6.5**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.7.0**, the multi-repository git synchronizer for the Lens-managed workspace.
 
 `/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — most logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
@@ -140,4 +140,4 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 
 - Script: `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
-- Version: aligned with the Lens plugin version (currently 3.6.5)
+- Version: aligned with the Lens plugin version (currently 3.7.0)
