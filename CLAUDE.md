@@ -4,9 +4,11 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.7.0**
-- Updated: 2026-05-23
+- Current: **v3.9.0**
+- Updated: 2026-05-26
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.9.0 feat: Codex 를 **공동 조사자·검증자**로 격상 — 이종 모델 더블 검증. `/cp` Phase 0.5(Codex 병렬 독립 조사) + Phase 2.4(듀얼 합성·교차검증, `🔀 듀얼 합성` 섹션), `/cc` Phase 4.5(Codex 코드리뷰 게이트 — Supervisor+Codex 둘 다 pass 여야 진행). trivial 제외 항상, Codex 부재 시 graceful degrade. 산출물 링크 풀 경로 강제. 상세: `CHANGELOG.md` + `docs/rules/codex-integration.md` §8.5.
+- v3.8.0 feat: `/cp` Goal 을 **사람 중심 2층 구조**로 전환 — 🎯 목표는 "무엇이 가능해지는가"(사람 언어, 기술 토큰 금지), 기술 증거(`201`/`user row` 등)는 전부 ✅검증 표로 격리. Goal 인터뷰(Phase 0.0), 서브골 분해(0.2), 검증표 `종류`(auto/manual) 칼럼, Goal 게이트에 기술토큰·매핑 검사 추가. `lib/plan-manager.js` 전면 동기화(8-lang dict / generatePlanContent / extractGoal 다국어 헤더). 상세: `CHANGELOG.md`.
 - v3.7.0 feat: plan 문서에 `✅ 검증(Verification)` 섹션 신설(필수, `REQUIRED_SECTIONS`) — 각 성공 기준의 검증 방법+기대 결과 표. 네이티브 Claude Code `/goal` 연동(`/cp` 가 `/goal` 명령 emit, `/cc` 가 증거를 transcript 에 명시). placeholder 정규식이 `%{}`/`${}` 오판하던 회귀 수정. 상세: `CHANGELOG.md`.
 - v3.6.2 fix: `/cp` PLAN/DONE 흐름에 HTML 보고서+board 생성을 **필수 Phase(2.6 / 3.5)** 로 박음 — 부록 섹션에만 있어 md 만 나오던 문제 해결. `reportFormat` opt-in 무관, 한 번에 md+HTML+board 산출. 상세: `CHANGELOG.md`.
 - v3.6.1 fix: board "convert to html" 버튼이 `file://`(비보안 컨텍스트)에서 clipboard 차단 시 수동복사 모달로 폴백 (`isSecureContext` 게이트). 상세: `CHANGELOG.md`.

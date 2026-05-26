@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.7.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
+description: "Lens Multi v3.9.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.7.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.9.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.7.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.9.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, a Monitor agent tracks progress in real-time, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -165,16 +165,16 @@ plan_doc_path: docs/tasks/YYYY-MM-DD-{slug}.md
 plan_id: {plan-id}
 original_request: {원본 요청}
 
-[GOAL — 최우선, 절대 양보 금지]
-{Goal 섹션 본문}
+[GOAL — 사람 언어, 최우선·절대 양보 금지]
+{🎯 목표 섹션 본문 — 사람 언어 목표 + Done 한 문장}
 
-[SUCCESS_CRITERIA — TodoWrite 의 최상위 항목으로 등록할 것]
-- [ ] {기준 1}
-- [ ] {기준 2}
+[SUCCESS_CRITERIA — TodoWrite 의 최상위 항목으로 등록할 것 (= 🎯 사람 목표 그대로)]
+- [ ] {사람 목표 1}
+- [ ] {사람 목표 2}
 
-[VERIFICATION — 각 기준의 확인 방법, Phase 6 QA 가 그대로 실행]
-| 성공 기준 | 검증 방법 | 기대 결과 |
-| {기준 1} | {명령/액션} | {pass 판정} |
+[VERIFICATION — 각 목표의 증거, Phase 6 QA 가 그대로 실행. auto 행은 직접 명령 실행해 pass/fail 기록, manual 행은 사람 확인 필요로 표시]
+| 목표가 됐다는 신호 | 확인 방법 | 통과 판정 | 종류 |
+| {신호 1} | {명령/관측} | {pass 판정} | auto/manual |
 
 [CURRENT_PATH] Plan A
 [PLAN_A_STEPS] {Plan A 체크리스트}
@@ -242,10 +242,10 @@ original_request: {원본 요청}
 
 **실행은 사용자 승인 없이 절대 시작하지 않습니다.**
 
-**AskUserQuestion** (header: "Lens Multi v3.7.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.9.0 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.7.0 — 실행 계획
+Lens Multi v3.9.0 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -517,6 +517,39 @@ opus인 경우: 깊은 추론과 구조적 통찰에 집중. 단순 코드 스�
 
 ---
 
+### Phase 4.5: Codex 코드리뷰 (병렬 더블 검증 — trivial 제외 항상)
+
+> Claude Supervisor 와 **병렬로**, Codex 가 이번 반복의 코드 변경을 독립 리뷰한다. Claude 혼자 놓치는 버그·엣지케이스를 이종 모델로 더블 검증. **Supervisor pass + Codex pass 둘 다**여야 Phase 6 진입. 상세 호출 규칙: `docs/rules/codex-integration.md` §8.5.
+
+**적용 범위**: trivial (오타·한 줄 수정) 또는 비-코드 작업(조사·문서만) 은 skip. 그 외 모든 코드 변경 적용.
+
+1. **Codex 감지** — 3단계 fallback. 부재 시 "Codex 미설치 — Supervisor 단독 검토" 플래그 후 Phase 5 진행 (게이트는 Supervisor 단독, 나머지 동일).
+2. **리뷰 대상 확보** — 이번 반복의 코드 변경: `git diff` 가능하면 diff, 아니면 변경 파일 목록 + 내용.
+3. **Codex 리뷰 호출** — Supervisor Agent 와 병렬이 되도록 **백그라운드**(Bash `run_in_background: true`)로, **프로젝트 루트에서** 실행:
+
+```text
+다음 코드 변경을 리뷰하세요. 순수 텍스트, 한국어.
+
+## 작업 목표 (사람 언어)
+{GOAL}
+
+## 변경 내용 (diff)
+{git diff 또는 변경 파일 내용}
+
+## 리뷰 관점
+1. 버그·정확성 — 의도대로 동작하지 않는 지점
+2. 엣지 케이스·에러 처리 누락
+3. 보안 (injection, 비밀 노출, 권한 등)
+4. 회귀 — 기존 동작을 깨뜨릴 가능성
+
+각 지적은 [심각도 high/med/low] + 파일:라인 + 무엇이 + 왜. 마지막 줄에 PASS 또는 FAIL 한 단어만.
+```
+
+4. **판정 파싱** — 본문 추출(`^codex$`~`^tokens used$`) 후 마지막 줄 `PASS`/`FAIL` 읽기. `[high]` 심각도 지적이 하나라도 있으면 PASS 라 적혀 있어도 **FAIL 로 간주**.
+5. **실패/timeout** — "Codex 리뷰 실패: {요약}" 기록, Supervisor 단독 게이트로 진행 (블로킹 금지 — Codex 부재와 동일 취급).
+
+---
+
 ### Phase 5: Leader — 반복 또는 진행
 
 Supervisor 보고서를 읽습니다.
@@ -538,16 +571,18 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 3. Plan B 전환 시 plan 문서의 `## 진행상황` 의 `현재 경로` 를 `Plan B` 로 Edit, 후속 Worker 는 PLAN_B_STEPS 로 재할당
 4. **재시도 한도**: 같은 서브태스크에 대해 최대 3회 재시도 후엔 강제로 Plan B 전환 묻기 (Plan B 도 실패 시 사용자 개입 필수)
 
-#### 5.1 overall_pass == true
+#### 5.1 Supervisor pass AND Codex 리뷰 pass
 
 → **Phase 6 (QA Verification)** 으로 진행
 
-#### 5.2 overall_pass == false AND 반복 횟수 < 5
+**더블 게이트 (v3.9+)**: `supervisor.overall_pass == true` **그리고** Codex 리뷰 pass(또는 Codex 부재/실패/비-코드) 여야 Phase 6 진입. Codex 가 FAIL(또는 high 지적)이면 Supervisor 가 pass 여도 진행 금지 → 5.2 로 가서 Codex issues 를 해당 서브태스크 `fix_instructions` 에 병합해 재할당.
+
+#### 5.2 (Supervisor fail OR Codex 리뷰 fail) AND 반복 횟수 < 5
 
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.7.0 — 반복 {N}/5
+Lens Multi v3.9.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -611,13 +646,13 @@ Lens Multi v3.7.0 — 반복 {N}/5
 - [ ] {기준 2}
 ...
 
-## VERIFICATION (plan 문서의 검증 방법 — 있으면 그대로 실행)
-| 성공 기준 | 검증 방법 | 기대 결과 |
-| {기준 1} | {명령/액션} | {pass 판정} |
+## VERIFICATION (plan 문서의 증거 — 있으면 그대로 실행)
+| 목표가 됐다는 신호 | 확인 방법 | 통과 판정 | 종류 |
+| {신호 1} | {명령/관측} | {pass 판정} | auto/manual |
 
-각 SUCCESS_CRITERIA 항목에 대해:
-1. VERIFICATION 에 검증 방법이 명시돼 있으면 **그대로 실행**, 없으면 어떤 도구로 검증할지 결정 (Bash/Read/Glob/curl/Playwright 등)
-2. 실제 명령 실행
+각 SUCCESS_CRITERIA(= 사람 목표) 항목에 대해:
+1. VERIFICATION 에 확인 방법이 명시돼 있으면 **그대로 실행**, 없으면 어떤 도구로 검증할지 결정 (Bash/Read/Glob/curl/Playwright 등)
+2. `종류=auto` → 명령을 직접 실행해 증거 확보. `종류=manual` → 자동 실행 불가하므로 관측 결과를 사용자 확인 요청 + transcript 에 "manual 확인 대기" 명시 (**manual 항목을 자동으로 pass 처리 금지**)
 3. 결과를 evidence 로 기록
 4. pass/fail 판정
 
@@ -692,7 +727,7 @@ Lens Multi v3.7.0 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.7.0 — 최종 결과                       ║
+║   Lens Multi v3.9.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -833,7 +868,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.7.0 — 최종 결과
+Lens Multi v3.9.0 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 
@@ -862,6 +897,8 @@ QA 검증: 모든 페이지 렌더링 OK, 라우팅 작동, 테스트 5/5 통과
 - **최대 5회 반복** — 6번째는 불가, 단 SUCCESS_CRITERIA 미달이면 done 대신 사용자 개입 요청
 - **일반 목적 Workers** — skills 없이도 모든 도구 사용 가능
 - **실제 검증** — QA 는 텍스트 검토 금지, 명령어/도구 실행 필수. SUCCESS_CRITERIA 각 항목은 도구로 직접 증명
+- **더블 검증 (v3.9+)** — trivial·비-코드 제외 항상 Codex 코드리뷰(Phase 4.5)를 Supervisor 와 병렬 실행. **Supervisor pass + Codex pass 둘 다**여야 Phase 6 진입 (Codex FAIL/high 지적이면 Supervisor pass 여도 재할당). Codex 부재/실패는 graceful degrade — 블로킹 금지. 상세: `docs/rules/codex-integration.md`.
+- **산출물 링크는 풀 경로** — 최종 보고·후속 안내에서 deliverable 파일은 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로 클릭 링크로 제시 (`docs/...`, `src/...` 등 전체 경로).
 
 ---
 

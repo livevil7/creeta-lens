@@ -1,3 +1,47 @@
+## [3.9.0] - 2026-05-26
+
+Codex 를 "Claude 결과의 부분 검토자"에서 **공동 조사자·공동 검증자**로 격상. Claude 혼자 계획하고 코딩하면 놓치고 삽질하는 게 많다 — 조사·계획·개발 전 과정을 Claude ‖ Codex 이종 모델로 **더블 검증**한다. trivial 제외 항상 적용, Codex 부재/실패는 graceful degrade.
+
+### Added (v3.9.0)
+
+- **`/cp` Phase 0.5 — Codex 병렬 독립 조사** — Goal 정의 직후 Codex 를 **백그라운드**(Bash `run_in_background`)로 띄워 레포를 스스로 읽고 자기 접근안+리스크+관련 파일을 내게 한다. Claude 는 기다리지 않고 Phase 1(자기 Plan A 설계)을 병렬 진행. Codex 는 더 이상 "Claude 안의 검토자"가 아니라 독립 조사자. (`skills/cp/SKILL.md`)
+- **`/cp` Phase 2.4 — 듀얼 합성·교차검증** — Claude 안 vs Codex 안을 **합의/분기**로 분류. 합의는 고신뢰 lock, 분기는 Claude 가 코드를 직접 재확인(Read/Grep/Bash)해 해소 — 객관 판정 불가면 trade-off 근거와 함께 선택하고 문서에 기록(사용자가 승인 게이트에서 확인). plan 문서에 `## 🔀 듀얼 합성` 섹션 신설. (`skills/cp/SKILL.md`, `lib/plan-manager.js`)
+- **`/cc` Phase 4.5 — Codex 코드리뷰 게이트** — 매 반복의 코드 변경(diff)을 Codex 가 Supervisor 와 **병렬**로 독립 리뷰(버그·엣지·보안·회귀, 마지막 줄 PASS/FAIL). **Supervisor pass + Codex pass 둘 다**여야 Phase 6 진입 — Codex FAIL/high 지적이면 Supervisor pass 여도 fix_instructions 에 병합해 재할당. (`skills/cc/SKILL.md`)
+- **`lib/plan-manager.js` `generatePlanContent()` 듀얼 합성 렌더링** — `planData.dualSynthesis = {agreements, divergences:[{point,claude,codex,chosen,rationale}]}` 제공 시 `## 🔀 듀얼 합성` 섹션 출력(옵션, 다국어 제목). 미제공 시 미출력 — REQUIRED_SECTIONS 불변, validate 영향 없음.
+
+### Changed (v3.9.0)
+
+- **`docs/rules/codex-integration.md` 확장** — 사용 지점을 pre-mortem 1곳 → 4곳(조사/합성/pre-mortem/코드리뷰)으로 갱신. §8.5 "듀얼 검증 호출 패턴" 신설: `run_in_background` 병렬성, 조사·리뷰는 프로젝트 루트에서 실행(파일 접근), 판정 파싱(PASS/FAIL + high), graceful degrade.
+- **`/cp` Phase 3 Pre-mortem 중복 호출 회피** — Phase 0.5 에서 Codex 조사가 돌았으면 Codex 의 리스크 시각은 Phase 2.4 합성에서 통합됐으므로 Pre-mortem 의 Codex 호출은 skip(Opus 단독). Phase 0.5 skip 시(부재/handoff)만 Codex 병렬. quota 절약.
+- **산출물 파일 링크 풀 경로 강제 (`skills/cp/SKILL.md` + `skills/cc/SKILL.md`)** — 보고·후속 안내에서 deliverable 파일은 bare 이름(`board.html`) 금지, 프로젝트 루트 기준 전체 경로 클릭 링크(`docs/tasks/{id}.md` 등)로 제시. 양 스킬 절대 규칙에 명시.
+
+### Compatibility (v3.9.0)
+
+- 더블 검증은 **trivial(오타·변수명·한 줄 수정)·비-코드 작업 skip**, Codex **부재/실패/timeout 은 graceful degrade**(Claude/Supervisor 단독 + 플래그, 블로킹 금지) — 기존 단일 모델 흐름이 그대로 fallback.
+- v3.8.0 의 사람 중심 Goal 2층 구조와 직교 — 듀얼 합성·리뷰는 그 위에 얹힌 검증 레이어. plan 문서 신규 섹션(`🔀 듀얼 합성`)은 옵션이라 기존 문서/`validatePlanStructure()` 에 영향 없음.
+
+## [3.8.0] - 2026-05-26
+
+`/cp` 의 Goal 을 **사람 중심 2층 구조**로 재설계. 기존 Goal 은 "POST /api/users 가 201 반환" 같은 개발자 검증어를 강제해 사용자가 자기 계획서를 읽고도 판단할 수 없었다. 이제 🎯 목표는 "무엇이 가능해지는가"(사람 언어)만, 기술 증거는 ✅검증 표로 완전히 분리한다. 사용자가 읽고 승인하는 층과 기계(/cc·/goal)가 판정하는 층을 나눴다.
+
+### Changed (v3.8.0)
+
+- **Goal = 사람 언어 2층 구조 (`skills/cp/SKILL.md` Phase 0 / 2.5 / 문서 품질 규칙)** — 🎯 목표 문장은 "이 작업이 끝나면 무엇이 가능해지는가" 를 사람 말로(함수명·HTTP 코드·SQL·클래스명·경로 등 기술 토큰 금지). `201`·`user row`·`exit 0` 같은 기술 증거는 전부 ✅검증 표로 격리. 목표 문장은 사용자용, 검증 표는 기계용.
+- **Goal 품질 게이트 강화 (Phase 0 / Phase 5.0)** — ① 목표 문장에 기술 토큰이 있으면 reject → 검증 표로 이동, ② 각 목표가 ✅검증 ≥1행으로 매핑 안 되면(=모호) reject. 통과 못하면 Approve 거부, Modify 강제.
+- **`lib/plan-manager.js` 전면 동기화** — `generatePlanContent()` 가 새 2층 구조 생성: Goal 은 사람 언어 plain bullet(체크박스 제거), 검증표에 `종류`(auto/manual) 칼럼 추가, 8개 언어 헤더 dict 를 사람 중심 라벨로 교체(goal/deliverables/verification/vCriterion 값 변경 + `vKind` 신설 + 사장된 `criteria` 키 제거). 데이터 필드 `goal.verification = [{signal, method, expected, kind}]`. successCriteria(사람 목표) 미스 시 deliverables 폴백, verification 미제공 시 outcomes 로 manual 행 생성.
+- **핸드오프 계약 분리 — 양방향 동기화 (`skills/cp/SKILL.md` + `skills/cc/SKILL.md`)** — `[GOAL]` = 사람 언어, `[SUCCESS_CRITERIA]` = 🎯 사람 목표 그대로, `[VERIFICATION]` 표에 `종류` 칼럼 추가. 수신측 `/cc` 도 4칼럼 페이로드 + Phase 6 QA 를 동기화: `종류=auto` 행은 명령 직접 실행, `종류=manual` 행은 **자동 pass 처리 금지**(사람 확인 대기로 transcript 명시).
+
+### Added (v3.8.0)
+
+- **Goal 인터뷰 (Phase 0.0)** — 요청이 모호하거나 사람 목표가 불명확하면 사람 언어 질문 2개("무엇을 할 수 있게 되나요?" / "무엇으로 확인하나요?")로 목표를 끌어낸다. 기술 검증은 Claude 가 답변에서 역으로 도출 — 사용자에게 묻지 않음.
+- **Goal 분해 / 서브골 (Phase 0.2)** — large 작업은 목표를 사람 언어 서브골 리스트로 쪼개고 각 서브골→검증행 매핑 + 선택적 `의존: N` 표기. small/medium 은 단일 목표 리스트.
+- **`extractGoal()` 다국어 + 신구조 파싱** — 헤더를 🎯/Goal/목표/目標/目标/Ziel/Objectif/Objetivo/Obiettivo 로 인식(기존엔 영어 "Goal" 만). v3.8 신구조의 plain-bullet 사람 목표를 successCriteria 로 추출하면서, 레거시(체크박스=기준 / plain=deliverables) 구조도 그대로 호환.
+
+### Compatibility (v3.8.0)
+
+- 런타임 경로는 `/cp` 가 SKILL.md 를 따라 md 를 직접 작성하는 것 — `generatePlanContent()` 는 백업 생성기(선례: `docs/tasks/2026-05-16-cp-goal-first-overhaul.md`). 이번 전면 동기화로 백업 생성기도 신구조와 일치.
+- 기존 v3.4–3.7 형식 plan 문서(개발 중심 Goal + 체크박스 성공 기준)는 `validatePlanStructure()` 통과 그대로 유지(섹션 alias 가 🎯/✅/목표/검증 모두 인식). `extractGoal()` 도 레거시 체크박스 구조를 계속 파싱.
+
 # Changelog
 
 ## [3.7.0] - 2026-05-23

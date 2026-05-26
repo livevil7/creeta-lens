@@ -16,10 +16,16 @@ Lens v3.1에서 OpenAI Codex CLI를 활용한 pre-mortem 이종 모델 검증의
 - **블라인드 스팟 해소**: 단일 모델 편향(유사한 추론 경로, 동일한 놓침)을 상쇄
 - **비용 효율**: Plus/Pro/Max 구독 내에서 추가 과금 없이 활용
 
-### v3.1 사용 지점
+### 사용 지점 (v3.9+)
 
-- `/cp PLAN` 모드의 **Phase 2.5 Pre-mortem** — Opus + Codex 병렬 호출
-- 각 모델이 독립적으로 계획의 허점을 지적하고, 결과를 병합하여 계획에 반영
+Codex 는 단순 "Claude 결과 검토자"가 아니라 **공동 조사자·공동 검증자**다. 네 지점에서 이종 모델 더블 검증을 수행한다:
+
+- `/cp PLAN` **Phase 0.5 — 병렬 독립 조사**: Goal 정의 직후 Codex 가 레포를 스스로 읽고 자기 접근안+리스크를 제시 (Claude 의 Plan A 설계와 병렬). 결과는 Phase 2.4 에서 합성.
+- `/cp PLAN` **Phase 2.4 — 듀얼 합성·교차검증**: Claude 안과 Codex 안의 합의/분기 분류 → 분기 재검증.
+- `/cp PLAN` **Phase 3 — Pre-mortem**: 통합안의 최종 리스크 점검 (Phase 0.5 에서 Codex 조사가 이미 돌았으면 Opus 단독, 아니면 Codex 병렬).
+- `/cc` **Phase 4.5 — 코드리뷰 게이트**: 매 반복의 코드 변경을 Codex 가 독립 리뷰. Supervisor pass + Codex pass 둘 다여야 진행.
+
+**trivial 작업(오타·변수명·한 줄 수정)은 모든 지점 skip** — 불필요한 호출 회피. Codex 부재/실패는 항상 graceful degrade (Claude/Supervisor 단독 진행 + 플래그 기록, 블로킹 금지).
 
 ## 2. 사전 조건 감지
 
@@ -163,6 +169,25 @@ BODY=$(timeout 30 bash -c "$CODEX_CMD" 2>&1) || BODY="[Codex timeout — Opus �
 - 구독 등급에 따라 일일 사용량 제한 존재 (구체 수치는 OpenAI 공식 페이지 참조)
 - 연속 호출 시 rate limit 가능 — pre-mortem 1회/계획이면 일반적으로 문제 없음
 - 로컬 네트워크 상태에 따라 응답 시간 변동
+
+## 8.5 듀얼 검증 호출 패턴 (v3.9+)
+
+§4 표준 호출 + §5 본문 추출 + §7 에러 처리를 그대로 공유한다. 조사·리뷰에 추가되는 규칙:
+
+### 병렬성 — run_in_background
+
+조사(Phase 0.5)·코드리뷰(Phase 4.5)는 Claude 의 본 작업과 **진짜 병렬**이어야 한다. Bash tool 의 `run_in_background: true` 로 Codex 를 띄우고, Claude 는 자기 작업(Plan A 설계 / Supervisor 검토)을 진행한 뒤 백그라운드 출력을 수거한다. sleep/폴링 금지 — 완료 알림을 받는다.
+
+### 파일 접근 — 프로젝트 루트에서 실행
+
+Pre-mortem 은 repo 무관(`--skip-git-repo-check`)이지만, **조사·코드리뷰는 Codex 가 파일을 읽어야** 한다. 반드시 프로젝트 루트(cwd)에서 `codex exec` 를 호출 — Codex 는 cwd 의 파일에 접근한다.
+
+### 프롬프트 / 판정
+
+- **Phase 0.5 독립 조사**: "이 작업을 직접 조사하고 독립 실행 계획을 제안" (권장 접근 / 리스크 3 / 관련 파일). 전체 템플릿은 `skills/cp/SKILL.md` Phase 0.5.
+- **Phase 4.5 코드리뷰**: "이 diff 를 리뷰" (버그·엣지·보안·회귀, 마지막 줄 `PASS`|`FAIL`). 전체 템플릿은 `skills/cc/SKILL.md` Phase 4.5.
+- **코드리뷰 판정 파싱**: 본문 마지막 줄의 `PASS`/`FAIL` + `[high]` 심각도 지적 유무. high 지적이 있으면 FAIL 로 간주.
+- **합성/게이트**: 조사 결과는 Claude 가 합의/분기로 분류해 통합 (Phase 2.4). 리뷰 결과는 Supervisor 와 AND 게이트 (둘 다 pass 여야 진행).
 
 ## 9. 관련 파일 / 외부 참조
 
