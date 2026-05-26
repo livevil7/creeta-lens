@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>사람 중심 Goal + Codex 듀얼 검증 · 보고서</title>
+<meta name="lens:source" content="docs/history/2026-05-26-goal-human-centric-codex-dual-verification.md">
+<meta name="lens:source-hash" content="9d30c9b49398">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">08</b></div>
+
+<main class="deck">
+
+<!-- ── 1. Cover ───────────────────────────────────── -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 08 · COVER</div>
+  <div class="meta">
+    <span>2026-05-26</span>
+    <span class="dot">·</span>
+    <span class="badge">Done</span>
+    <span class="dot">·</span>
+    <span>creeta-lens</span>
+  </div>
+
+  <h1 class="h-title">사람 중심 Goal 2층 구조 + Codex 듀얼 검증</h1>
+  <p class="lede">
+    <code>/cp</code> 의 Goal 을 사람 언어로 되돌리고(v3.8.0), Codex 를 "검토자"에서
+    <strong>공동 조사자·공동 검증자</strong>로 격상(v3.9.0). 두 작업을 한 릴리스로 묶어 배포.
+  </p>
+
+  <div class="hero">
+    <div class="num">4<span class="unit">검증 지점</span></div>
+    <div class="caption">
+      Codex 가 들어가는 곳 — <strong>/cp 병렬 조사(0.5) · 듀얼 합성(2.4) · Pre-mortem(3) · /cc 코드리뷰 게이트(4.5)</strong>.
+      조사·계획·개발 전 과정을 이종 모델로 더블 검증.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-05-26-goal-human-centric-codex-dual-verification</span>
+  </div>
+</section>
+
+<!-- ── 2. At a glance ─────────────────────────────── -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 08 · AT A GLANCE</div>
+  <h2 class="title">숫자로 본 릴리스</h2>
+  <p class="sub">한 세션에서 두 기능셋을 묶어 v3.9.0 으로 배포 + 설치 검증까지.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">releases bundled</div>
+      <div class="v accent">2<span class="unit">→ v3.9.0</span></div>
+      <div class="desc"><strong>v3.8.0</strong>(사람 중심 Goal) + <strong>v3.9.0</strong>(듀얼 검증)을 한 커밋·태그로.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">files changed</div>
+      <div class="v">13</div>
+      <div class="desc">commit <code>b27b2a6</code>. 스킬·라이브러리·규칙·manifest.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">Codex 검증 지점</div>
+      <div class="v">4</div>
+      <div class="desc">/cp 0.5 · 2.4 · 3 · /cc 4.5. trivial·비-코드는 skip.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">plan-manager 언어</div>
+      <div class="v">8</div>
+      <div class="desc">8-lang dict 를 사람 중심 라벨 + <code>종류</code> 칼럼으로 전면 동기화.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">validate errors</div>
+      <div class="v good">0</div>
+      <div class="desc">generate / validate / extractGoal 왕복 + 레거시 호환 전부 PASS.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">옛 로컬 태그 정리</div>
+      <div class="v">9</div>
+      <div class="desc">v1.3.0~v2.0.0 삭제(로컬 한정). 원격 보존.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 3. Problem ────────────────────────────────── -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 08 · PROBLEM</div>
+  <h2 class="title">계획서를 쓴 사람이 자기 계획을 못 읽었다</h2>
+  <p class="sub">
+    Goal 이 "POST /api/users 가 201 반환" 같은 개발 검증어를 강제 → 사용자가 승인·거부 판단 불가.
+    그리고 Claude 혼자 계획·코딩하면 놓치고 삽질하는 게 많았다.
+  </p>
+
+  <div class="compare">
+    <div class="panel warn">
+      <div class="ph">
+        <span class="tag">Before</span>
+        <h3>개발 중심 Goal · 단일 모델</h3>
+      </div>
+      <div class="post-list">
+        <div class="post-row"><span>🎯 Goal</span><span class="pd">POST /api/users 201</span></div>
+        <div class="post-row"><span>검증</span><span class="pd">Goal 에 뒤섞임</span></div>
+        <div class="post-row"><span>조사</span><span class="pd">Claude 단독</span></div>
+        <div class="post-row"><span>코드리뷰</span><span class="pd">Claude Supervisor 뿐</span></div>
+      </div>
+      <p class="note">함수·HTTP 코드 때문에 사용자가 판단 불가. 단일 모델 편향으로 블라인드 스팟·삽질.</p>
+    </div>
+
+    <div class="panel good">
+      <div class="ph">
+        <span class="tag">After</span>
+        <h3>사람 언어 Goal · 이종 모델 더블 검증</h3>
+      </div>
+      <div class="post-list">
+        <div class="post-row"><span>🎯 목표</span><span class="pd">회원가입을 마칠 수 있다</span></div>
+        <div class="post-row"><span>✅ 검증</span><span class="pd">표로 분리 (auto/manual)</span></div>
+        <div class="post-row"><span>조사</span><span class="pd">Claude ‖ Codex 병렬</span></div>
+        <div class="post-row"><span>코드리뷰</span><span class="pd">Supervisor + Codex 게이트</span></div>
+      </div>
+      <p class="note">목표는 사용자가 읽고 판단, 증거는 기계가 판정. 두 모델이 갈리는 지점 = 블라인드 스팟 후보.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 4. How it works ─────────────────────────────── -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 08 · PIPELINE</div>
+  <h2 class="title">Codex 가 공동 파트너로 들어가는 흐름</h2>
+  <p class="sub">"Claude 안의 검토자"가 아니라, 레포를 스스로 읽고 독립 조사·리뷰하는 공동 작업자.</p>
+
+  <div class="pipe" style="margin-top:24px">
+    <div class="step">
+      <div class="n">1</div>
+      <h3>병렬 조사 · /cp 0.5</h3>
+      <p class="what">Goal 정의 직후 Codex 를 <strong>백그라운드</strong>로 띄워 레포 독립 조사. Claude 는 안 기다리고 Plan A 병렬 설계.</p>
+      <div class="files"><span class="nm">codex exec (run_in_background)</span></div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <h3>듀얼 합성 · /cp 2.4</h3>
+      <p class="what">두 안을 <strong>합의/분기</strong> 분류. 분기는 Claude 가 코드 직접 재확인으로 해소, 불가하면 근거와 함께 선택·기록.</p>
+      <div class="files"><span class="nm">## 🔀 듀얼 합성</span></div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <h3>코드리뷰 게이트 · /cc 4.5</h3>
+      <p class="what">매 반복의 diff 를 Codex 가 Supervisor 와 <strong>병렬</strong> 리뷰. 둘 다 PASS 여야 Phase 6 진입.</p>
+      <div class="files"><span class="nm">PASS / FAIL + [high]</span></div>
+    </div>
+    <div class="step">
+      <div class="n">4</div>
+      <h3>graceful degrade</h3>
+      <p class="what">trivial·비-코드는 skip. Codex 부재/실패/timeout 은 <strong>블로킹 없이</strong> Claude/Supervisor 단독 fallback.</p>
+      <div class="files"><span class="nm">codex-integration.md §8.5</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 5. Key decisions ────────────────────────────── -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 08 · KEY DECISIONS</div>
+  <h2 class="title">왜 이렇게 설계했나</h2>
+  <p class="sub">사람 중심 분리는 사용자 명시 요청, 더블 검증 형태는 비용·충돌 trade-off 로 선택.</p>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <div class="n">01</div>
+      <div>
+        <h3>Goal=사람 언어, 검증=기계 언어</h3>
+        <p>사용자 명시 요청("무슨 함수가 어쩌고 하면 내가 알아듣겠어?"). 기술 토큰은 목표 문장에서 <strong>reject → ✅검증 표로 이동</strong>. "사람 목표→검증 ≥1행" 매핑이 곧 게이트.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">02</div>
+      <div>
+        <h3>더블 검증 = 항상 (trivial만 skip)</h3>
+        <p>비용·속도보다 <strong>안전망 우선</strong>(사용자 선택). trivial·비-코드 skip, Codex 부재/실패는 graceful degrade.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">03</div>
+      <div>
+        <h3>/cc = Claude 구현 → Codex 리뷰 게이트</h3>
+        <p>독립 구현 후 병합(머지 충돌·비용 큼) 대신 <strong>리뷰 루프</strong>. Supervisor + Codex 둘 다 PASS 여야 진행.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">04</div>
+      <div>
+        <h3>분기는 Claude 가 근거와 함께 결정</h3>
+        <p>객관 판정 불가한 분기는 trade-off 근거와 함께 선택하고 <code>🔀 듀얼 합성</code> 섹션에 기록 — 사용자가 승인 게이트에서 확인.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">05</div>
+      <div>
+        <h3>plan-manager.js 전면 동기화</h3>
+        <p>런타임은 SKILL.md 기반(코드 생성기는 백업)이지만 <strong>백업·extractGoal·8-lang dict 까지 신구조로 일치</strong>시켜 latent drift 제거.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">06</div>
+      <div>
+        <h3>v3.8.0 별도 릴리스 안 함</h3>
+        <p>미커밋 상태에서 v3.9.0 작업이 이어져 <strong>한 커밋·태그로 묶음</strong>. CHANGELOG 는 [3.8.0]·[3.9.0] 항목 분리 유지.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 6. Validation ─────────────────────────────── -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 08 · VALIDATION</div>
+  <h2 class="title">어떻게 믿을 수 있나</h2>
+  <p class="sub">코드 생성기는 실측, 릴리스는 체인 검증, 설치는 실제 플러그인 install 까지 확인.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">텍스트 검토가 아니라 실제 <code>node</code> 실행·릴리스 명령·설치 검증으로 증명.</div>
+    <ol>
+      <li>
+        <h4>plan-manager.js 실측</h4>
+        <div class="det"><code>node -e</code> 로 generatePlanContent(ko) 가 🎯 목표(plain bullet)+✅검증(<code>종류</code> 칼럼)+🔀 듀얼 합성 생성 확인. <code>validatePlanStructure</code> = <strong>{valid:true}</strong>, <code>extractGoal</code> 왕복(사람 목표→successCriteria) 확인.</div>
+      </li>
+      <li>
+        <h4>레거시 호환</h4>
+        <div class="det">옛 체크박스 구조(deliverables + 성공기준) 문서도 <code>extractGoal</code> 이 그대로 파싱. verification 미제공 시 outcomes 로 <strong>manual 행 폴백</strong>.</div>
+      </li>
+      <li>
+        <h4>릴리스 체인</h4>
+        <div class="det"><code>bump-version.sh 3.9.0</code> (11/11 파일) → commit <code>b27b2a6</code> + tag <code>v3.9.0</code> + push(master+태그). 옛 태그 충돌(v1.9.0/v2.0.0)은 릴리스와 무관.</div>
+      </li>
+      <li>
+        <h4><code>/lens-upgrade</code> 실측</h4>
+        <div class="det">마켓플레이스 v3.9.0 감지 → <code>claude plugin install lens@CreetaCorp</code> → 검증: <strong>registry 1 entry = v3.9.0</strong>, <code>claude plugin list</code> 확인.</div>
+      </li>
+      <li>
+        <h4>Karpathy 규칙 보존</h4>
+        <div class="det">새 3.9.0 캐시의 c/cc/cp SKILL.md 전부 <code>MUST FOLLOW</code> 마커 포함 직접 grep 확인 (검증 스크립트는 stale 이라 우회).</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ── 7. Files ────────────────────────────────────── -->
+<section class="slide" id="files">
+  <div class="page-no">07 / 08 · ARTIFACTS</div>
+  <h2 class="title">바뀐 파일</h2>
+  <p class="sub">commit <code>b27b2a6</code> · 13개. 스킬 2 · 라이브러리 1 · 규칙 1 · manifest/문서 9.</p>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <div class="gh"><h3>Skills</h3><span class="cnt">2</span></div>
+      <ul>
+        <li><span>skills/cp/SKILL.md</span></li>
+        <li><span>skills/cc/SKILL.md</span></li>
+      </ul>
+      <p class="note">cp: Phase 0 2층 · 0.0 인터뷰 · 0.2 서브골 · <strong>0.5 Codex 조사 · 2.4 듀얼 합성</strong> · 게이트 · 핸드오프. cc: 4칼럼 핸드오프 · <strong>4.5 Codex 리뷰</strong> · 더블 게이트 · QA auto/manual.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Library</h3><span class="cnt">1</span></div>
+      <ul>
+        <li><span>lib/plan-manager.js</span></li>
+      </ul>
+      <p class="note">8-lang dict · generatePlanContent 2층+<code>종류</code> · extractGoal 다국어 · dualSynthesis 렌더링 · JSDoc.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Rules</h3><span class="cnt">1</span></div>
+      <ul>
+        <li><span>docs/rules/codex-integration.md</span></li>
+      </ul>
+      <p class="note">사용지점 1→4곳 · <strong>§8.5 듀얼 검증 호출 패턴</strong>(run_in_background · 파일 접근 · 판정 파싱).</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Manifest / Docs</h3><span class="cnt">9</span></div>
+      <ul>
+        <li><span>plugin.json · marketplace.json</span></li>
+        <li><span>CLAUDE.md · CHANGELOG.md · README.md</span></li>
+        <li><span>hooks/hooks.json · session-start.js</span></li>
+        <li><span>skills/c · cs/SKILL.md</span><span class="meta">버전 bump</span></li>
+      </ul>
+      <p class="note">3.7.0 → 3.8.0 → 3.9.0 버전 동기화.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 8. Next ───────────────────────────────────── -->
+<section class="slide" id="next">
+  <div class="page-no">08 / 08 · WHAT'S NEXT</div>
+  <h2 class="title">남은 일</h2>
+  <p class="sub">배포·설치는 끝. 네 가지 후속.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next">
+      <div class="l">Follow-up · A</div>
+      <h3>Claude Code 재시작</h3>
+      <p>현재 세션은 캐시 <strong>3.6.5</strong> 로 동작(skill 로드 시점). 재시작해야 <code>v3.9.0</code> 새 동작이 로드됨.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">Follow-up · B</div>
+      <h3>검증 스크립트 stale</h3>
+      <p><code>sync-karpathy-rules.ps1</code> 가 하드코딩 <code>lens\3.3.3</code> 경로 + <code>CLAUDE.md</code> 마커 불일치로 <strong>false [MISS]</strong>. 동적 버전 감지로 수정 필요.</p>
+    </div>
+    <div class="next">
+      <div class="l">Follow-up · C</div>
+      <h3>stale task 2건</h3>
+      <p><code>docs/tasks/</code> 의 cp-goal-first-overhaul(v3.4 shipped) · cp-html-reports-board(v3.6.0 shipped) 미archive. <code>/cp done</code> 로 정리 가능.</p>
+    </div>
+    <div class="next">
+      <div class="l">Follow-up · D</div>
+      <h3>미저장 메모리</h3>
+      <p>"목표·설명은 사람 언어로" + "산출물 풀 링크" 선호는 durable 하지만 사용자 보류로 <strong>미기록</strong>. 원하면 feedback 메모리로 저장.</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">목표는 사람이 읽고 판단, 증거는 기계가 판정. 그리고 모든 걸 두 모델로 검증한다.</div>
+    <div class="right">creeta-lens · lens plan/multi<br>2026-05-26</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+
+  function tick() {
+    const h = document.documentElement;
+    const pct = h.scrollTop / (h.scrollHeight - h.clientHeight) * 100;
+    rail.style.width = Math.min(100, Math.max(0, pct)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      const r = slides[i].getBoundingClientRect();
+      if (r.top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>
