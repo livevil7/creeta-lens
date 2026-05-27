@@ -132,6 +132,7 @@ EN, KO, JA, ZH, ES, FR, DE, IT (8 languages)
 
 ## 문서
 
+- 먼저 읽기: [docs/START_HERE.md](docs/START_HERE.md) — 레포 진입점 + 질문 라우팅
 - 진행 중인 작업: `docs/tasks/` 확인
 - 프로젝트 규칙: `docs/rules/` 확인
 - 작업 히스토리: `docs/history/` 참조
