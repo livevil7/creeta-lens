@@ -1,4 +1,4 @@
-# Lens v3.9.0
+# Lens v3.10.0
 
 **Never wonder which plugin to use again.**
 
@@ -122,6 +122,19 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 | `/cp build auth with JWT` | Generates a work plan, saves to `docs/2026-02-28-jwt-auth.md`, asks for approval |
 | `/cp refactor the API layer` | Creates a step-by-step plan, saves to `docs/`, waits for your go-ahead |
 | `/cp` (no args) | Shows full skill inventory (same as `/c`) |
+
+### `/cps` — Generate a repo orientation document
+
+```
+/cps
+```
+
+`/cps` scans a repo's real documentation and generates `docs/START_HERE.md` — a single first-read entry point answering **"Where do I start?"** and **"Which doc answers my question?"** (4 sections: What This Repo Does / What This Repo Is Not / Current First-Read Path / Fast Answer Rules).
+
+| You type | What happens |
+| --- | --- |
+| `/cps` (fresh repo) | Globs real docs, assembles `docs/START_HERE.md`, injects a one-line pointer into CLAUDE.md if missing |
+| `/cps` (START_HERE exists) | Re-derives from current docs, shows a diff, and asks before overwriting (never silently overwrites manual edits) |
 
 **When to use which:**
 

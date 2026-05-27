@@ -1,20 +1,20 @@
 ---
 name: "cp"
-description: "Lens Plan v3.9.0 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
+description: "Lens Plan v3.10.0 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.9.0 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
+| cp | Lens Plan v3.10.0 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.9.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.10.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -610,11 +610,74 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
 
 완료된 작업의 History 문서를 작성하고 Task 파일을 정리합니다.
 
-### Phase 1: 활성 작업 확인
+### Phase 1: 활성 작업 확인 및 완료 추정 분류
 
-`docs/tasks/`를 스캔하여 파일 목록을 표시합니다 (최신 순).
+`docs/tasks/` 를 스캔하여 모든 파일을 재평가합니다. 단순 목록 표시를 넘어 각 task 의 완료 여부를 자동 추정하고 분류합니다.
 
-**AskUserQuestion** (header: "작업 완료")으로 어떤 작업이 완료되었는지 선택하게 합니다.
+#### Phase 1.1: 기존 task 파일 전수 재평가
+
+각 `docs/tasks/*.md` 파일을 Read 해서 아래 3가지 신호를 검토:
+
+1. **체크리스트 완료율** — `- [ ]` 대 `- [x]` 비율. 100% 근처면 완료 후보.
+2. **`✅ 검증` 표** (있으면) — 각 행의 "통과 판정" 을 현재 레포 상태/git log 로 참고 (가능한 범위). 대부분 통과하면 완료 후보.
+3. **`## 진행상황`** — "현재 경로" / "마지막 업데이트" 가 오래됐거나 "완료 임박" 등 진행 신호 검토. **버전 출시/배포 기록은 task 의 `## 진행상황` 섹션 + 레포의 `CHANGELOG.md` / `CLAUDE.md` Version 섹션에서 확인한다.**
+
+#### Phase 1.2: 자동 분류 (3가지 범주)
+
+각 task 를 다음 중 하나로 분류:
+
+| 분류 | 판단 기준 | 처리 |
+|------|----------|------|
+| **완료 추정** | 체크리스트 ≥80% 완료 **또는** 검증표 모든 행 통과 신호 **또는** 진행상황에 버전 출시/배포 기록 있음 | 아래 1.3 으로 일괄 제안 |
+| **진행중** | 체크리스트 <80% **또는** 진행상황에 "재개 포인트" 명시 있음 | 제외 (현황 보고만) |
+| **수동 확인 필요** | 표준 구조(YAML frontmatter + `## 🎯 목표`/`## Goal` + `## Plan A` + `## 진행상황`)를 갖추지 못해 체크리스트/검증표/진행상황을 신뢰성 있게 파싱할 수 없는 경우 (구버전 포맷) | 제외 (완료 추정 묶음에 안 넣음) |
+
+**강한 완료 신호 (tie-break 예외)**: task 가 명시한 **대상 버전**(예: `**대상 버전**: v3.4.0`, 제목/`refs`/본문의 버전)이 레포의 `CHANGELOG.md` / `CLAUDE.md` Version 섹션에 **출시 기록**으로 확인되면 — 체크박스가 미체크(0%)거나 "재개 포인트"가 남아있거나 구버전 포맷이어도 — **완료 추정으로 올린다**. (출시됐다 = 사실상 done. 완료를 체크박스 대신 ✅·버전으로 기록한 옛 task 가 영원히 안 정리되는 것을 막는다.) 최종 아카이브는 여전히 사용자 승인이므로 안전은 승인 게이트가 담당한다.
+
+**분류 신호 상충 시 tie-break 규칙**: **위 강한 완료 신호가 없을 때**, 그 외 신호가 상충하면 (예: 체크리스트 ≥80% 인데 동시에 "재개 포인트" 명시됨) **안전한 쪽을 우선한다**. "진행중" 또는 "수동 확인 필요"를 완료 추정보다 우선한다. 잘못 아카이브하느니 남겨두는 것이 안전하다.
+
+#### Phase 1.3: 완료 추정 묶음 일괄 제안
+
+분류 결과를 표로 표시:
+
+```
+기존 task 재평가 결과:
+
+| 파일명 | 상태 | 이유 |
+|--------|------|------|
+| 2026-05-16-cp-goal-first-overhaul.md | 완료 추정 | 체크리스트 5.5/6 ✓, 버전 v3.4.0 배포됨 |
+| 2026-05-20-cp-html-reports-board.md | 완료 추정 | 검증 표 S1~S7 통과, v3.6.0/v3.6.2 통합됨 |
+| 2026-05-27-... | 진행중 | 재개 포인트: Phase 5 사용자 검토 |
+```
+
+**AskUserQuestion** (header: "작업 완료 — 기존 task 정리"):
+
+```
+아래 task 들이 완료된 것으로 보입니다. 이들을 history 로 정리할까요?
+
+완료 추정 (일괄 제안):
+  ☐ 2026-05-16-cp-goal-first-overhaul.md
+  ☐ 2026-05-20-cp-html-reports-board.md
+
+진행중:
+  ⊕ 2026-05-27-cps-start-here-and-cp-done-sweep.md (Phase 5 대기)
+
+선택:
+- **Approve** — 완료 추정 항목들을 history 로 이동 (= history 에 기록 작성 + 원본 task 파일 삭제). 내용은 history 에 보존됨. (Phase 2 진입)
+- **Modify** — 선택적 제외 (예: "2026-05-16만 정리, 2026-05-20은 아직") 후 진행
+- **Skip All** — 중단
+```
+
+사용자가 **Approve** 또는 **Modify** 를 선택하면, 선택된 각 task 에 대해 아래 Phase 2 로 순차 진입.
+
+**Modify 선택 시**: 완료 추정 항목을 다시 AskUserQuestion(multiSelect)으로 제시해 사용자가 실제 정리할 항목만 고르게 한 뒤 그에 대해서만 Phase 2 이상을 진행한다.
+
+#### Phase 1.4: 안전 규칙 (절대 준수)
+
+- **분류는 추정일 뿐** — 자동 판정이 아니라 "이 정도면 완료일 가능성 높음" 이라는 확률적 제안. 최종 판단은 **항상 사용자 승인**.
+- **자동 삭제 절대 금지** — 사용자 승인 후 Phase 2~4(완료 인터뷰 → history 작성 → task 삭제)를 수행하므로 내용 손실은 없음. 내용 보존 강제.
+- **"수동 확인 필요"는 완료 추정 묶음에 넣지 않음** — 파싱 불가 항목은 사용자가 눈으로 판정해야 함. 추정 분류는 신뢰도가 높은 항목만.
+- **기존 Progress 섹션 존중** — 사용자가 손으로 적어둔 "재개 포인트" / "마지막 업데이트"를 근거로 삼되, 불명확하면 수동 확인 대상으로 넘김.
 
 ### Phase 2: 완료 인터뷰
 

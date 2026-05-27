@@ -1,3 +1,18 @@
+## [3.10.0] - 2026-05-27
+
+문서 라이프사이클 자동화 강화. 신규 skill `/cps` 로 어떤 레포든 "어디부터 읽고 질문을 어느 문서로 보낼지" 안내하는 진입점 문서(`docs/START_HERE.md`)를 실제 docs 스캔 기반으로 만든다. 더불어 `/cp done` 이 새 task 만이 아니라 방치된 기존 task 까지 전수 재평가해 완료분을 일괄 정리 제안한다. (예시 산출물 양식: `livevil-contents/docs/START_HERE.md`)
+
+### Added (v3.10.0)
+
+- **신규 skill `/cps` (Lens Start)** — 어떤 레포든 `docs/START_HERE.md`(레포 first-read 진입점 + 질문 라우팅)를 생성/갱신. 5단계 절차: ① 실제 docs 인벤토리 수집(`docs/**/*.md` 단 START_HERE 자신 제외 + 루트 README/CLAUDE.md, 제목 없으면 파일명 fallback) → ② 4섹션 조립(What This Repo Does / What This Repo Is Not / Current First-Read Path / Fast Answer Rules) → ③ 기존 파일 있으면 diff+승인 게이트(비파괴) → ④ Write(`docs/` 없으면 생성) → ⑤ CLAUDE.md 포인터 조건부 1줄 주입. **허구 경로 0 원칙**: Glob 미확인 경로 나열 금지, 근거 부족은 `(Not documented yet)`. (`skills/cps/SKILL.md`)
+
+### Changed (v3.10.0)
+
+- **`/cp` DONE 모드 Phase 1 강화** — "활성 작업 확인"이 단순 목록 표시 + 사용자 선택에서, **`docs/tasks/` 의 기존 task 전수 재평가**로 격상. Phase 1.1(체크리스트 완료율 + `✅ 검증` 표 + `## 진행상황`·CHANGELOG/CLAUDE.md Version 기반 신호 검토) → Phase 1.2(완료추정 / 진행중 / 수동확인필요 3분류, 신호 상충 시 안전쪽 우선) → Phase 1.3(완료추정 묶음 일괄 아카이브 AskUserQuestion, Approve 문구에 "원본 task 삭제" 명시, Modify 는 multiSelect 재질문) → Phase 1.4(안전 규칙: 분류는 추정일 뿐·자동삭제 금지·수동확인필요는 묶음 제외). **DONE Phase 2~4 흐름 불변**. (`skills/cp/SKILL.md`)
+- **CLAUDE.md Skills 표 + README** — `/cps` 행 추가.
+
+### Fixed (v3.10.0)
+
 ## [3.9.0] - 2026-05-26
 
 Codex 를 "Claude 결과의 부분 검토자"에서 **공동 조사자·공동 검증자**로 격상. Claude 혼자 계획하고 코딩하면 놓치고 삽질하는 게 많다 — 조사·계획·개발 전 과정을 Claude ‖ Codex 이종 모델로 **더블 검증**한다. trivial 제외 항상 적용, Codex 부재/실패는 graceful degrade.

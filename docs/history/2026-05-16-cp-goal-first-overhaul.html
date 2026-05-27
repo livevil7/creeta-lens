@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>/cp + /cc Goal-first 개편 · 보고서</title>
+<meta name="lens:source" content="docs/history/2026-05-16-cp-goal-first-overhaul.md">
+<meta name="lens:source-hash" content="382d00316d98">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">05</b></div>
+
+<main class="deck">
+
+<section class="slide" id="cover">
+  <div class="page-no">01 / 05 · COVER</div>
+  <div class="meta">
+    <span>2026-05-16</span><span class="dot">·</span>
+    <span class="badge">Done</span><span class="dot">·</span>
+    <span>lens core</span>
+  </div>
+  <h1 class="h-title">/cp + /cc 를 Goal-first 구조로 동시 개편</h1>
+  <p class="lede">계획(<code>/cp</code>)과 실행(<code>/cc</code>)을 <strong>Goal 최우선</strong> 구조로 재편 — 성공 기준 미달 시 done을 차단하고 Plan A↔B를 자동 전환하는 Goal-aware 실행 엔진으로 격상.</p>
+  <div class="hero">
+    <div class="num">v3.4.0<span class="unit">shipped</span></div>
+    <div class="caption">이후 <strong>v3.7 / v3.8 / v3.9</strong>로 계승된 Goal-first 기반. 계획 문서 = <code>Goal → Plan A → Plan B → Risks → Progress</code>.</div>
+  </div>
+  <div class="footer-meta"><span>creeta-lens / docs / history</span><span>2026-05-16-cp-goal-first-overhaul</span></div>
+</section>
+
+<section class="slide" id="glance">
+  <div class="page-no">02 / 05 · AT A GLANCE</div>
+  <h2 class="title">개편 범위</h2>
+  <p class="sub">2개 스킬 + 라이브러리 + 템플릿 + 핸드오프 프로토콜 동시 인플레이스 수정.</p>
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi"><div class="l">files changed</div><div class="v">5</div><div class="desc">cp · cc SKILL.md + plan-manager.js + 템플릿 + CHANGELOG.</div></div>
+    <div class="kpi"><div class="l">plan sections</div><div class="v accent">5</div><div class="desc">Goal → Plan A → Plan B → 사전 리스크 → 진행상황 고정 순서.</div></div>
+    <div class="kpi"><div class="l">languages</div><div class="v">8</div><div class="desc">EN/KO/JA/ZH/ES/FR/DE/IT 헤더 dict 전부 채움.</div></div>
+    <div class="kpi"><div class="l">하위 호환</div><div class="v good">유지</div><div class="desc">기존 v3.3.x 형식 문서도 계속 파싱.</div></div>
+  </div>
+</section>
+
+<section class="slide" id="decisions">
+  <div class="page-no">03 / 05 · KEY DECISIONS</div>
+  <h2 class="title">왜 이렇게 설계했나</h2>
+  <p class="sub">Goal을 모든 것의 위에 둔다. 방법(Plan)은 Goal에 종속.</p>
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec"><div class="n">01</div><div><h3>Goal 절대 우위</h3><p>Plan A/B·Pre-mortem은 Goal에 종속된 보조. Goal이 약하면 <strong>Approve 거부</strong>.</p></div></div>
+    <div class="dec"><div class="n">02</div><div><h3>핸드오프 프로토콜 명문화</h3><p><code>/cp → /cc</code>가 어떤 필드를 어떤 형식으로 넘기는지 양쪽 SKILL.md에 고정.</p></div></div>
+    <div class="dec"><div class="n">03</div><div><h3>Plan B 의무화</h3><p>medium+ 규모는 Plan B 필수, small은 생략 사유 명시.</p></div></div>
+    <div class="dec"><div class="n">04</div><div><h3>done 차단</h3><p><code>/cc</code>는 모든 성공 기준이 yes 되기 전엔 완료 보고 차단 — retry/Plan B/사용자 개입 중 선택.</p></div></div>
+  </div>
+</section>
+
+<section class="slide" id="files">
+  <div class="page-no">04 / 05 · ARTIFACTS</div>
+  <h2 class="title">변경 파일</h2>
+  <p class="sub">6개 파일 동시 인플레이스 수정.</p>
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card"><div class="gh"><h3>Skills</h3><span class="cnt">2</span></div>
+      <ul><li><span>skills/cp/SKILL.md</span></li><li><span>skills/cc/SKILL.md</span></li></ul>
+      <p class="note">cp = Goal-first 재구성 · cc = Goal-aware 실행 엔진.</p></div>
+    <div class="file-card"><div class="gh"><h3>Lib / Template</h3><span class="cnt">2</span></div>
+      <ul><li><span>lib/plan-manager.js</span><span class="meta">+extractGoal()</span></li><li><span>templates/plan.template.md</span></li></ul></div>
+    <div class="file-card"><div class="gh"><h3>Release</h3><span class="cnt">2</span></div>
+      <ul><li><span>CHANGELOG.md</span><span class="meta">v3.4.0</span></li><li><span>plugin.json</span><span class="meta">bump</span></li></ul></div>
+  </div>
+</section>
+
+<section class="slide" id="next">
+  <div class="page-no">05 / 05 · LINEAGE</div>
+  <h2 class="title">계승</h2>
+  <p class="sub">이 기반 위에 후속 버전이 쌓였다.</p>
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next"><div class="l">v3.7</div><h3>검증 섹션</h3><p>각 성공 기준의 검증 방법+기대 결과 표 필수화 + 네이티브 /goal 연동.</p></div>
+    <div class="next"><div class="l">v3.8</div><h3>사람 중심 2층 Goal</h3><p>🎯목표(사람 언어) / ✅검증(기계) 분리.</p></div>
+    <div class="next"><div class="l">v3.9</div><h3>Codex 듀얼 검증</h3><p>Phase 0.5 병렬 조사 + Phase 2.4 합성 + /cc Phase 4.5 코드리뷰 게이트.</p></div>
+  </div>
+  <div class="signature"><div class="quote">Goal 먼저, 방법은 그 다음.</div><div class="right">creeta-lens · lens core<br>2026-05-16</div></div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

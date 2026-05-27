@@ -4,9 +4,10 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.9.0**
-- Updated: 2026-05-26
+- Current: **v3.10.0**
+- Updated: 2026-05-27
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.10.0 feat: 신규 skill **`/cps`** (Lens Start) — 어떤 레포든 `docs/START_HERE.md`(레포 first-read 진입점 + 질문 라우팅)를 실제 docs 스캔 기반으로 생성. 인벤토리는 추론 금지(허구 경로 0, 근거 부족은 `(Not documented yet)`), 기존 파일은 diff+승인 게이트(비파괴), CLAUDE.md 포인터는 없을 때만 1줄 조건부 주입. 더불어 **`/cp done` 강화** — 새 task 만이 아니라 `docs/tasks/` 의 기존 task 를 전수 재평가해 "완료추정/진행중/수동확인필요" 자동 분류 + 완료추정 일괄 아카이브 제안(신호 상충 시 안전쪽 우선, 자동삭제 금지, DONE Phase 2~4 불변). 상세: `CHANGELOG.md`.
 - v3.9.0 feat: Codex 를 **공동 조사자·검증자**로 격상 — 이종 모델 더블 검증. `/cp` Phase 0.5(Codex 병렬 독립 조사) + Phase 2.4(듀얼 합성·교차검증, `🔀 듀얼 합성` 섹션), `/cc` Phase 4.5(Codex 코드리뷰 게이트 — Supervisor+Codex 둘 다 pass 여야 진행). trivial 제외 항상, Codex 부재 시 graceful degrade. 산출물 링크 풀 경로 강제. 상세: `CHANGELOG.md` + `docs/rules/codex-integration.md` §8.5.
 - v3.8.0 feat: `/cp` Goal 을 **사람 중심 2층 구조**로 전환 — 🎯 목표는 "무엇이 가능해지는가"(사람 언어, 기술 토큰 금지), 기술 증거(`201`/`user row` 등)는 전부 ✅검증 표로 격리. Goal 인터뷰(Phase 0.0), 서브골 분해(0.2), 검증표 `종류`(auto/manual) 칼럼, Goal 게이트에 기술토큰·매핑 검사 추가. `lib/plan-manager.js` 전면 동기화(8-lang dict / generatePlanContent / extractGoal 다국어 헤더). 상세: `CHANGELOG.md`.
 - v3.7.0 feat: plan 문서에 `✅ 검증(Verification)` 섹션 신설(필수, `REQUIRED_SECTIONS`) — 각 성공 기준의 검증 방법+기대 결과 표. 네이티브 Claude Code `/goal` 연동(`/cp` 가 `/goal` 명령 emit, `/cc` 가 증거를 transcript 에 명시). placeholder 정규식이 `%{}`/`${}` 오판하던 회귀 수정. 상세: `CHANGELOG.md`.
@@ -22,10 +23,12 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 | `/c` | Single skill navigator | Scan → Recommend → Execute → Discover |
 | `/cc` | Parallel multi-agent engine | Scan → Multi-Match → Parallel Execute → Synthesize |
 | `/cp` | Plan-first execution | Scan → Analyze → Generate Plan → Approve → Execute → Post-Exec Update |
+| `/cps` | Repo orientation doc | Scan docs → Assemble 4 sections → Diff gate → Write → Conditional CLAUDE.md pointer |
 
 - `/c <request>` picks the best one skill and runs it
 - `/cc <request>` runs ALL relevant skills as parallel Task agents, then synthesizes outputs
 - `/cp <request>` generates a work plan document, gets user approval, then executes
+- `/cps` generates/updates `docs/START_HERE.md` — a repo's first-read orientation + question-routing entry point
 - Any command with no args shows full skill inventory
 
 ## Hooks (5)
