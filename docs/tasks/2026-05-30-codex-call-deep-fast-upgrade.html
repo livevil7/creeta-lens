@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Codex 호출 업그레이드 · 보고서</title>
+<meta name="lens:source" content="docs/tasks/2026-05-30-codex-call-deep-fast-upgrade.md">
+<meta name="lens:source-hash" content="558047e26f6b">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">06</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 06 · COVER</div>
+  <div class="meta">
+    <span>2026-05-30</span>
+    <span class="dot">·</span>
+    <span class="badge task">Task</span>
+    <span class="dot">·</span>
+    <span>lens · codex integration</span>
+  </div>
+
+  <h1 class="h-title">Codex 호출 업그레이드 — 깊게(xhigh) + 빠르게(priority) + drift 정리</h1>
+  <p class="lede">
+    lens가 codex를 부를 때 <strong>항상 가장 깊은 추론으로, 가능한 한 빠르게</strong> 답을 받고,
+    codex가 멈춰도 작업이 막히지 않으며, 문서의 모델 표기를 실제와 일치시킨다.
+    근거는 추측이 아니라 <strong>직접 실측</strong>.
+  </p>
+
+  <div class="hero">
+    <div class="num">2<span class="unit">독립 다이얼</span></div>
+    <div class="caption">
+      <code>reasoning_effort=xhigh</code>(깊이) + <code>service_tier=priority</code>(속도)를 분리 고정.
+      실측: low는 xhigh보다 <strong>토큰 6배</strong>를 쓰고도 속도 이득 없음 → xhigh 유지가 정답.
+      토큰 비용은 비고려(사용자 방침).
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / tasks</span>
+    <span>2026-05-30-codex-call-deep-fast-upgrade</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 06 · AT A GLANCE</div>
+  <h2 class="title">작업 규모</h2>
+  <p class="sub">중앙 규칙 1곳(SoT) + 스킬 2곳의 직접 인용만 손본다. 외과적 변경.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">edited files</div>
+      <div class="v">3</div>
+      <div class="desc"><code>codex-integration.md</code> + <code>cp/SKILL.md</code> + <code>cc/SKILL.md</code>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">config dials</div>
+      <div class="v accent">2</div>
+      <div class="desc">xhigh(깊이) + priority(속도). 별개 다이얼, 동시 적용.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">model fix</div>
+      <div class="v">5.2→5.5</div>
+      <div class="desc">문서가 GPT-5.2 표기, 실제 호출은 gpt-5.5. drift 제거.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">verifications</div>
+      <div class="v">5</div>
+      <div class="desc">호출 설정 / 잔재 0 / 모델 일치 / degrade / 설치 반영.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">low vs xhigh</div>
+      <div class="v warn">6×</div>
+      <div class="desc">low가 토큰 6배 더 씀, 속도 이득 0. 실측 4회 재현.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">target version</div>
+      <div class="v">3.11.0</div>
+      <div class="desc"><code>bump-version.sh</code>가 11곳 일괄. 배포는 승인 후.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Goal -->
+<section class="slide" id="goal">
+  <div class="page-no">03 / 06 · GOAL</div>
+  <h2 class="title">목표 — 무엇이 가능해지는가</h2>
+  <p class="sub">사람 언어 목표. 완료의 정의: /cp·/cc 1회 실행 시 깊게+빠르게 호출 + 깨짐 없는 수거 + codex 없어도 완주.</p>
+
+  <div class="goal-list" style="margin-top:24px">
+    <div class="goal"><div class="box"></div><div class="t"><strong>깊게+빠르게</strong> — codex가 항상 최고 추론(xhigh)과 우선 처리(priority)로 호출된다. 토큰 비용 비고려.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>안 막힘</strong> — codex가 느리거나 멈춰도 Claude 혼자 작업을 끝까지 마친다 (숫자 timeout 없이).</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>표기 일치</strong> — 문서의 codex 모델/설정이 실제 돌아가는 것과 같다 (5.2/5.5 혼동 제거).</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>깨짐 없는 수거</strong> — codex 응답을 취약한 텍스트 파싱 대신 <code>-o</code> 파일로 안정 수거.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>Claude도 높은 모델</strong> — /cc·/cp의 워커·슈퍼바이저·QA를 <code>opus</code>로. Monitor(상태 폴러)만 haiku 유지.</div></div>
+  </div>
+</section>
+
+<!-- 4. Plan -->
+<section class="slide" id="plan">
+  <div class="page-no">04 / 06 · PLAN</div>
+  <h2 class="title">변경 — 파일별</h2>
+  <p class="sub">SoT = <code>codex-integration.md</code>. 스킬 2곳은 흩어진 직접 인용을 §참조로 통일.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">A</div>
+      <h3>codex-integration.md</h3>
+      <div class="what">§4 표준 호출에 <code>-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=priority -o</code> 추가. §5 awk 파싱 → <code>-o</code> 파일 수거 + <strong>고유 파일명</strong> 규칙. §7 <strong>timeout 제거</strong>. 모델 5.2→5.5.</div>
+    </div>
+    <div class="step">
+      <div class="n">B</div>
+      <h3>cp/SKILL.md</h3>
+      <div class="what">Phase 0.5·2.4·3.2의 <code>^codex$~tokens used</code> 추출 + <code>codex exec "..."</code> 직접 인용을 <strong>§4/§5 참조</strong>로 통일. "timeout" 어휘 → "미응답/실패".</div>
+    </div>
+    <div class="step">
+      <div class="n">C</div>
+      <h3>cc/SKILL.md</h3>
+      <div class="what">Phase 4.5 코드리뷰 게이트의 호출·파싱을 <strong>§4/§5 참조</strong>로 통일. "실패/timeout" → "미응답/실패".</div>
+    </div>
+    <div class="step">
+      <div class="n">E</div>
+      <h3>cc/SKILL.md · Claude 모델</h3>
+      <div class="what">Model Assignment Table 상향: Worker(Easy/Medium/Hard)·Supervisor·QA → <code>opus</code>. <strong>Monitor만 haiku 유지</strong>(상태 폴러, 품질 이득 0). /cp는 pre-mortem 이미 opus라 변경 없음.</div>
+    </div>
+    <div class="step">
+      <div class="n">D</div>
+      <h3>버전·릴리즈</h3>
+      <div class="what"><code>bump-version.sh 3.11.0</code> (11곳) + CHANGELOG + CLAUDE.md feat. 배포(commit+tag <code>v3.11.0</code>+push)는 <strong>사용자 승인 후</strong> 별도.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Risks -->
+<section class="slide" id="risks">
+  <div class="page-no">05 / 06 · RISKS</div>
+  <h2 class="title">사전 리스크</h2>
+  <p class="sub">단일 모델 pre-mortem — Codex 조사가 sandbox 차단 + 인코딩 깨짐으로 degrade(이 작업이 인코딩하려는 graceful degrade의 실증 사례). Blocker 없음.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">Opus · 최대 위험</div>
+      <h3>-o 파일명 race</h3>
+      <p>Phase 0.5·2.4·4.5가 background 병렬인데 같은 <code>/tmp/codex.txt</code>를 쓰면 덮어쓰기. → §5에 <strong>고유 파일명 컨벤션</strong> 1개를 표준으로 박는다(Plan A 흡수).</p>
+    </div>
+    <div class="next warn">
+      <div class="l">Opus · 호환</div>
+      <h3>priority/-o 미지원 환경</h3>
+      <p>다른 codex 빌드/계정에서 <code>service_tier</code>·<code>-o</code> 거부 가능. → Plan B: 부가분만 빼고 핵심(xhigh+모델 fix)은 유지.</p>
+    </div>
+    <div class="next">
+      <div class="l">Opus · 오해</div>
+      <h3>priority 효과 과장</h3>
+      <p>실측상 priority는 소규모 작업 무효과(compute-bound). 문서에 "부하 시 큐 우선권"임을 명시 안 하면 잘못된 속도 기대.</p>
+    </div>
+    <div class="next">
+      <div class="l">Opus · 운영</div>
+      <h3>머신 간 전파</h3>
+      <p><code>bump-version.sh</code>는 이 레포만 갱신. Mac Mini 등은 push 후 <code>/lens-upgrade</code> 필요. 검증 #5는 이 PC 한정 — 완료 노트에 명시.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Resume -->
+<section class="slide" id="resume">
+  <div class="page-no">06 / 06 · RESUME</div>
+  <h2 class="title">재개 포인트</h2>
+  <p class="sub">Phase 5 사용자 검토 대기. Approve 시 A→D 순차 적용.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">중앙 규칙(A)을 먼저 고치면 스킬(B·C)은 참조 갱신만. 마지막에 버전/배포(D).</div>
+    <ol>
+      <li class="todo">
+        <h4>A — codex-integration.md</h4>
+        <div class="det">§4 호출 플래그 + §5 -o 수거/고유 파일명 + §7 timeout 제거 + 모델 5.2→5.5.</div>
+      </li>
+      <li class="todo">
+        <h4>B·C — cp/cc SKILL.md</h4>
+        <div class="det">직접 인용을 §참조로 통일, timeout 어휘 정리.</div>
+      </li>
+      <li class="todo">
+        <h4>D — 버전·배포</h4>
+        <div class="det"><code>bump-version.sh 3.11.0</code> + CHANGELOG. commit+tag+push는 별도 승인.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

@@ -1,3 +1,22 @@
+## [3.11.0] - 2026-05-30
+
+Codex 호출과 Claude 실행을 **깊게+빠르게**로 통일. 토큰 비용은 고려하지 않는다(사용자 방침) — codex 는 항상 최고 추론(`xhigh`) + 큐 우선권(`priority`), Claude 측 워커·슈퍼바이저·QA 는 항상 `opus`. 더불어 background 병렬 모델에 안 맞던 군더더기(blocking timeout, 취약한 stdout awk 파싱)를 제거하고 모델 표기 drift(GPT-5.2 → gpt-5.5)를 정리. 실측 근거(gpt-5.5): `low` 추론은 `xhigh` 보다 토큰 ~6배 + 속도 이득 0 → xhigh 가 소규모에서 오히려 싸고 빠름. (계획: `docs/tasks/2026-05-30-codex-call-deep-fast-upgrade.md`)
+
+### Added (v3.11.0)
+
+- **codex 표준 호출에 깊이·속도 다이얼 명시 (`docs/rules/codex-integration.md` §4)** — `-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=priority -o "$OUT"`. reasoning_effort(품질)와 service_tier(큐 우선권)는 독립 다이얼이라 동시 적용. "왜 xhigh+priority" 근거 단락 + 실측 수치 추가.
+- **`-o` 본문 수거 + 고유 파일명 규칙 (§5)** — `-o "$OUT"`(`mktemp /tmp/codex_XXXXXX.txt`)로 최종 답변만 파일 수거. background 병렬 호출(Phase 0.5·2.4·4.5) 간 파일명 충돌 방지.
+
+### Changed (v3.11.0)
+
+- **Claude 모델 배정 Opus 우선 (`skills/cc/SKILL.md`)** — Worker(전 난이도)·Supervisor·QA = `opus` 고정(난이도 무관). Monitor 만 `haiku` 유지(대시보드 상태 폴링 — opus 품질 이득 0인 유일 예외). 모델 할당 테이블·ASCII 다이어그램·난이도 매핑·Supervisor 모델 선택 로직·예시 일괄 갱신. "비용 효율" 문구 → "품질 우선". (`/cp` 는 Phase 3.1 pre-mortem 이 이미 opus — 변경 없음.)
+- **codex 호출/수거 참조 통일 (`skills/cp/SKILL.md`, `skills/cc/SKILL.md`)** — Phase 0.5·2.4·3.2(cp)·4.5(cc)의 흩어진 직접 인용(`codex exec "..."`, `^codex$`~`tokens used` awk)을 §4/§5 참조로 통일.
+
+### Fixed (v3.11.0)
+
+- **blocking timeout 제거 (`docs/rules/codex-integration.md` §7)** — 과거 30초 `timeout 30 bash -c` 패턴은 동기 호출 시대의 잔재. 현재는 background 병렬이라 Claude 가 기다리지 않으므로 모순. "gate 에서 ready 면 수거, 아니면 degrade(기다리지 않음)"로 교체 — 숫자 timeout 없음. cp/cc 의 "timeout" 어휘도 "미응답/실패"로 정리.
+- **모델 표기 drift (`docs/rules/codex-integration.md`)** — `GPT-5.2-Codex` → `gpt-5.5`(이 codex 확장 빌드가 노출하는 실제 모델). 성능 표의 응답시간·토큰 수치를 실측 기반으로 갱신.
+
 ## [3.10.0] - 2026-05-27
 
 문서 라이프사이클 자동화 강화. 신규 skill `/cps` 로 어떤 레포든 "어디부터 읽고 질문을 어느 문서로 보낼지" 안내하는 진입점 문서(`docs/START_HERE.md`)를 실제 docs 스캔 기반으로 만든다. 더불어 `/cp done` 이 새 task 만이 아니라 방치된 기존 task 까지 전수 재평가해 완료분을 일괄 정리 제안한다. (예시 산출물 양식: `livevil-contents/docs/START_HERE.md`)

@@ -1,20 +1,20 @@
 ---
 name: "cp"
-description: "Lens Plan v3.10.0 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
+description: "Lens Plan v3.11.0 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.10.0 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
+| cp | Lens Plan v3.11.0 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.10.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.11.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -205,7 +205,7 @@ large 규모는 목표를 **사람 언어 서브골 리스트**로 쪼갠다. �
 JSON 금지. Claude 의 안을 가정하지 말고 당신 시각으로 독립적으로.
 ```
 
-3. **Claude 는 기다리지 않는다** — 킥오프 후 즉시 Phase 1(자기 조사·Plan A 설계)로 진행. Codex 응답은 Phase 2.4 에서 `^codex$`~`^tokens used$` 본문 추출로 수거.
+3. **Claude 는 기다리지 않는다** — 킥오프 후 즉시 Phase 1(자기 조사·Plan A 설계)로 진행. Codex 응답은 Phase 2.4 에서 `-o` 출력 파일(고유 파일명)에서 수거 (상세: `docs/rules/codex-integration.md` §5).
 
 ### Phase 1: Plan A 설계 (Goal 에 도달하는 권장 경로)
 
@@ -235,7 +235,7 @@ Plan A 가 막혔을 때의 **대체 방법** 을 명시.
 
 Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude 단독 계획 그대로 Phase 2.5 진행, 문서에 "단일 모델 — Codex 미사용" 표기).
 
-1. **수거** — 백그라운드 Codex 출력에서 본문 추출. timeout/실패면 "Codex 조사 실패: {요약}" 기록 후 Claude 단독으로 진행.
+1. **수거** — 백그라운드 Codex 의 `-o` 출력 파일에서 본문 읽기(§5). gate 시점에 미완/실패면 기다리지 않고 "Codex 조사 실패: {요약}" 기록 후 Claude 단독으로 진행.
 2. **분류** — Claude 의 접근 vs Codex 의 접근을 항목별로 대조:
    - **합의** (둘 다 동의한 접근/단계/리스크) → 고신뢰. 그대로 Plan 에 lock.
    - **분기** (서로 다른 판단) → 재검증 대상.
@@ -369,7 +369,7 @@ Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적
 `docs/rules/codex-integration.md` 의 감지 로직으로 Codex CLI 존재 확인:
 
 1. `command -v codex` 또는 VSCode 확장 경로 확인
-2. 존재하면: Bash tool 로 `codex exec --skip-git-repo-check "..."` 호출
+2. 존재하면: Bash tool 로 **§4 표준 호출**(`-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=priority -o "$OUT"`) 그대로 호출
 3. 부재하면: skip 하고 "Codex 미설치 — Opus 단독 pre-mortem" 플래그 기록
 
 Codex 프롬프트:
@@ -388,7 +388,7 @@ Codex 프롬프트:
 JSON 금지, 자유 서술.
 ```
 
-Codex 호출 중 실패 (timeout, 인증 만료) 시 "Codex 호출 실패: {에러 요약}" 기록하고 Opus 결과만 사용. 상세: `docs/rules/codex-integration.md`.
+Codex 미응답/실패 (인증 만료 등) 시 기다리지 않고 "Codex 호출 실패: {에러 요약}" 기록하고 Opus 결과만 사용. 상세: `docs/rules/codex-integration.md` §7.
 
 #### 3.3 결과 통합 + Plan B Trigger 매칭
 

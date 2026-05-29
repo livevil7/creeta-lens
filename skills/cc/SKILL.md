@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.10.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
+description: "Lens Multi v3.11.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.10.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.11.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.10.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.11.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, a Monitor agent tracks progress in real-time, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -110,14 +110,14 @@ Leader · Worker(병렬) · Supervisor · QA — 모든 phase가 이 4규칙을 
   ┌──────────────────────────┐  │
   │   Supervisor Agent       │──┘
   │  (Quality review + score)│
-  │    sonnet model          │
+  │    opus model            │
   └────────┬─────────────────┘
            │ (pass)
            ▼
   ┌──────────────────────────┐
   │  QA Verification Agent   │──→ fail → back to Leader
   │ (Actually test results)  │
-  │     haiku model          │
+  │     opus model           │
   │ Playwright/Bash/Read/curl│
   └────────┬─────────────────┘
            │ (verified)
@@ -141,15 +141,17 @@ Leader · Worker(병렬) · Supervisor · QA — 모든 phase가 이 4규칙을 
 
 ## 모델 할당 테이블
 
+> **품질 우선 (토큰 비용 비고려)**: substantive 역할(Worker 전 난이도·Supervisor·QA)은 항상 `opus`. Monitor 만 예외(`haiku`) — 대시보드 상태 폴링뿐이라 opus 로 올려도 품질 이득이 0.
+
 | 역할 | 모델 | 이유 |
 |------|------|------|
 | Leader | 현재 모델 | 분석 및 계획 정확도 |
-| Worker (Easy) | haiku | 간단한 작업 |
-| Worker (Medium) | sonnet | 코드/분석 작업 |
+| Worker (Easy) | opus | 품질 우선 — 단순 작업도 최고 모델 |
+| Worker (Medium) | opus | 코드/분석 작업 |
 | Worker (Hard) | opus | 복잡한 아키텍처 |
-| Monitor | haiku | 상태 확인만 필요 |
-| Supervisor | sonnet (기본) / opus (opus worker 있을 때) | 품질 검토; opus worker 산출물 리뷰 시 동급으로 승격 |
-| QA | haiku | 테스트 실행 |
+| Monitor | haiku | 상태 확인만 — opus 품질 이득 0인 유일 예외 |
+| Supervisor | opus | 품질 검토 — Worker 산출물과 동급 깊이 |
+| QA | opus | 실제 검증 — 깊은 분석 필요 |
 
 ---
 
@@ -233,19 +235,19 @@ original_request: {원본 요청}
 
 #### 1.4 모델 할당
 
-각 서브태스크의 난이도에 따라 Worker에 할당할 모델을 결정합니다:
-- **Easy** (단순 작업): haiku
-- **Medium** (코드/분석): sonnet
+모든 Worker는 `opus`로 할당합니다 (품질 우선 — 토큰 비용 비고려). 난이도 라벨(Easy/Medium/Hard)은 진행 표시·우선순위 참고용으로만 유지하며, 모델은 난이도와 무관하게 항상 opus:
+- **Easy** (단순 작업): opus
+- **Medium** (코드/분석): opus
 - **Hard** (복잡한 아키텍처): opus
 
 #### 1.5 승인 요청 (필수)
 
 **실행은 사용자 승인 없이 절대 시작하지 않습니다.**
 
-**AskUserQuestion** (header: "Lens Multi v3.10.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.11.0 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.10.0 — 실행 계획
+Lens Multi v3.11.0 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -255,9 +257,9 @@ Lens Multi v3.10.0 — 실행 계획
 ┌───┬──────────────────────┬────────────┬────────┬─────────┐
 │ # │ 서브태스크            │ 할당 스킬   │ 모델   │ 난이도   │
 ├───┼──────────────────────┼────────────┼────────┼─────────┤
-│ 1 │ [설명]               │ /skill     │ sonnet │ Medium  │
-│ 2 │ [설명]               │ general    │ haiku  │ Easy    │
-│ 3 │ [설명]               │ /review    │ sonnet │ Medium  │
+│ 1 │ [설명]               │ /skill     │ opus   │ Medium  │
+│ 2 │ [설명]               │ general    │ opus   │ Easy    │
+│ 3 │ [설명]               │ /review    │ opus   │ Medium  │
 └───┴──────────────────────┴────────────┴────────┴─────────┘
 
 품질 검증: Supervisor 리뷰 + QA 검증
@@ -335,7 +337,7 @@ Monitor는 **백그라운드에서 실행**되며, 다른 Agent와 독립적입�
 각 Worker에 할당:
 - 고유 Worker ID (#1, #2, #N)
 - 해당 서브태스크 설명
-- 할당된 모델 (haiku/sonnet/opus)
+- 할당된 모델 (opus — Monitor만 haiku)
 - 할당된 skill 정보 (있으면)
 - 모든 도구 접근 권한
 
@@ -448,22 +450,17 @@ Monitor가 모든 Worker 완료를 보고할 때까지 대기합니다.
 
 ### Phase 4: Supervisor — 품질 검토
 
-#### 4.0 Supervisor 모델 선택
+#### 4.0 Supervisor 모델
 
-Phase 1의 Worker 할당 테이블에서 `opus` worker 존재 여부 스캔:
-- 하나라도 있음 → Supervisor 모델 = `opus`
-- 없음 → Supervisor 모델 = `sonnet` (기본)
+Supervisor 모델 = `opus` 고정 (품질 우선 — 토큰 비용 비고려). Worker 가 전부 opus 이므로 Supervisor 도 동급 깊이여야 "주니어가 시니어 코드 리뷰"하는 역전이 없다.
 
-이유: Worker (Hard) 작업을 opus가 했는데 Supervisor를 sonnet으로 두면 "주니어가 시니어 코드 리뷰"하는 역전 구조. 단순 태스크에 과잉 비용을 피하면서도 깊이가 필요할 때만 승격.
-
-모든 Worker가 완료되면, **별도의 Supervisor Agent** (위 로직으로 선택된 모델)를 시작합니다:
+모든 Worker가 완료되면, **별도의 Supervisor Agent** (opus)를 시작합니다:
 
 ```
 당신은 Supervisor Agent입니다. 모든 Worker의 출력 품질과 완성도를 검토합니다.
 
 ## 당신의 모델
-당신의 모델은 {assigned_model}입니다.
-opus인 경우: 깊은 추론과 구조적 통찰에 집중. 단순 코드 스타일 체크 외에도 아키텍처 의사결정의 trade-off까지 검토.
+당신의 모델은 opus입니다. 깊은 추론과 구조적 통찰에 집중하세요 — 단순 코드 스타일 체크 외에도 아키텍처 의사결정의 trade-off까지 검토.
 
 ## 원본 요청
 {사용자 원본 요청}
@@ -525,7 +522,7 @@ opus인 경우: 깊은 추론과 구조적 통찰에 집중. 단순 코드 스�
 
 1. **Codex 감지** — 3단계 fallback. 부재 시 "Codex 미설치 — Supervisor 단독 검토" 플래그 후 Phase 5 진행 (게이트는 Supervisor 단독, 나머지 동일).
 2. **리뷰 대상 확보** — 이번 반복의 코드 변경: `git diff` 가능하면 diff, 아니면 변경 파일 목록 + 내용.
-3. **Codex 리뷰 호출** — Supervisor Agent 와 병렬이 되도록 **백그라운드**(Bash `run_in_background: true`)로, **프로젝트 루트에서** 실행:
+3. **Codex 리뷰 호출** — Supervisor Agent 와 병렬이 되도록 **백그라운드**(Bash `run_in_background: true`)로, **프로젝트 루트에서**, **§4 표준 호출**(`-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=priority -o "$OUT"`, 고유 파일명)로 실행:
 
 ```text
 다음 코드 변경을 리뷰하세요. 순수 텍스트, 한국어.
@@ -545,8 +542,8 @@ opus인 경우: 깊은 추론과 구조적 통찰에 집중. 단순 코드 스�
 각 지적은 [심각도 high/med/low] + 파일:라인 + 무엇이 + 왜. 마지막 줄에 PASS 또는 FAIL 한 단어만.
 ```
 
-4. **판정 파싱** — 본문 추출(`^codex$`~`^tokens used$`) 후 마지막 줄 `PASS`/`FAIL` 읽기. `[high]` 심각도 지적이 하나라도 있으면 PASS 라 적혀 있어도 **FAIL 로 간주**.
-5. **실패/timeout** — "Codex 리뷰 실패: {요약}" 기록, Supervisor 단독 게이트로 진행 (블로킹 금지 — Codex 부재와 동일 취급).
+4. **판정 파싱** — `-o` 출력 파일에서 본문 읽기(§5) 후 마지막 줄 `PASS`/`FAIL` 읽기. `[high]` 심각도 지적이 하나라도 있으면 PASS 라 적혀 있어도 **FAIL 로 간주**.
+5. **미응답/실패** — gate 시점에 미완이면 기다리지 않고 "Codex 리뷰 실패: {요약}" 기록, Supervisor 단독 게이트로 진행 (블로킹 금지 — Codex 부재와 동일 취급).
 
 ---
 
@@ -582,7 +579,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.10.0 — 반복 {N}/5
+Lens Multi v3.11.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -628,7 +625,7 @@ Lens Multi v3.10.0 — 반복 {N}/5
 
 ### Phase 6: QA Verification (필수 — 절대 생략, SUCCESS_CRITERIA 직접 검증)
 
-모든 Worker와 Supervisor가 완료되면, **별도의 QA Agent** (haiku 모델)가 **실제로 검증**합니다.
+모든 Worker와 Supervisor가 완료되면, **별도의 QA Agent** (opus 모델)가 **실제로 검증**합니다.
 
 **v3.4+ 변경점**: QA 의 **첫 책임은 SUCCESS_CRITERIA 각 항목을 실제 검증** 하는 것. 서브태스크 산출물 검증은 그 보조.
 
@@ -727,7 +724,7 @@ Lens Multi v3.10.0 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.10.0 — 최종 결과                       ║
+║   Lens Multi v3.11.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -841,11 +838,11 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 **사용자 요청**: "React 웹사이트 만들어 줄래? 랜딩, 블로그, 대시보드 페이지. 완전히 작동하는 것."
 
 ### Phase 1: 분해
-1. React 프로젝트 초기화 + 라우터 설정 (Worker #1, haiku)
-2. 랜딩 페이지 컴포넌트 + 스타일링 (Worker #2, sonnet)
-3. 블로그 페이지 + Mock API (Worker #3, sonnet)
+1. React 프로젝트 초기화 + 라우터 설정 (Worker #1, opus)
+2. 랜딩 페이지 컴포넌트 + 스타일링 (Worker #2, opus)
+3. 블로그 페이지 + Mock API (Worker #3, opus)
 4. 대시보드 페이지 + 데이터 시각화 (Worker #4, opus)
-5. E2E 테스트 작성 (Worker #5, sonnet) — 할당 skill: `/qa`
+5. E2E 테스트 작성 (Worker #5, opus) — 할당 skill: `/qa`
 
 ### Phase 2: TodoWrite
 5개 항목, 모두 `pending`
@@ -868,7 +865,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.10.0 — 최종 결과
+Lens Multi v3.11.0 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 

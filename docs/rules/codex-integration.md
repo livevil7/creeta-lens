@@ -6,7 +6,7 @@ Lens v3.1에서 OpenAI Codex CLI를 활용한 pre-mortem 이종 모델 검증의
 
 ### Codex CLI란
 
-- OpenAI가 제공하는 GPT-5.2-Codex 전용 CLI 도구
+- OpenAI가 제공하는 codex 전용 CLI 도구 (이 확장 빌드가 노출하는 모델: `gpt-5.5`)
 - 로컬 셸에서 비대화형 호출 가능 (`codex exec`)
 - ChatGPT Plus/Pro/Max 구독으로 인증 (별도 API 키 불필요)
 
@@ -72,52 +72,52 @@ codex login status
 ## 4. 표준 호출 패턴
 
 ```bash
-codex exec --skip-git-repo-check "프롬프트 내용"
+OUT=$(mktemp /tmp/codex_XXXXXX.txt)   # 고유 파일명 — 병렬 호출 충돌 방지
+codex exec --skip-git-repo-check \
+  -m gpt-5.5 \
+  -c model_reasoning_effort=xhigh \
+  -c service_tier=priority \
+  -o "$OUT" \
+  "프롬프트 내용"
+# 응답 본문은 "$OUT" 에 깔끔히 떨어진다 (§5 참조)
 ```
 
 ### 플래그 설명
 
-- `exec` — 비대화형 1회 응답 모드. TUI를 띄우지 않고 stdout으로 결과 출력
+- `exec` — 비대화형 1회 응답 모드. TUI를 띄우지 않고 결과 출력
 - `--skip-git-repo-check` — 현재 디렉토리가 git repo가 아니어도 실행 허용. Pre-mortem은 repo와 무관하므로 필수
+- `-m gpt-5.5` — 모델 명시 고정. config 기본값에 의존하지 않고 항상 동일 모델 사용 (이 codex 확장 빌드가 노출하는 모델)
+- `-c model_reasoning_effort=xhigh` — **깊이 다이얼**: 최고 추론 강도. 토큰 비용은 고려하지 않는다 (방침)
+- `-c service_tier=priority` — **속도 다이얼**: API 부하 시 큐 우선권. *별개 다이얼*이라 xhigh와 동시 적용 가능
+- `-o "$OUT"` — 최종 답변 본문만 파일로 출력. 메타(`session id`/`tokens used`) 섞인 stdout을 awk로 파싱할 필요가 없다
 
-### Windows 환경 호출 예
+### 왜 xhigh + priority 인가
 
-```bash
-CODEX_BIN=$(ls $HOME/.vscode/extensions/openai.chatgpt-*/bin/windows-x86_64/codex.exe 2>/dev/null | head -1)
-"$CODEX_BIN" exec --skip-git-repo-check "프롬프트 내용"
-```
+깊이와 속도는 **독립 다이얼**이다. `reasoning_effort` 는 추론 토큰량(품질·깊이), `service_tier` 는 큐 우선권(지연)을 조절한다 — 한쪽이 다른 쪽을 깎지 않는다. 실측(gpt-5.5): `low` 는 `xhigh` 보다 **토큰을 ~6배 더 쓰면서 속도 이득이 없었다** (소규모 작업). 따라서 codex 에선 xhigh 가 소규모에서 오히려 싸고 빠르다 → 항상 xhigh. `priority` 는 raw 속도가 아니라 **부하 시 큐 우선권**이라 소규모엔 무효과(compute-bound)일 수 있으나, 큰 작업/혼잡 시 보험이며 해는 없다.
 
-## 5. 응답 파싱
+> 참고: codex 바이너리 절대경로는 `CODEX_BIN=$(ls $HOME/.vscode/extensions/openai.chatgpt-*/bin/windows-x86_64/codex.exe 2>/dev/null | head -1)` 로 잡고 `"$CODEX_BIN"` 으로 호출 (PATH 부재 시, §2 단계 2).
 
-Codex의 stdout에는 메타 정보가 섞여 있다. 본문만 추출해야 한다.
+## 5. 응답 수거
 
-### 원본 출력 예시
+`-o "$OUT"` 플래그를 쓰면 codex 가 **최종 답변 본문만** 해당 파일에 쓴다. 메타(`session id`/`tokens used`)가 섞인 stdout 을 파싱할 필요가 없다.
 
-```
-reasoning summaries: none
-session id: 019db...
---------
-user
-{전송한 프롬프트}
-codex
-{실제 응답 본문}
-tokens used
-5,617
-```
-
-### 본문 추출 규칙
-
-- 시작: `^codex$` 라벨 다음 줄
-- 끝: `^tokens used$` 이전 줄
-
-### Bash 추출 스니펫
+### 본문 읽기
 
 ```bash
-OUTPUT=$(codex exec --skip-git-repo-check "$PROMPT" 2>&1)
+BODY=$(cat "$OUT")
+```
+
+읽은 `$BODY` 를 결과 문서에 삽입한다. **고유 파일명 필수** — Phase 0.5·2.4·4.5 가 background 병렬로 동시에 돌 수 있으므로, `mktemp /tmp/codex_XXXXXX.txt` 같은 고유 경로를 호출마다 새로 잡아 덮어쓰기를 막는다.
+
+### (참고) -o 없이 stdout 만 받은 경우
+
+구버전 codex 등으로 `-o` 를 못 쓰면 stdout 에 메타가 섞인다. 본문은 `^codex$` 라벨 다음 줄 ~ `^tokens used$` 이전 줄이며, 폴백 추출은:
+
+```bash
 BODY=$(echo "$OUTPUT" | awk '/^codex$/{flag=1; next} /^tokens used$/{flag=0} flag')
 ```
 
-추출된 `$BODY`를 pre-mortem 결과 문서에 삽입한다.
+`-o` 가 동작하는 환경에선 이 awk 폴백을 쓰지 않는다.
 
 ## 6. Pre-mortem 프롬프트 템플릿
 
@@ -140,28 +140,24 @@ JSON 형식 사용하지 말고 한국어로 답변.
 - **200단어 제한**: 응답 시간 단축, 핵심 허점에 집중
 - **순수 텍스트**: 파싱 편의성 (JSON/마크다운 파싱 불필요)
 - **3가지 시나리오 강제**: 단일 실패 모드가 아닌 다중 관점 유도
-- **한국어 명시**: GPT-5.2는 영문 응답 기본값이므로 명시적 지시 필요
+- **한국어 명시**: gpt-5.5는 영문 응답 기본값이므로 명시적 지시 필요
 
-## 7. 에러 처리
+## 7. 에러 처리 — 기다리지 않는다 (숫자 timeout 없음)
 
-| 에러 유형 | 대응 |
-|----------|------|
-| **Timeout (30초 초과)** | Codex 호출 중단, Opus 단독으로 pre-mortem 진행 |
-| **인증 만료** | 결과 문서에 "Codex 인증 만료 — Opus 단독 pre-mortem 진행" 기록 |
-| **일반 실패** | stderr를 pre-mortem 결과 섹션에 "Codex 에러" 블록으로 포함 |
+호출은 background 병렬(§8.5)이라 Claude 는 codex 를 기다리며 멈추지 않는다. **gate(Phase 2.4 / 5)에 도달했을 때 결과가 ready 면 수거, 아니면 degrade** — Claude 단독으로 진행한다. codex 가 느리든 영원히 hang 하든 Claude 작업은 막히지 않으며, orphan 프로세스는 세션 종료(Stop 훅)가 정리한다. 따라서 **별도의 숫자 timeout(과거 30초)을 두지 않는다.**
 
-### Timeout 구현 예
-
-```bash
-BODY=$(timeout 30 bash -c "$CODEX_CMD" 2>&1) || BODY="[Codex timeout — Opus 단독 진행]"
-```
+| 상황 | 대응 |
+|------|------|
+| **gate 시점에 미완** | 기다리지 않고 degrade — "Codex 미완 — 단독 진행" 플래그 기록 |
+| **인증 만료 / 호출 실패** | "Codex 실패: {요약}" 기록 후 Claude/Opus 단독 진행 |
+| **stderr 에러** | 결과 섹션에 "Codex 에러" 블록으로 포함 (블로킹 금지) |
 
 ## 8. 비용 및 성능 가이드
 
 | 항목 | 값 |
 |------|-----|
-| Pre-mortem 1회당 토큰 사용량 | 약 5K ~ 10K tokens |
-| 응답 시간 | 10 ~ 30초 (GPT-5.2 추론 시간 포함) |
+| Pre-mortem 1회당 토큰 사용량 | 가변 — **비용 비고려**(깊이·속도 우선 방침). xhigh 는 소규모에서 오히려 토큰이 적음 |
+| 응답 시간 | 소규모 ~5–10초 (xhigh). 부하 시 priority 가 큐 우선권 |
 | 과금 | ChatGPT Plus/Pro/Max 구독 시 별도 과금 없음 |
 
 ### 주의사항
@@ -172,11 +168,11 @@ BODY=$(timeout 30 bash -c "$CODEX_CMD" 2>&1) || BODY="[Codex timeout — Opus �
 
 ## 8.5 듀얼 검증 호출 패턴 (v3.9+)
 
-§4 표준 호출 + §5 본문 추출 + §7 에러 처리를 그대로 공유한다. 조사·리뷰에 추가되는 규칙:
+§4 표준 호출 + §5 응답 수거 + §7 에러 처리를 그대로 공유한다. 조사·리뷰에 추가되는 규칙:
 
 ### 병렬성 — run_in_background
 
-조사(Phase 0.5)·코드리뷰(Phase 4.5)는 Claude 의 본 작업과 **진짜 병렬**이어야 한다. Bash tool 의 `run_in_background: true` 로 Codex 를 띄우고, Claude 는 자기 작업(Plan A 설계 / Supervisor 검토)을 진행한 뒤 백그라운드 출력을 수거한다. sleep/폴링 금지 — 완료 알림을 받는다.
+조사(Phase 0.5)·코드리뷰(Phase 4.5)는 Claude 의 본 작업과 **진짜 병렬**이어야 한다. Bash tool 의 `run_in_background: true` 로 Codex 를 띄우고, Claude 는 자기 작업(Plan A 설계 / Supervisor 검토)을 진행한 뒤 백그라운드 출력을 수거한다. sleep/폴링 금지 — 완료 알림을 받는다. **gate 도달 시 ready 면 수거, 미완이면 기다리지 않고 degrade**(§7) — 숫자 timeout 없음.
 
 ### 파일 접근 — 프로젝트 루트에서 실행
 
