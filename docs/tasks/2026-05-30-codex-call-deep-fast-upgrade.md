@@ -130,6 +130,6 @@ Codex 미사용 — Phase 0.5 조사가 sandbox 차단 + 인코딩 깨짐으로 
 
 ## 진행상황
 - **마지막 업데이트**: 2026-05-30
-- **현재 경로**: Plan A — 편집 적용 완료
-- **상태**: A(codex-integration.md)·B(cp)·C+E(cc)·F(cp 확인)·D(bump 3.11.0 + CHANGELOG + CLAUDE.md feat) 적용 완료. auto 검증 #1·#2·#3·#6·#7 통과.
-- **재개 포인트**: **배포 대기** — commit + tag `v3.11.0` + push (사용자 승인 필요). 배포 후 이 PC 반영은 `/lens-upgrade`(검증 #5, manual). 완료 처리는 배포 후 `/cp done`.
+- **현재 경로**: Plan A — 완료
+- **상태**: A~F + D 적용 완료. **배포 완료** (commit `b7c195f` + tag `v3.11.0` push → livevil7/creeta-lens = CreetaCorp/lens, 동일 레포). **업그레이드 완료** (`scripts/upgrade.sh` → 캐시 3.11.0 설치, `plugin list` v3.11.0 확인). 검증 #1·#2·#3·#5·#6·#7 전부 통과.
+- **재개 포인트**: 없음 — 작업 완료. 단 **이 PC는 Claude Code 재시작 후** 3.11.0이 활성화됨(현재 세션은 3.10.0 캐시 잡고 있음). 다른 머신은 `/lens-upgrade`. 정리는 `/cp done` 으로 history 이동.
