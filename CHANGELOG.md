@@ -1,3 +1,11 @@
+## [3.12.1] - 2026-06-01
+
+Windows Python Store stub(`python3` exit 49) 함정이 `scripts/upgrade.sh` 에 그대로 남아 있어 `/lens-upgrade` 가 박스에 따라 즉시 깨지던 문제 핫픽스. v3.12.0 의 `cu.sh` 에는 이미 들어가 있던 fix(actual `--version` 실행으로 stub 회피)를 `upgrade.sh` 에 backport.
+
+### Fixed (v3.12.1)
+
+- **`/lens-upgrade` Windows Python Store stub 회피 (`scripts/upgrade.sh`)** — `command -v python3` 가 Store stub 을 truthy 로 잡아 `python3 upgrade.py` 호출이 exit 49 로 즉사하던 문제. cu.sh 와 동일한 패턴(python3/python/py 순서로 `--version` 직접 실행) 으로 교체. 실제 Python 이 PATH 에 있는데도 lens 업그레이드가 안 되던 Windows 박스에서 unblock.
+
 ## [3.12.0] - 2026-06-01
 
 신규 skill `/cu` (Lens Update) 추가. `/lens-upgrade` 는 lens 한 가지만 다루지만, `/cu` 는 **이 컴퓨터에 실제 설치된 모든 CLI(Claude Code, Codex, gh)와 모든 Claude Code 플러그인**을 스캔해 현재/최신 버전을 비교하고, 사용자가 다중선택으로 고른 항목만 업그레이드한다. 컴퓨터마다 설치 상태가 다르다는 전제 위에 설계 — 검출 못 한 항목은 결과에 아예 나오지 않으므로 "없는 도구를 발견했다" 류의 환각이 구조적으로 차단된다.

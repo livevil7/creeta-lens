@@ -20,11 +20,16 @@ if [ ! -f "$PY_SCRIPT" ]; then
   exit 1
 fi
 
-if command -v python3 >/dev/null 2>&1; then
-  PY=python3
-elif command -v python >/dev/null 2>&1; then
-  PY=python
-else
+# Windows ships a Microsoft Store "python3" stub on PATH that exits 49.
+# Probe by actually running --version, not by command -v.
+PY=""
+for candidate in python3 python py; do
+  if "$candidate" --version >/dev/null 2>&1; then
+    PY="$candidate"
+    break
+  fi
+done
+if [ -z "$PY" ]; then
   echo "ERROR: Python 3 is required but not found in PATH." >&2
   exit 1
 fi
