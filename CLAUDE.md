@@ -4,8 +4,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.11.0**
-- Updated: 2026-05-30
+- Current: **v3.12.0**
+- Updated: 2026-06-01
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.11.0 feat: codex 호출 + Claude 실행을 **깊게+빠르게**로 통일(토큰 비용 비고려). codex 표준 호출에 `-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=priority -o "$OUT"`(깊이·속도 독립 다이얼), `-o` 본문 수거+고유 파일명. `/cc` Worker/Supervisor/QA → `opus` 고정(Monitor만 haiku). 군더더기 제거: blocking timeout(background 모델과 모순) + 취약한 stdout awk 파싱. 모델 drift 정리(GPT-5.2→gpt-5.5). 실측 근거: low 추론은 xhigh보다 토큰 6배+속도 이득 0. 상세: `CHANGELOG.md` + `docs/rules/codex-integration.md` §4·§5·§7.
 - v3.10.0 feat: 신규 skill **`/cps`** (Lens Start) — 어떤 레포든 `docs/START_HERE.md`(레포 first-read 진입점 + 질문 라우팅)를 실제 docs 스캔 기반으로 생성. 인벤토리는 추론 금지(허구 경로 0, 근거 부족은 `(Not documented yet)`), 기존 파일은 diff+승인 게이트(비파괴), CLAUDE.md 포인터는 없을 때만 1줄 조건부 주입. 더불어 **`/cp done` 강화** — 새 task 만이 아니라 `docs/tasks/` 의 기존 task 를 전수 재평가해 "완료추정/진행중/수동확인필요" 자동 분류 + 완료추정 일괄 아카이브 제안(신호 상충 시 안전쪽 우선, 자동삭제 금지, DONE Phase 2~4 불변). 상세: `CHANGELOG.md`.

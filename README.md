@@ -1,4 +1,4 @@
-# Lens v3.11.0
+# Lens v3.12.0
 
 **Never wonder which plugin to use again.**
 
@@ -135,6 +135,23 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 | --- | --- |
 | `/cps` (fresh repo) | Globs real docs, assembles `docs/START_HERE.md`, injects a one-line pointer into CLAUDE.md if missing |
 | `/cps` (START_HERE exists) | Re-derives from current docs, shows a diff, and asks before overwriting (never silently overwrites manual edits) |
+
+### `/cu` — Per-machine CLI + plugin updater
+
+```
+/cu
+```
+
+`/cu` is the **wide** counterpart to `/lens-upgrade`. It scans every CLI and plugin Claude Code actually touches on *this* machine (Claude Code CLI, Codex CLI, gh CLI, every installed plugin across every marketplace), compares installed vs latest, and updates **only the items you pick** via multi-select.
+
+| You type | What happens |
+| --- | --- |
+| `/cu` (everything up-to-date) | Reports "all current", asks nothing, exits |
+| `/cu` (anything stale) | Renders comparison table → AskUserQuestion multi-select → runs only the picks |
+
+Per-machine safe: items not installed on this box never appear in the list, so different machines get different (correct) results.
+
+Auto-upgrade path: `claude update`, `claude plugin update <name>@<marketplace>`, and lens itself is delegated to `/lens-upgrade`. CLIs that need a system package manager (`winget`, `brew`) print the command instead of running it.
 
 **When to use which:**
 

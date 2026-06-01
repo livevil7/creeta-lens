@@ -1,3 +1,16 @@
+## [3.12.0] - 2026-06-01
+
+신규 skill `/cu` (Lens Update) 추가. `/lens-upgrade` 는 lens 한 가지만 다루지만, `/cu` 는 **이 컴퓨터에 실제 설치된 모든 CLI(Claude Code, Codex, gh)와 모든 Claude Code 플러그인**을 스캔해 현재/최신 버전을 비교하고, 사용자가 다중선택으로 고른 항목만 업그레이드한다. 컴퓨터마다 설치 상태가 다르다는 전제 위에 설계 — 검출 못 한 항목은 결과에 아예 나오지 않으므로 "없는 도구를 발견했다" 류의 환각이 구조적으로 차단된다.
+
+### Added (v3.12.0)
+
+- **신규 skill `/cu` (Lens Update)** — 5단계 절차: ① `scripts/cu.sh scan` 으로 설치 항목 JSON 산출(CLI 3종은 `--version` + GitHub releases/tags, 플러그인은 `installed_plugins.json` + 마켓플레이스 clone) → ② 표 렌더 + needs_update 표시 → ③ `AskUserQuestion(multiSelect)` 로 어떤 항목을 업그레이드할지 확인(CLI/Plugin 4-옵션 한도 회피 분리) → ④ 선택 항목마다 `cu.sh upgrade <id>` 실행(자동 가능: `claude update`·`claude plugin update`·lens는 `/lens-upgrade` 위임; 수동 안내: `winget`·`brew`·VSCode 확장은 명령만 출력하고 exit 3) → ⑤ 성공/실패/수동 분류 보고. (`skills/cu/SKILL.md`)
+- **`scripts/cu.py` 스캐너 + 업그레이드 디스패처** — stdlib only. `shutil.which` 로 Windows `.cmd` shim 해결, `git ls-remote` 폴백으로 commit-SHA-as-version 마켓플레이스(claude-plugins-official 같은 로컬 경로 source) 의 최신 SHA 비교 지원, Windows Python Store stub(`python3` exit 49) 회피 wrapper, `sys.stdout.reconfigure(utf-8)` 로 콘솔 mojibake 차단.
+
+### Changed (v3.12.0)
+
+### Fixed (v3.12.0)
+
 ## [3.11.0] - 2026-05-30
 
 Codex 호출과 Claude 실행을 **깊게+빠르게**로 통일. 토큰 비용은 고려하지 않는다(사용자 방침) — codex 는 항상 최고 추론(`xhigh`) + 큐 우선권(`priority`), Claude 측 워커·슈퍼바이저·QA 는 항상 `opus`. 더불어 background 병렬 모델에 안 맞던 군더더기(blocking timeout, 취약한 stdout awk 파싱)를 제거하고 모델 표기 drift(GPT-5.2 → gpt-5.5)를 정리. 실측 근거(gpt-5.5): `low` 추론은 `xhigh` 보다 토큰 ~6배 + 속도 이득 0 → xhigh 가 소규모에서 오히려 싸고 빠름. (계획: `docs/tasks/2026-05-30-codex-call-deep-fast-upgrade.md`)
