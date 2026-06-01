@@ -1,3 +1,18 @@
+## [3.12.2] - 2026-06-01
+
+`/cu` 의 codex / gh 자동 처리 범위 확장. v3.12.0 의 첫 구현은 "Windows = codex 는 VSCode 번들 가정 + gh 는 winget 명령 안내만" 으로 단정해 둘 다 무조건 수동(`exit 3`) 으로 떨궜는데, 실제로는 `which codex` 경로(`AppData/Roaming/npm/...` → npm 글로벌)와 `winget list --id GitHub.cli` 소스 확인으로 자동 처리 가능했다. 이번 릴리즈에서 양쪽 다 sniff 해서 자동 가능하면 자동 실행, 식별 안 되면 기존처럼 명령만 안내로 떨어지게 보강.
+
+### Changed (v3.12.2)
+
+- **`scan_codex()` install-kind sniffing (`scripts/cu.py`)** — `shutil.which("codex")` 결과 경로로 `npm` / `vscode` / `unknown` 분기. npm 글로벌(`AppData\Roaming\npm`, `node_modules` 등) 이면 `can_auto=True` + `upgrade_cmd="npm install -g @openai/codex@latest"`, VSCode 확장 번들(`.vscode/extensions/openai.chatgpt-...`) 이면 기존 수동 안내, 식별 불가면 안전쪽으로 수동 안내.
+- **`scan_gh()` 패키지매니저 소스 검출 (`scripts/cu.py`)** — Windows 에서 `winget list --id GitHub.cli` 출력에 "winget" 소스가 잡히면 `winget upgrade --silent --accept-source-agreements --accept-package-agreements --disable-interactivity` 로 자동 처리. macOS 는 `shutil.which("brew")` 통과 시 `brew upgrade gh` 자동. 그 외(apt/dnf/pacman/scoop/manual) 는 기존 수동 안내 유지.
+- **upgrade 디스패처에 `_upgrade_codex_npm` / `_upgrade_gh_winget` / `_upgrade_gh_brew` + `_manual_hint` 분리 (`scripts/cu.py`)** — `cmd_upgrade()` 의 cli:codex / cli:gh 분기를 install-kind / 패키지매니저 감지로 다시 그어 자동 가능하면 즉시 자동, 아니면 `_manual_hint()` 로 exit 3.
+- **`/cu` SKILL.md "What it does NOT do" 갱신** — "system package manager 가 필요한 CLI 는 무조건 수동" 단정 문구를 "per-CLI sniffing" 으로 교체. README 의 Auto-upgrade path 문구도 codex npm / winget gh / brew gh / 식별 불가 분기 명시.
+
+### Fixed (v3.12.2)
+
+- **codex / gh 가 실제로 자동 가능한 환경에서도 항상 exit 3 로 떨어지던 문제** — Windows + codex npm 글로벌 + gh winget 박스에서 `/cu` 가 두 CLI 를 매번 "수동 업데이트 필요" 로 안내해 사용자가 직접 명령을 복붙해야 했음. 이제 같은 박스에서 6/6 모두 자동 처리.
+
 ## [3.12.1] - 2026-06-01
 
 Windows Python Store stub(`python3` exit 49) 함정이 `scripts/upgrade.sh` 에 그대로 남아 있어 `/lens-upgrade` 가 박스에 따라 즉시 깨지던 문제 핫픽스. v3.12.0 의 `cu.sh` 에는 이미 들어가 있던 fix(actual `--version` 실행으로 stub 회피)를 `upgrade.sh` 에 backport.

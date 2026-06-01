@@ -1,4 +1,4 @@
-# Lens v3.12.1
+# Lens v3.12.2
 
 **Never wonder which plugin to use again.**
 
@@ -151,7 +151,7 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 
 Per-machine safe: items not installed on this box never appear in the list, so different machines get different (correct) results.
 
-Auto-upgrade path: `claude update`, `claude plugin update <name>@<marketplace>`, and lens itself is delegated to `/lens-upgrade`. CLIs that need a system package manager (`winget`, `brew`) print the command instead of running it.
+Auto-upgrade path: `claude update`, `claude plugin update <name>@<marketplace>`, npm-global codex (`npm install -g @openai/codex@latest`), winget-sourced gh on Windows, brew-sourced gh on macOS, and lens itself delegated to `/lens-upgrade`. When the install source can't be identified (e.g. apt/dnf/pacman, VSCode-bundled codex), the command is printed and the user runs it.
 
 **When to use which:**
 

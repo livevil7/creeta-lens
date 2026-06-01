@@ -112,17 +112,42 @@ def scan_claude():
     }
 
 
+def _codex_install_kind():
+    """Identify how `codex` is installed on this box.
+
+    Returns one of: 'npm', 'vscode', 'unknown'. We sniff by the resolved path
+    so the same code works on every OS without hardcoding a platform branch.
+    """
+    path = shutil.which("codex") or ""
+    p = path.replace("\\", "/").lower()
+    if not p:
+        return "unknown"
+    if "/npm/" in p or "/node_modules/" in p or p.endswith("/npm/codex"):
+        return "npm"
+    if "/.vscode/extensions/" in p or "openai.chatgpt" in p:
+        return "vscode"
+    return "unknown"
+
+
 def scan_codex():
     rc, out, _ = run(["codex", "--version"])
     if rc != 0 or not out:
         return None
     parts = out.split()
     installed = parts[-1] if parts else "?"
-    sysname = platform.system()
-    if sysname == "Windows":
-        cmd = "VSCode 확장 'openai.chatgpt' 업데이트 (코덱스 번들)"
-    else:
+    kind = _codex_install_kind()
+    if kind == "npm":
         cmd = "npm install -g @openai/codex@latest"
+        can_auto = True
+        note = "npm 글로벌 설치 감지"
+    elif kind == "vscode":
+        cmd = "VSCode 확장 'openai.chatgpt' 업데이트 (코덱스 번들)"
+        can_auto = False
+        note = "VSCode 확장 번들이라 수동 안내"
+    else:
+        cmd = "npm install -g @openai/codex@latest  # 설치 경로 미상, npm 가정"
+        can_auto = False
+        note = "설치 경로 미상 — 자동 처리 불가"
     return {
         "id": "cli:codex",
         "kind": "cli",
@@ -130,26 +155,51 @@ def scan_codex():
         "installed": installed,
         "latest": github_latest_tag("openai/codex"),
         "upgrade_cmd": cmd,
-        "can_auto": False,
-        "note": "Windows는 VSCode 확장 번들이라 수동 안내",
+        "can_auto": can_auto,
+        "note": note,
     }
+
+
+def _gh_winget_source():
+    """Return True if Windows winget tracks GitHub.cli as the install source."""
+    if platform.system() != "Windows":
+        return False
+    rc, out, _ = run(["winget", "list", "--id", "GitHub.cli"])
+    if rc != 0 or not out:
+        return False
+    # winget output table: last column "Source" — look for the literal "winget"
+    return any("winget" in line.lower() for line in out.splitlines() if "github.cli" in line.lower())
 
 
 def scan_gh():
     rc, out, _ = run(["gh", "--version"])
     if rc != 0 or not out:
         return None
-    # "gh version 2.92.0 (2026-04-28)"
     first = out.splitlines()[0]
     tokens = first.split()
     installed = tokens[2] if len(tokens) >= 3 else "?"
     sysname = platform.system()
+    can_auto = False
+    note = None
     if sysname == "Windows":
-        cmd = "winget upgrade --id GitHub.cli"
+        if _gh_winget_source():
+            cmd = "winget upgrade --id GitHub.cli --silent --accept-source-agreements --accept-package-agreements --disable-interactivity"
+            can_auto = True
+            note = "winget 소스 감지"
+        else:
+            cmd = "winget upgrade --id GitHub.cli"
+            note = "winget 미감지 — 수동 안내 (다른 패키지 매니저 가능성)"
     elif sysname == "Darwin":
-        cmd = "brew upgrade gh"
+        if shutil.which("brew"):
+            cmd = "brew upgrade gh"
+            can_auto = True
+            note = "Homebrew 감지"
+        else:
+            cmd = "brew upgrade gh"
+            note = "brew 미감지 — 수동 안내"
     else:
         cmd = "(distro package manager — e.g. apt/dnf/pacman)"
+        note = "Linux 배포판 패키지 매니저 다양성 — 수동 안내"
     return {
         "id": "cli:gh",
         "kind": "cli",
@@ -157,8 +207,8 @@ def scan_gh():
         "installed": installed,
         "latest": github_latest_tag("cli/cli"),
         "upgrade_cmd": cmd,
-        "can_auto": False,
-        "note": None,
+        "can_auto": can_auto,
+        "note": note,
     }
 
 
@@ -327,21 +377,57 @@ def _upgrade_plugin_generic(full_name):
     return subprocess.call([claude, "plugin", "update", full_name])
 
 
-def cmd_upgrade(item_id):
-    if item_id == "cli:claude":
-        return _upgrade_claude()
-    if item_id in ("cli:codex", "cli:gh"):
-        # not auto — show command and exit 3 so caller knows
-        items = []
-        for fn in (scan_codex, scan_gh):
-            it = fn()
-            if it:
-                items.append(it)
-        match = next((x for x in items if x["id"] == item_id), None)
+def _upgrade_codex_npm():
+    npm = _resolve("npm")
+    print(f">>> {npm} install -g @openai/codex@latest")
+    return subprocess.call([npm, "install", "-g", "@openai/codex@latest"])
+
+
+def _upgrade_gh_winget():
+    winget = _resolve("winget")
+    args = [
+        winget, "upgrade", "--id", "GitHub.cli",
+        "--silent",
+        "--accept-source-agreements",
+        "--accept-package-agreements",
+        "--disable-interactivity",
+    ]
+    print(">>> " + " ".join(args))
+    return subprocess.call(args)
+
+
+def _upgrade_gh_brew():
+    brew = _resolve("brew")
+    print(f">>> {brew} upgrade gh")
+    return subprocess.call([brew, "upgrade", "gh"])
+
+
+def _manual_hint(item_id):
+    """Print the printable manual command for an item and return exit 3."""
+    scanner = {"cli:codex": scan_codex, "cli:gh": scan_gh}.get(item_id)
+    if scanner:
+        match = scanner()
         if match:
             print(f"수동 업데이트 필요: {match['name']}")
             print(f"  $ {match['upgrade_cmd']}")
-        return 3
+    return 3
+
+
+def cmd_upgrade(item_id):
+    if item_id == "cli:claude":
+        return _upgrade_claude()
+    if item_id == "cli:codex":
+        kind = _codex_install_kind()
+        if kind == "npm":
+            return _upgrade_codex_npm()
+        return _manual_hint(item_id)
+    if item_id == "cli:gh":
+        sysname = platform.system()
+        if sysname == "Windows" and _gh_winget_source():
+            return _upgrade_gh_winget()
+        if sysname == "Darwin" and shutil.which("brew"):
+            return _upgrade_gh_brew()
+        return _manual_hint(item_id)
     if item_id.startswith("plugin:"):
         full_name = item_id[len("plugin:"):]
         if full_name == "lens@CreetaCorp":

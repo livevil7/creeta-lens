@@ -39,7 +39,10 @@ CLIs that aren't on PATH are simply omitted — that's how per-machine differenc
 
 - It does not install anything new. It only updates what is already there.
 - It does not pull marketplaces on its own. `claude plugin update` does that; lens has its own `/lens-upgrade` for the harder reconciliation case.
-- It does not auto-update CLIs that require a system package manager (`winget`, `brew`, `apt`). For those it prints the command for the user to run.
+- It does not auto-update CLIs whose install source it cannot identify. Per-CLI sniffing decides auto vs manual:
+  - `codex`: npm global (`AppData/Roaming/npm/...` or `node_modules/...`) → auto via `npm install -g @openai/codex@latest`. VSCode extension bundle → manual hint.
+  - `gh`: Windows + `winget list --id GitHub.cli` returns winget source → auto via `winget upgrade --silent --accept-*-agreements --disable-interactivity`. macOS + `brew` present → auto via `brew upgrade gh`. Other (apt/dnf/pacman) → manual hint.
+  - When in doubt, falls back to manual hint (exit 3).
 
 ## How to run it
 
