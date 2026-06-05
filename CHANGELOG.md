@@ -1,3 +1,36 @@
+## [3.13.0] - 2026-06-06
+
+Lens 자가 현대화 릴리스. 새 스킬 `/cr` 가 Lens 자신을 주기적으로 감사한다 — Claude Code + Codex 가 네이티브로 가져간 능력(공급)과 사용자의 실제 세션 패턴(수요)을 양면 대조해 각 기능을 KEEP/THIN/OBSOLETE 로 분류하고, 업그레이드·편의 개선·net-new 기능을 제안한다. 첫 실증 감사(멀티에이전트 워크플로, 25+19 agents)에서 나온 14개 우선조치 중 9개를 이번 릴리스에 함께 반영. 핵심 발견: 네이티브 4종(Dynamic Workflows·per-agent 모델 서브에이전트·/goal·plan mode)이 /c·/cc·/cp 의 *엔진*을 흡수했으나 OBSOLETE 는 0 — 디스크 영속·cross-vendor 이종검증·Karpathy 계약 *코어*는 생존. 상세: `docs/history/2026-06-05-lens-modernization-audit.md`.
+
+### Added (v3.13.0)
+
+- **신규 스킬 `/cr` (Lens Review) — `skills/cr/SKILL.md`**: 자가 현대화 감사. 레지스트리의 "가정된 네이티브 공백"을 라이브 probe(로컬 CLI/도구표) + 공식 체인지로그(fallback)로 대조 → 노후도 분류 + 업그레이드/편의 + (deep)대화 마이닝 신기능 제안 → 리포트(md+HTML+board) → 고신뢰 건 `/cp` 핸드오프. **OBSOLETE 는 코드 자동삭제 0, 제안만**. fetch 실패는 UNKNOWN-degrade(false-obsolete 방지).
+- **능력 가정 레지스트리 — `docs/rules/capability-assumptions.json`**: 11행(네이티브 능력 단위) × {affects_lens, assumed_native_gap, gap_closed_signal, signal_method(probe/web/both), false_obsolete_risk}. `/cr` 의 SoT 데이터.
+- **`lib/capability-audit.js`**: 감사 상태(`.lens/capability-audit-state.json`) read/`stamp` + `isLensRepo()` 이중확인 + 레지스트리 해시 + 알림 포맷. CLI `stamp`/`nudge`.
+- **SessionStart staleness 알림 — `hooks/session-start.js`**: Lens 레포에서만, 기간 초과 또는 레지스트리 해시 변경 시 한 줄. **네트워크 호출 0**.
+- **Pass-1 감사 리포트 + 신기능 계획**: `docs/history/2026-06-05-lens-modernization-audit.md`, `docs/tasks/`(/cr 계획 + 대화 마이닝 발견 `/ch`·`/cx` 계획).
+- **config 키 — `lens.config.json`**: `capabilityAuditNudge`(기본 true), `capabilityAuditIntervalDays`(기본 30), `autoCommitOnComplete`(기본 false).
+
+### Changed (v3.13.0)
+
+- **Codex 코드리뷰 구조화·git-aware (`docs/rules/codex-integration.md`, `skills/cc/SKILL.md`)**: Phase 4.5 를 `codex exec review --uncommitted --output-schema --ephemeral` 로 전환(라이브 0.137 실측 통과). 수동 diff 주입·awk PASS/FAIL 휴리스틱 제거. 구버전은 자유형 fallback.
+- **codex `service_tier=fast` 통일 (`docs/rules/codex-integration.md`)**: `priority` 는 레거시 별칭으로 강등. `gpt-5.5`/티어 서버측 검증 폐기 대비 버전무관 fallback 명시.
+- **`/cc` Phase 7.4 자동 커밋+동기화 (opt-in) + Phase 1.5 헤드리스 폴백**: 게이트 통과 시 `autoCommitOnComplete` 면 commit+sync(시크릿 제외·기본 브랜치 보호·diverged 보고만). `LENS_NONINTERACTIVE=1`(cron) 이면 AskUserQuestion 게이트가 hang 대신 plan-only/자동승인 폴백.
+- **`/cps` 완료 후 자동 커밋 (opt-in) — `skills/cps/SKILL.md`**.
+- **PostToolUse 컨텍스트 주입 (`hooks/post-tool-task.js`)**: 직전 Task status/실패사유를 `additionalContext`(모델이 읽는 유일 필드)로 노출 — write→consume 단절 해소.
+- **`/cs` `--json` 모드 (`scripts/git-sync-all.sh`, `skills/cs/SKILL.md`)**: `{pulled,pushed,unchanged,diverged,failed}` 구조화 출력(사람 출력은 stderr). set -u 빈배열 안전(bash 3.2 대비).
+- **추천기 기본 off — `lens.config.json` `autoRecommend:false`**: 매 메시지 자동제안 nag 제거(추천기가 hollow — triggers 빈약·score 노이즈). 네이티브 Skills 발견에 위임. SessionStart 의 빈 Plugin Discovery 블록 제거(+ 고아 import 정리).
+
+### Fixed (v3.13.0)
+
+- **`/cu` codex 오탐 (`scripts/cu.py`)**: VSCode 번들 codex(alpha 케이던스)를 GitHub stable 과 비교해 "항상 update available" 뜨던 것 → vscode kind 면 `needs_update=null`(❓).
+- **`/cs` 미구현 드리프트 (`skills/cs/SKILL.md`)**: "Stop 훅이 결국 auto-commit" 암시 제거(`stop.js` 는 git 동작 0).
+- **문서 드리프트 (`CLAUDE.md`)**: "60+ known plugins" → 실제 `KNOWN_PLUGINS` 빈 상태 반영.
+
+### Deprecated (v3.13.0)
+
+- **`lib/plan-manager.js` 생성 절반 `@deprecated`**: `generatePlanContent`(8개국어 dict)·`extractGoal`·`validatePlanStructure`·`updatePlanStatus`·`save/loadPlanState`·`parsePlanFrontmatter` 는 런타임 호출자 0(검증됨) — `/cp` SKILL.md 가 직접 plan 문서를 작성. 백업/참조용으로 유지, 릴리스 동기화 의무 아님. 라이브 절반(`formatPlanSummary`/`ensurePlansDir`)은 유지.
+
 ## [3.12.2] - 2026-06-01
 
 `/cu` 의 codex / gh 자동 처리 범위 확장. v3.12.0 의 첫 구현은 "Windows = codex 는 VSCode 번들 가정 + gh 는 winget 명령 안내만" 으로 단정해 둘 다 무조건 수동(`exit 3`) 으로 떨궜는데, 실제로는 `which codex` 경로(`AppData/Roaming/npm/...` → npm 글로벌)와 `winget list --id GitHub.cli` 소스 확인으로 자동 처리 가능했다. 이번 릴리즈에서 양쪽 다 sniff 해서 자동 가능하면 자동 실행, 식별 안 되면 기존처럼 명령만 안내로 떨어지게 보강.
