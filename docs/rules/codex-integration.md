@@ -76,7 +76,7 @@ OUT=$(mktemp /tmp/codex_XXXXXX.txt)   # 고유 파일명 — 병렬 호출 충�
 codex exec --skip-git-repo-check \
   -m gpt-5.5 \
   -c model_reasoning_effort=xhigh \
-  -c service_tier=priority \
+  -c service_tier=fast \
   -o "$OUT" \
   "프롬프트 내용"
 # 응답 본문은 "$OUT" 에 깔끔히 떨어진다 (§5 참조)
@@ -88,12 +88,20 @@ codex exec --skip-git-repo-check \
 - `--skip-git-repo-check` — 현재 디렉토리가 git repo가 아니어도 실행 허용. Pre-mortem은 repo와 무관하므로 필수
 - `-m gpt-5.5` — 모델 명시 고정. config 기본값에 의존하지 않고 항상 동일 모델 사용 (이 codex 확장 빌드가 노출하는 모델)
 - `-c model_reasoning_effort=xhigh` — **깊이 다이얼**: 최고 추론 강도. 토큰 비용은 고려하지 않는다 (방침)
-- `-c service_tier=priority` — **속도 다이얼**: API 부하 시 큐 우선권. *별개 다이얼*이라 xhigh와 동시 적용 가능
+- `-c service_tier=fast` — **속도 다이얼**: API 부하 시 큐 우선권. *별개 다이얼*이라 xhigh와 동시 적용 가능. (현행 codex 0.137+ 정식 키는 `fast`; 과거 `priority` 는 동일 동작의 **레거시 별칭**으로 아직 매핑되나 미래 제거 대비 `fast` 로 통일. 라이브 실측 EXIT 0)
 - `-o "$OUT"` — 최종 답변 본문만 파일로 출력. 메타(`session id`/`tokens used`) 섞인 stdout을 awk로 파싱할 필요가 없다
 
-### 왜 xhigh + priority 인가
+### 왜 xhigh + fast 인가
 
-깊이와 속도는 **독립 다이얼**이다. `reasoning_effort` 는 추론 토큰량(품질·깊이), `service_tier` 는 큐 우선권(지연)을 조절한다 — 한쪽이 다른 쪽을 깎지 않는다. 실측(gpt-5.5): `low` 는 `xhigh` 보다 **토큰을 ~6배 더 쓰면서 속도 이득이 없었다** (소규모 작업). 따라서 codex 에선 xhigh 가 소규모에서 오히려 싸고 빠르다 → 항상 xhigh. `priority` 는 raw 속도가 아니라 **부하 시 큐 우선권**이라 소규모엔 무효과(compute-bound)일 수 있으나, 큰 작업/혼잡 시 보험이며 해는 없다.
+깊이와 속도는 **독립 다이얼**이다. `reasoning_effort` 는 추론 토큰량(품질·깊이), `service_tier` 는 큐 우선권(지연)을 조절한다 — 한쪽이 다른 쪽을 깎지 않는다. 실측(gpt-5.5): `low` 는 `xhigh` 보다 **토큰을 ~6배 더 쓰면서 속도 이득이 없었다** (소규모 작업). 따라서 codex 에선 xhigh 가 소규모에서 오히려 싸고 빠르다 → 항상 xhigh. `fast`(구 `priority`) 는 raw 속도가 아니라 **부하 시 큐 우선권**이라 소규모엔 무효과(compute-bound)일 수 있으나, 큰 작업/혼잡 시 보험이며 해는 없다.
+
+### 모델·티어 드리프트 대비 (버전 무관 fallback)
+
+`-m gpt-5.5` 와 `service_tier` 는 **서버측 검증**이라, OpenAI 가 모델을 폐기/리네임하면 호출이 런타임 400(`invalid_request_error`)으로 죽는다. 머신 하드코딩 금지 원칙에 따라:
+
+- **모델**: `-m gpt-5.5` 호출이 400(invalid model)이면 **`-m` 을 빼고 1회 재시도** (codex config 기본 모델 사용). 특정 모델명에 영구 의존하지 않는다.
+- **티어**: `service_tier=fast` 가 거부되면 `-c service_tier` 자체를 생략하고 재시도 (기본 티어). `fast`/`priority` 둘 다 미지원인 구버전 대비.
+- 이 fallback 은 graceful — 이종검증이 조용히 죽는 대신 기본값으로라도 돈다. 깨짐은 `/cr` 감사가 `codex --version` probe 로 선제 감지.
 
 > 참고: codex 바이너리 절대경로는 `CODEX_BIN=$(ls $HOME/.vscode/extensions/openai.chatgpt-*/bin/windows-x86_64/codex.exe 2>/dev/null | head -1)` 로 잡고 `"$CODEX_BIN"` 으로 호출 (PATH 부재 시, §2 단계 2).
 
@@ -181,8 +189,22 @@ Pre-mortem 은 repo 무관(`--skip-git-repo-check`)이지만, **조사·코드�
 ### 프롬프트 / 판정
 
 - **Phase 0.5 독립 조사**: "이 작업을 직접 조사하고 독립 실행 계획을 제안" (권장 접근 / 리스크 3 / 관련 파일). 전체 템플릿은 `skills/cp/SKILL.md` Phase 0.5.
-- **Phase 4.5 코드리뷰**: "이 diff 를 리뷰" (버그·엣지·보안·회귀, 마지막 줄 `PASS`|`FAIL`). 전체 템플릿은 `skills/cc/SKILL.md` Phase 4.5.
-- **코드리뷰 판정 파싱**: 본문 마지막 줄의 `PASS`/`FAIL` + `[high]` 심각도 지적 유무. high 지적이 있으면 FAIL 로 간주.
+- **Phase 4.5 코드리뷰 (구조화·git-aware — v3.13+ 권장)**: 자유형 "이 diff 를 리뷰" 프롬프트 + 수동 diff 주입 + 본문 마지막 줄 awk `PASS`/`FAIL` 파싱은 **취약**(diff 잘림·텍스트 휴리스틱). 대신 **`codex exec review`** 가 git 을 직접 읽고 구조화 판정을 낸다 (현행 0.137+ 라이브 실측 확인):
+
+  ```bash
+  SCHEMA=$(mktemp /tmp/codex_schema_XXXXXX.json)   # {verdict: pass|fail, high_findings:[...]}
+  RES=$(mktemp /tmp/codex_review_XXXXXX.json)
+  codex exec review --uncommitted \
+    -m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast \
+    --output-schema "$SCHEMA" --ephemeral --json > "$RES" 2>/dev/null
+  # 판정: $RES 의 verdict==fail 또는 high_findings 비어있지 않음 → FAIL
+  ```
+
+  - `--uncommitted` (또는 `--base <branch>`) — Codex 가 작업트리 변경을 직접 읽음. **수동 diff 주입 제거**.
+  - `--output-schema` — `{verdict, high_findings}` 구조 강제. **awk PASS/FAIL 휴리스틱 제거**.
+  - `--ephemeral` — 세션 비영속. orphan 정리(Stop 훅) 의존 완화.
+  - ⚠️ **반드시 `codex exec review`** — bare `codex review` 는 `--output-schema`/`--ephemeral` 미노출. `exec review` 만이 review 인자(`--uncommitted/--base`)와 exec 플래그를 동시 노출.
+  - **fallback**: `codex exec review` 미지원 구버전이면 기존 자유형 diff 리뷰 + `PASS`/`FAIL`+`[high]` 파싱 (graceful degrade). 전체 템플릿은 `skills/cc/SKILL.md` Phase 4.5.
 - **합성/게이트**: 조사 결과는 Claude 가 합의/분기로 분류해 통합 (Phase 2.4). 리뷰 결과는 Supervisor 와 AND 게이트 (둘 다 pass 여야 진행).
 
 ## 9. 관련 파일 / 외부 참조

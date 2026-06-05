@@ -39,13 +39,30 @@ function main() {
     const dashboard = loadDashboard();
     const summary = dashboard.summary;
 
+    // additionalContext is the ONLY field the model actually reads. Surface the
+    // just-completed agent's status (and any error) so the orchestrator/Supervisor
+    // sees failures without having to cat .lens/agent-dashboard.json. Keep it terse;
+    // emphasize errors, stay quiet-ish on routine success.
+    const finalStatus = agent?.status || status;
+    let additionalContext;
+    if (finalStatus === 'error') {
+      additionalContext = `[Lens] sub-agent "${agent?.name || description || 'task'}" FAILED${errorMsg ? `: ${String(errorMsg).slice(0, 200)}` : ''}. Dashboard: ${summary.running} running / ${summary.done} done / ${summary.error} error.`;
+    } else if (summary.error > 0) {
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ⚠️ ${summary.error} earlier agent(s) errored — check before declaring done. ${summary.running} still running.`;
+    } else if (summary.running > 0) {
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done. ${summary.running} still running, ${summary.done} done.`;
+    } else {
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). All ${summary.done} agents complete.`;
+    }
+
     const response = {
       hookSpecificOutput: {
         hookEventName: 'PostToolUse',
         matcher: 'Task',
+        additionalContext,
         agentId: agent?.id || 'unknown',
         agentName: agent?.name || 'unknown',
-        status: agent?.status || status,
+        status: finalStatus,
         durationMs: agent?.durationMs || null,
         dashboardSummary: {
           total: summary.total,

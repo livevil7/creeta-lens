@@ -15,9 +15,9 @@ installFailSoftHandlers('session-start');
 const { scanInstalledSkills, formatSkillTable } = require(path.join(PLUGIN_ROOT, 'lib', 'skill-scanner'));
 const { loadMemory, saveMemory, recordSessionStart, formatMemorySummary } = require(path.join(PLUGIN_ROOT, 'lib', 'memory-store'));
 const { formatKeywordTable, saveScanCache } = require(path.join(PLUGIN_ROOT, 'lib', 'keyword-matcher'));
-const { KNOWN_PLUGINS, formatPluginSource } = require(path.join(PLUGIN_ROOT, 'lib', 'plugin-registry'));
 const { initSession, getDashboardPath } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
 const { formatPlanSummary, ensurePlansDir } = require(path.join(PLUGIN_ROOT, 'lib', 'plan-manager'));
+const { formatAuditNudge } = require(path.join(PLUGIN_ROOT, 'lib', 'capability-audit'));
 
 // Load config
 const config = safeReadJson(path.join(PLUGIN_ROOT, 'lens.config.json'), {}) || {};
@@ -55,12 +55,17 @@ function main() {
     // 4. Build plan history for context
     const planSummary = formatPlanSummary(config.planDir || null);
 
+    // 4b. /cr capability-audit staleness nudge — Lens repo only, NO network.
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const auditNudge = formatAuditNudge({ root: projectRoot, config });
+
     // 5. Build additional context
     const additionalContext = buildAdditionalContext({
       skillTable,
       memorySummary,
       keywordTable,
       planSummary,
+      auditNudge,
       skillCount: skills.length,
       pluginCount: [...new Set(skills.map(s => s.plugin))].length,
       config,
@@ -101,7 +106,7 @@ function main() {
 
 // ── Context Builder ───────────────────────────────────────
 
-function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planSummary, skillCount, pluginCount, config: cfg }) {
+function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planSummary, auditNudge, skillCount, pluginCount, config: cfg }) {
   const autoRecommend = cfg.autoRecommend !== false;
   const showReport = cfg.showReport !== false;
 
@@ -109,6 +114,11 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planS
 
   // Header
   ctx += `# Lens v3.12.2 - Session Startup\n\n`;
+
+  // /cr capability-audit nudge (Lens repo only; muted single line)
+  if (auditNudge) {
+    ctx += `> ${auditNudge}\n\n`;
+  }
 
   // Skill inventory
   ctx += `## Installed Skills (Auto-Scanned)\n\n`;
@@ -131,21 +141,8 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planS
     ctx += `- Use the user's language for suggestions\n\n`;
   }
 
-  // Plugin Discovery Registry
-  ctx += `## Plugin Discovery Registry\n\n`;
-  ctx += `When NO installed skill matches the user's request, search this registry and suggest installable plugins.\n\n`;
-  ctx += `| Plugin | Source | Domain | Description |\n`;
-  ctx += `|--------|--------|--------|-------------|\n`;
-  for (const p of KNOWN_PLUGINS) {
-    ctx += `| ${p.name} | ${formatPluginSource(p.source)} | ${p.domain} | ${p.description} |\n`;
-  }
-  ctx += `\n`;
-  ctx += `### Discovery Rules\n`;
-  ctx += `- Only show when NO installed skill matches the request\n`;
-  ctx += `- Match user's request keywords against plugin keywords\n`;
-  ctx += `- Show max 3 matching plugins with install commands\n`;
-  ctx += `- Format: "No installed skill matches, but you can install: \`install-command\`"\n`;
-  ctx += `- Use the user's language for the suggestion\n\n`;
+  // Plugin Discovery Registry — removed (v3.13): KNOWN_PLUGINS is empty, so this
+  // only ever emitted an empty table. Native Skills auto-discovery handles routing.
 
   // Plan history
   if (planSummary) {

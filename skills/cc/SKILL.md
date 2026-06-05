@@ -240,9 +240,14 @@ original_request: {원본 요청}
 - **Medium** (코드/분석): opus
 - **Hard** (복잡한 아키텍처): opus
 
-#### 1.5 승인 요청 (필수)
+#### 1.5 승인 요청 (필수 — 단, 헤드리스 예외)
 
 **실행은 사용자 승인 없이 절대 시작하지 않습니다.**
+
+> **헤드리스/무인 폴백 (cron·`claude -p`)**: 환경변수 `LENS_NONINTERACTIVE=1` 이 설정돼 있으면(Mac Mini cron 등 무인 파이프라인) `AskUserQuestion` 은 응답자가 없어 **행(hang)** 한다. 이 경우 승인 게이트를 차단하지 말고:
+> - **비파괴/읽기 위주 작업**: 계획을 출력하고 자동 진행(승인 생략).
+> - **파괴적/되돌리기 어려운 작업**(대량 삭제·배포·외부 발행): 자동 진행 금지 → **plan-only 로 계획만 출력하고 종료**, 사람이 상호작용 세션에서 재실행하도록 안내.
+> 이 폴백은 Phase 1.5·경로전환(5.x)·경고모드(6.2) 등 **모든 `AskUserQuestion` 게이트에 공통 적용**. 상호작용 세션(`LENS_NONINTERACTIVE` 미설정)에선 기존대로 승인 필수.
 
 **AskUserQuestion** (header: "Lens Multi v3.12.2 — 실행 계획")으로 승인을 받습니다:
 
@@ -521,28 +526,31 @@ Supervisor 모델 = `opus` 고정 (품질 우선 — 토큰 비용 비고려). W
 **적용 범위**: trivial (오타·한 줄 수정) 또는 비-코드 작업(조사·문서만) 은 skip. 그 외 모든 코드 변경 적용.
 
 1. **Codex 감지** — 3단계 fallback. 부재 시 "Codex 미설치 — Supervisor 단독 검토" 플래그 후 Phase 5 진행 (게이트는 Supervisor 단독, 나머지 동일).
-2. **리뷰 대상 확보** — 이번 반복의 코드 변경: `git diff` 가능하면 diff, 아니면 변경 파일 목록 + 내용.
-3. **Codex 리뷰 호출** — Supervisor Agent 와 병렬이 되도록 **백그라운드**(Bash `run_in_background: true`)로, **프로젝트 루트에서**, **§4 표준 호출**(`-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=priority -o "$OUT"`, 고유 파일명)로 실행:
+2. **Codex 리뷰 호출 (구조화·git-aware — v3.13+ 권장)** — Codex 가 작업트리를 **직접 읽으므로 수동 diff 주입 불필요**. Supervisor Agent 와 병렬이 되도록 **백그라운드**(Bash `run_in_background: true`)로, **프로젝트 루트에서** 실행:
 
-```text
-다음 코드 변경을 리뷰하세요. 순수 텍스트, 한국어.
-
-## 작업 목표 (사람 언어)
-{GOAL}
-
-## 변경 내용 (diff)
-{git diff 또는 변경 파일 내용}
-
-## 리뷰 관점
-1. 버그·정확성 — 의도대로 동작하지 않는 지점
-2. 엣지 케이스·에러 처리 누락
-3. 보안 (injection, 비밀 노출, 권한 등)
-4. 회귀 — 기존 동작을 깨뜨릴 가능성
-
-각 지적은 [심각도 high/med/low] + 파일:라인 + 무엇이 + 왜. 마지막 줄에 PASS 또는 FAIL 한 단어만.
+```bash
+SCHEMA=$(mktemp /tmp/codex_schema_XXXXXX.json)
+printf '%s' '{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","fail"]},"high_findings":{"type":"array","items":{"type":"string"}}},"required":["verdict","high_findings"]}' > "$SCHEMA"
+RES=$(mktemp /tmp/codex_review_XXXXXX.json)
+"$CODEX_BIN" exec review --uncommitted \
+  -m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast \
+  --output-schema "$SCHEMA" --ephemeral --json > "$RES" 2>/dev/null
+# 결과: $RES 의 최종 메시지에 {"verdict","high_findings"} JSON
 ```
 
-4. **판정 파싱** — `-o` 출력 파일에서 본문 읽기(§5) 후 마지막 줄 `PASS`/`FAIL` 읽기. `[high]` 심각도 지적이 하나라도 있으면 PASS 라 적혀 있어도 **FAIL 로 간주**.
+  ⚠️ **반드시 `codex exec review`** (bare `codex review` 는 `--output-schema`/`--ephemeral` 미노출). `$CODEX_BIN` 은 §2 감지값. 상세: `docs/rules/codex-integration.md` §8.5.
+
+3. **판정** — `$RES` 의 구조화 출력에서 `verdict == "fail"` **또는** `high_findings` 비어있지 않으면 **FAIL**. (awk PASS/FAIL 휴리스틱·`[high]` 텍스트 파싱 불필요 — 스키마가 강제.)
+
+4. **Fallback (구버전 codex)** — `codex exec review` 미지원이면 §4 자유형 호출(`-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast -o "$OUT"`)로 변경 diff + 아래 프롬프트, 마지막 줄 `PASS`/`FAIL` + `[high]` 파싱으로 graceful degrade:
+
+```text
+다음 코드 변경을 리뷰하세요. 순수 텍스트, 한국어. 각 지적은 [심각도 high/med/low] + 파일:라인 + 무엇이 + 왜. 마지막 줄에 PASS 또는 FAIL 한 단어만.
+## 작업 목표
+{GOAL}
+## 변경 내용
+{git diff}
+```
 5. **미응답/실패** — gate 시점에 미완이면 기다리지 않고 "Codex 리뷰 실패: {요약}" 기록, Supervisor 단독 게이트로 진행 (블로킹 금지 — Codex 부재와 동일 취급).
 
 ---
@@ -789,6 +797,20 @@ Worker #2  |  점수: {score}/100  |  ✓ 통과
 작업 완료 후:
 - `docs/tasks/` 에 작업 파일이 있으면 → `/cp done` 제안으로 History 기록
 - 규칙 파일이 업데이트되면 → `docs/rules/` 경로 언급
+
+#### 7.4 자동 커밋 + 동기화 (게이트 통과 시 — opt-in)
+
+> **조건**: `verified == true` (6.1, 모든 SUCCESS_CRITERIA pass) **이고** 코드/파일 변경이 실제로 발생했을 때만. 경고 모드(6.2 / 5회 도달)에서는 **절대 자동 커밋 금지**.
+
+`lens.config.json` 의 `autoCommitOnComplete` 가 `true` 이거나 사용자의 전역 규칙이 "완료 후 커밋"을 요구하면, 다음 **안전 규칙**으로 commit + sync:
+
+1. **시크릿 제외** — `.env`·`*.local`·쿠키/세션/토큰 파일은 스테이징하지 않는다. `git status` 로 확인 후 의심 파일은 제외하고 보고.
+2. **기본 브랜치 보호** — 현재 브랜치가 default(`main`/`master`)면 먼저 작업 브랜치로 분기한 뒤 커밋(사용자가 default 직접 커밋을 명시 허용한 경우 제외).
+3. **커밋** — 변경을 스테이징 후 한 줄 메시지로 커밋. (커밋 메시지 trailer 규칙은 사용자/프로젝트 컨벤션 따름)
+4. **동기화** — ahead 면 push. 운영 머신(Mac Mini 등)까지 동기화가 필요한 레포면 `/cs` 패턴(pull→commit→push) 안내/실행.
+5. **diverged 면 보고만** — 원격과 갈라졌으면 자동 push 금지, "수동 해결 필요" 로 보고.
+
+기본값 `autoCommitOnComplete: false` (공개 배포 안전). 사용자가 켜거나 전역 규칙이 있으면 위 절차 적용. **확신 없으면 커밋하지 말고 변경 요약 + 제안만.**
 
 #### 7.4 plan 문서의 진행상황 갱신 (v3.4+, 핸드오프로 진입한 경우)
 

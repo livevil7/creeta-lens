@@ -1,6 +1,6 @@
 {
   "version": "1.7.0",
-  "autoRecommend": true,
+  "autoRecommend": false,
   "showReport": true,
   "minMatchScore": 5,
   "memoryPath": null,
@@ -10,5 +10,8 @@
   "saveSynthesisResults": true,
   "resultsDir": null,
   "reportFormat": "md",
-  "buildBoard": true
+  "buildBoard": true,
+  "autoCommitOnComplete": false,
+  "capabilityAuditNudge": true,
+  "capabilityAuditIntervalDays": 30
 }

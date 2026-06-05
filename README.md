@@ -153,6 +153,20 @@ Per-machine safe: items not installed on this box never appear in the list, so d
 
 Auto-upgrade path: `claude update`, `claude plugin update <name>@<marketplace>`, npm-global codex (`npm install -g @openai/codex@latest`), winget-sourced gh on Windows, brew-sourced gh on macOS, and lens itself delegated to `/lens-upgrade`. When the install source can't be identified (e.g. apt/dnf/pacman, VSCode-bundled codex), the command is printed and the user runs it.
 
+### `/cr` — Self-modernization audit
+
+```
+/cr            # quick: supply-side audit (native capability drift)
+/cr deep       # + demand-side conversation mining → net-new feature proposals
+```
+
+`/cr` re-evaluates **every Lens feature** as Claude Code + Codex evolve. It diffs a registry of "assumed native gaps" (`docs/rules/capability-assumptions.json`) against live reality — mostly by **probing the running environment** (`claude --help`, the session's tool surface, `codex --help`), falling back to official changelogs — and classifies each feature **KEEP / THIN / OBSOLETE**, with concrete upgrade vectors and ergonomics improvements. In `deep` mode it also mines your own session transcripts for recurring pains and proposes net-new features. Output is a dated report (md + HTML + board); high-confidence upgrades are handed to `/cp` as task docs. OBSOLETE never auto-deletes anything — it only proposes. A SessionStart nudge reminds you when the audit goes stale (Lens repo only; `capabilityAuditIntervalDays`, default 30).
+
+| You type | What happens |
+| --- | --- |
+| `/cr` (in the Lens repo) | Probes native capabilities, classifies all features, writes the audit report, hands upgrades to `/cp`, resets the staleness timer |
+| `/cr` (elsewhere) | Stops — `/cr` only runs inside the Lens source repo |
+
 **When to use which:**
 
 | | `/c` | `/cc` | `/cp` |

@@ -2,3 +2,5 @@
 .lens-cache.json
 .lens/
 .agents/
+__pycache__/
+*.pyc

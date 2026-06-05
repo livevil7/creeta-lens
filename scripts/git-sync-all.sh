@@ -14,7 +14,15 @@
 
 set -uo pipefail
 
-ACTION="${1:-sync}"
+# 인자 파싱: [pull|push|sync] 와 --json 을 위치 무관하게 받음.
+ACTION="sync"
+JSON_MODE=0
+for _arg in "$@"; do
+  case "$_arg" in
+    --json) JSON_MODE=1 ;;
+    pull|push|sync) ACTION="$_arg" ;;
+  esac
+done
 DATE_ISO=$(date +%Y-%m-%d)
 DATE_READABLE=$(date "+%Y-%m-%d %H:%M")
 
@@ -70,8 +78,9 @@ pulled=()
 pushed=()
 unchanged=()
 
-log() { printf "%s\n" "$*"; }
-hr() { printf "%s\n" "────────────────────────────────────────"; }
+# --json 모드에선 사람용 출력은 전부 stderr 로, stdout 은 마지막 JSON 한 줄만.
+log() { if [ "$JSON_MODE" = 1 ]; then printf "%s\n" "$*" >&2; else printf "%s\n" "$*"; fi; }
+hr() { log "────────────────────────────────────────"; }
 
 log ""
 log "╔══════════════════════════════════════════════╗"
@@ -199,3 +208,27 @@ if [ ${#unchanged[@]} -gt 0 ] && [ ${#unchanged[@]} -lt 20 ]; then
   log "○ 변경 없음 (${#unchanged[@]}): ${unchanged[*]}"
 fi
 hr
+
+# ── --json: 마지막 한 줄로 구조화 결과 (consumer 가 stdout 파싱) ──────────
+if [ "$JSON_MODE" = 1 ]; then
+  # bash 배열 → JSON 배열 (따옴표/역슬래시 이스케이프)
+  _json_arr() {
+    local first=1 out="[" x esc
+    for x in "$@"; do
+      esc=${x//\\/\\\\}; esc=${esc//\"/\\\"}
+      if [ $first = 1 ]; then first=0; else out+=","; fi
+      out+="\"$esc\""
+    done
+    printf '%s]' "$out"
+  }
+  # failed 에서 diverged 를 분리 (수동 해결 필요 vs 진짜 실패). set -u 하에서
+  # 빈 배열 확장이 터지지 않도록 ${arr[@]+"${arr[@]}"} 방어형 사용 (bash 3.2 대비).
+  diverged=(); real_failed=()
+  for x in ${failed[@]+"${failed[@]}"}; do
+    case "$x" in *diverged*) diverged+=("$x") ;; *) real_failed+=("$x") ;; esac
+  done
+  printf '{"action":"%s","total":%s,"success":%s,"pulled":%s,"pushed":%s,"unchanged":%s,"diverged":%s,"failed":%s}\n' \
+    "$ACTION" "$total" "$success" \
+    "$(_json_arr ${pulled[@]+"${pulled[@]}"})" "$(_json_arr ${pushed[@]+"${pushed[@]}"})" \
+    "$(_json_arr ${unchanged[@]+"${unchanged[@]}"})" "$(_json_arr ${diverged[@]+"${diverged[@]}"})" "$(_json_arr ${real_failed[@]+"${real_failed[@]}"})"
+fi

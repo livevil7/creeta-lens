@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "description": "Lens 기능이 가정하는 네이티브 공백 레지스트리. /cr 가 이 가정을 라이브 probe/web 으로 대조해 노후도(KEEP/THIN/OBSOLETE)를 판정한다. SoT=실제 SKILL.md/훅/lib. 행=네이티브 능력 단위(닫히면 affects_lens 의 Lens 기능이 THIN/OBSOLETE).",
+  "method": "signal_method: probe=로컬 환경/CLI 점검(권장·무네트워크), web=공식 체인지로그, both. false_obsolete_risk=이 가정을 죽은 것으로 오판할 위험.",
+  "last_full_audit": "2026-06-05",
+  "audit_report": "docs/history/2026-06-05-lens-modernization-audit.md",
+  "capabilities": [
+    {
+      "id": "native-subagent-model-routing",
+      "kind": "native-capability",
+      "affects_lens": [
+        "skills/c/SKILL.md",
+        "skills/cc/SKILL.md"
+      ],
+      "purpose": "/c·/cc의 worker dispatch + 모델 티어 배정(haiku/sonnet/opus)을 네이티브 Task model enum + model: frontmatter + CLAUDE_CODE_SUBAGENT_MODEL이 대체",
+      "assumed_native_gap": "네이티브가 작업별 모델 티어로 서브에이전트를 dispatch하지 못함",
+      "gap_closed_signal": "claude agents --help / --agents JSON에 model 필드, Task tool model enum 존재 — 이미 닫힘(v2.1.x GA). 추가로 enum이 non-Anthropic까지 열리면 codex 통합 KEEP 근거 약화",
+      "signal_method": "probe",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "Task model enum이 [sonnet,opus,haiku]로 닫혀 있어 cross-vendor(codex) dispatch는 여전히 비네이티브 — /c·/cc 모델배정만 대체, codex 통합은 무관",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "native-dynamic-workflows",
+      "kind": "native-capability",
+      "affects_lens": [
+        "skills/cc/SKILL.md"
+      ],
+      "purpose": "/cc 병렬 멀티에이전트 팬아웃+adversarial verify를 Dynamic Workflows(16동시/1000, agent()/parallel()/pipeline())가 코드-결정론으로 대체",
+      "assumed_native_gap": "네이티브가 병렬 서브에이전트 오케스트레이션+교차검증을 못 함",
+      "gap_closed_signal": "v2.1.154+ 세션에서 'workflow'/ultracode 트리거 동작 + Max/Team on-by-default. 비-Max 박스에서도 가용해지면 /cc prose 팬아웃 잔여가치 추가 약화",
+      "signal_method": "both",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "research-preview + plan-tier 게이트(Max/Team) — 비-Max/미트리거 세션에선 /cc prose 팬아웃이 유일 작동 경로. 모든 워커가 Anthropic이라 codex 이종검증은 미대체",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "native-goal-enforcement",
+      "kind": "native-capability",
+      "affects_lens": [
+        "skills/cp/SKILL.md",
+        "skills/cc/SKILL.md",
+        "skills/c/SKILL.md"
+      ],
+      "purpose": "/c Supervisor+QA, /cc done차단 루프, /cp 목표강제를 네이티브 /goal(매 턴 Haiku 평가자 재판정, v2.1.139+)이 harness 레벨로 대체",
+      "assumed_native_gap": "네이티브가 '빌더와 심판 분리, 완료조건 미달 시 계속 작업'을 못 함",
+      "gap_closed_signal": "v2.1.139+ 세션에서 /goal 명령 + 매 턴 평가자 achieved 로그 동작 — 이미 닫힘. /goal이 transcript-only를 넘어 도구 검증까지 하면 /cc Phase6 QA 잔여가치도 약화",
+      "signal_method": "probe",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "/goal은 transcript-observable 조건만 판정(도구 직접 검증 불가) — /cc QA의 명령실행 evidence 확보는 비대체. 슬래시라 /cc 스킬이 직접 실행 못 함(emit만)",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "native-plan-mode",
+      "kind": "native-capability",
+      "affects_lens": [
+        "skills/cp/SKILL.md"
+      ],
+      "purpose": "/cp PLAN·/c Phase1~2의 read-only 조사-후-계획 게이트를 네이티브 plan mode(--permission-mode plan)가 대체",
+      "assumed_native_gap": "네이티브가 편집 전 read-only 계획 게이트를 못 제공",
+      "gap_closed_signal": "claude --help의 --permission-mode 값에 plan 존재 — 이미 닫힘. plan mode가 디스크 md+html+board 산출물까지 만들면 /cp 데이터층 잔여가치 약화",
+      "signal_method": "probe",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "plan mode는 큐레이션된 md/html/board 영속 산출물을 안 만듦 — /cp 문서 라이프사이클은 비대체",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "native-todowrite-background",
+      "kind": "native-capability",
+      "affects_lens": [
+        "skills/c/SKILL.md",
+        "skills/cc/SKILL.md",
+        "hooks/post-tool-task.js"
+      ],
+      "purpose": "/c·/cc Monitor 폴링(5분 /loop)+진행추적을 네이티브 TodoWrite + background tasks(run_in_background, exit시 재호출)+TaskStop이 대체",
+      "assumed_native_gap": "네이티브가 detached 실행 추적 + 세션 내 진행 렌더를 못 함",
+      "gap_closed_signal": "세션 도구표에 TodoWrite/TaskStop 존재 + Bash run_in_background 노출 — 이미 닫힘. Monitor 에이전트는 순수 오버헤드",
+      "signal_method": "probe",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "낮음 — Monitor 폴링은 결정론적 대체 가능. 단 background는 Bash 도구 프리미티브라 SessionStart 훅 런타임은 못 씀(hooks-dashboard 주의)",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "native-plugin-enumeration",
+      "kind": "native-capability",
+      "affects_lens": [
+        "lib/skill-scanner.js",
+        "scripts/cu.py",
+        "hooks/session-start.js"
+      ],
+      "purpose": "skill-scanner(SKILL.md/.mcp.json/lspServers 순회) + /cu staleness 진단의 열거 부분을 claude plugin list/details(컴포넌트+토큰비용)가 대체",
+      "assumed_native_gap": "네이티브가 설치 플러그인/스킬/MCP/LSP를 토큰비용까지 열거 못 함",
+      "gap_closed_signal": "claude plugin details가 Skills/Hooks/MCP/LSP 카운트+토큰 출력 — 열거는 닫힘. 단 plugin list가 installed↔latest staleness(현재 'unknown'만 표시)를 보여주면 /cu 진단 핵심 약화",
+      "signal_method": "probe",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "plugin details는 installed 버전만, latest/staleness 랭킹 없음 — /cu staleness 진단 + cross-tool(claude+codex+gh) 묶음은 비대체",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "native-skill-discovery",
+      "kind": "native-capability",
+      "affects_lens": [
+        "scripts/user-prompt-handler.js",
+        "lib/keyword-matcher.js",
+        "lib/plugin-registry.js"
+      ],
+      "purpose": "hooks-discovery 키워드 자동제안 + /c 추천을 네이티브 Skills auto-discovery(의미기반 self-invoke) + Skill tool + /slash가 대체",
+      "assumed_native_gap": "네이티브가 요청에 맞는 스킬을 자동 발화/추천 못 함",
+      "gap_closed_signal": "세션 시스템프롬프트가 'invoke the relevant Skill tool' 강제 + Skill tool 정의 — 결과(맞는 스킬 발화)는 닫힘. 공식문서 'no algorithmic skill selection at code level'이 바뀌어 결정론 랭킹을 네이티브가 주면 추천기 완전 무력화",
+      "signal_method": "both",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "결정론적 ranked 추천 UX는 비네이티브이나 Lens 구현이 hollow(triggers:[], score=length) — 실질 우위 미미. /command nag-차단 OVERRIDE는 비네이티브 잔존",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "native-multirepo-git",
+      "kind": "native-capability",
+      "affects_lens": [
+        "scripts/git-sync-all.sh",
+        "skills/cs/SKILL.md"
+      ],
+      "purpose": "/cs 워크스페이스 전 레포 fetch+ff-pull+dirty자동커밋+ahead push sweep — 네이티브 EnterWorktree는 단일레포 멀티워크트리만",
+      "assumed_native_gap": "네이티브가 cross-repo 워크스페이스 동기화 sweep을 못 함",
+      "gap_closed_signal": "claude --help에 cross-repo sync 커맨드 등장 또는 EnterWorktree가 워크스페이스 다레포로 확장되면 /cs KEEP 무너짐. 현재 -w/--worktree·--tmux뿐",
+      "signal_method": "probe",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "네이티브 기준선이 직접 partial로 공백 인정 — device:inode dedup·diverged 게이트·marketplace pull-only는 비네이티브. KEEP 견고",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "native-plugin-update-lifecycle",
+      "kind": "native-capability",
+      "affects_lens": [
+        "scripts/upgrade.sh",
+        "skills/lens-upgrade/SKILL.md",
+        "scripts/cu.py"
+      ],
+      "purpose": "/lens-upgrade 버전올리기를 claude plugin marketplace update + plugin update --scope가 대체. dedup/stash/rollback은 미노출",
+      "assumed_native_gap": "네이티브 plugin install이 멀티스코프 중복·orphan 정리, dirty트리 보존, 실패 롤백을 못 함",
+      "gap_closed_signal": "claude plugin update --help에 dedup/rollback/stash 옵션 등장하면 /lens-upgrade reconciliation 코어 약화. 현재 update는 단일 plugin·'restart required'만",
+      "signal_method": "probe",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "멀티스코프 dedup·stash·자동롤백·origin교정(설치 origin=CreetaCorp vs 스크립트=livevil7 불일치)은 비네이티브 — 버전올리기만 위임 가능",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "codex-native-review-structured",
+      "kind": "external-tool",
+      "affects_lens": [
+        "docs/rules/codex-integration.md",
+        "skills/cc/SKILL.md"
+      ],
+      "purpose": "codex 통합 P4.5 자유형 diff 리뷰+awk PASS/FAIL 파싱을 codex exec review --uncommitted + --output-schema + --ephemeral이 대체(배관층 THIN)",
+      "assumed_native_gap": "codex가 비대화형 1급 코드리뷰·구조화 출력·orphan-free 세션을 못 함",
+      "gap_closed_signal": "codex exec review --help에 --uncommitted/--base + --output-schema/--ephemeral 동시 노출(bare codex review는 schema 미노출) — 이미 닫힘. 라이브 0.137.0-alpha.4 실측 통과",
+      "signal_method": "probe",
+      "probe_hint": "codex --version · codex exec review --help · codex -c service_tier=fast 실측(EXIT 0?)",
+      "official_sources": [
+        "https://github.com/openai/codex/releases"
+      ],
+      "false_obsolete_risk": "배관(review/schema/ephemeral)만 닫힘 — cross-vendor 이종검증 개념층은 codex가 OpenAI 계열인 한 KEEP. gpt-5.5/service_tier=priority는 서버측 검증이라 폐기 시 런타임 깨짐 감지 필요",
+      "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "codex-model-tier-drift",
+      "kind": "config-assumption",
+      "affects_lens": [
+        "docs/rules/codex-integration.md"
+      ],
+      "purpose": "codex-integration.md 하드코딩(gpt-5.5, service_tier=priority, xhigh)이 codex 바이너리 변경에 깨지지 않는지 — /cp·/cc 모든 codex 호출의 SoT",
+      "assumed_native_gap": "n/a (Lens 자체 하드코딩 가정의 유효성)",
+      "gap_closed_signal": "gpt-5.5가 서버에서 폐기되면 -m gpt-5.5가 런타임 400. service_tier=priority가 정식 fast 별칭에서 제거되면 파싱 실패. codex --version/config-reference 변경으로 감지",
+      "signal_method": "both",
+      "probe_hint": "codex --version · codex exec review --help · codex -c service_tier=fast 실측(EXIT 0?)",
+      "official_sources": [
+        "https://github.com/openai/codex/releases"
+      ],
+      "false_obsolete_risk": "현재 전부 실측 통과(EXIT 0) — 조기 제거 금지. 단 모델명/service_tier 서버측 검증이라 미래 깨짐 대비 fallback만 보강",
+      "last_reviewed": "2026-06-06"
+    }
+  ]
+}

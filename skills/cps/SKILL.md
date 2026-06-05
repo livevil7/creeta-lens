@@ -199,3 +199,7 @@ Both are briefings for humans / Claude, but they serve different purposes. `/cps
 ✅ 생성 완료: docs/START_HERE.md
 ✅ CLAUDE.md 포인터: [추가됨 | 이미 있음]
 ```
+
+### 6. 자동 커밋 (opt-in)
+
+`lens.config.json` 의 `autoCommitOnComplete` 가 `true` 이거나 사용자의 전역 "완료 후 커밋" 규칙이 있으면, Write 성공 후 `docs/START_HERE.md`(+CLAUDE.md 포인터 변경)를 스테이징·커밋하고, 운영 레포면 push 한다. 시크릿 제외·기본 브랜치 보호·diverged 시 보고만 — 안전 규칙은 `/cc` Phase 7.4 와 동일. 기본값 false. 확신 없으면 커밋하지 말고 경로만 보고(생성만 하고 untracked 로 떠도는 마찰 제거 목적).

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>/cx 세션 핸드오프 · 보고서</title>
+<meta name="lens:source" content="docs/tasks/2026-06-06-cx-cross-session-handoff.md">
+<meta name="lens:source-hash" content="aae3051b634b">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">04</b></div>
+<main class="deck">
+
+<section class="slide" id="cover">
+  <div class="page-no">01 / 04 · COVER</div>
+  <div class="meta"><span>2026-06-06</span><span class="dot">·</span><span class="badge task">Task</span><span class="dot">·</span><span>대화 마이닝 발견</span></div>
+  <h1 class="h-title"><code>/cx</code> — 세션 경계 자동 핸드오프</h1>
+  <p class="lede">여러 세션·머신 동시 운용 중 "옆 세션 뭐 하는지, 산출물 어디 있는지"를 직접 중계, 세션 끊기면 "Continue from where you left off" 10회+. <code>/cx</code> 는 직전 작업+산출물 위치를 즉시 복원한다.</p>
+  <div class="hero"><div class="num">163-168<span class="unit">agent-tracker.js initSession</span></div><div class="caption">docstring "Preserves..." ↔ 구현은 <strong>wipe</strong> — 진짜 코드 갭(검증됨). 외과적 수정.</div></div>
+  <div class="footer-meta"><span>creeta-lens / docs / tasks</span><span>2026-06-06-cx-cross-session-handoff</span></div>
+</section>
+
+<section class="slide" id="goal">
+  <div class="page-no">02 / 04 · GOAL</div>
+  <h2 class="title">목표</h2>
+  <p class="sub">풀 신규 엔진 금지(/cp 와 중복). 외과적 축소판만.</p>
+  <div class="goal-list" style="margin-top:24px">
+    <div class="goal"><div class="box"></div><div class="t"><strong>직전 복원</strong> — 새 세션에서 <code>/cx</code> 한 번으로 직전 작업 요약 + 산출물 절대경로 + 다음 할 일.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>반복 제거</strong> — "세션 끊겼어 다시 파악해"를 안 해도 됨.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>/cp dedup</strong> — /cp=계획된 작업 resume, /cx=비계획 ad-hoc 핸드오프. 경계 명시.</div></div>
+  </div>
+</section>
+
+<section class="slide" id="plan">
+  <div class="page-no">03 / 04 · PLAN</div>
+  <h2 class="title">Plan A — 외과적 4단계</h2>
+  <p class="sub">memory-store 엔 진행작업·산출물 경로가 없음. claude-mem 미설치. 진짜 갭.</p>
+  <div class="pipe cols-4" style="margin-top:24px">
+    <div class="step"><div class="n">1</div><h3>initSession 보존</h3><div class="what">wipe 대신 직전 lastSession 핸드오프 보존 (docstring↔구현 일치 = 버그수정).</div></div>
+    <div class="step"><div class="n">2</div><h3>Stop 캡처</h3><div class="what">stop.js 가 산출물 절대경로 + 1줄 next-step 캡처 (비중복 핵심).</div></div>
+    <div class="step"><div class="n">3</div><h3>노출</h3><div class="what">session-start additionalContext 로 직전 핸드오프 1줄.</div></div>
+    <div class="step"><div class="n">4</div><h3>/cx reader</h3><div class="what">그 위 얇은 reader. /cp resume 필드와 명시 dedup.</div></div>
+  </div>
+</section>
+
+<section class="slide" id="risks">
+  <div class="page-no">04 / 04 · RISKS</div>
+  <h2 class="title">사전 리스크</h2>
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn"><div class="l">의존</div><h3>wipe 동작 의존 코드</h3><p>step 1 은 사실상 버그수정 — 매 세션 빈 대시보드를 기대하는 코드가 없는지 확인.</p></div>
+    <div class="next warn"><div class="l">중복</div><h3>제2 플랜독 엔진화</h3><p>/cp 와 책임 중복 위험 → SKILL 에 경계(계획 vs ad-hoc) 명시.</p></div>
+    <div class="next warn"><div class="l">보안</div><h3>산출물 경로 민감정보</h3><p>절대경로에 시크릿 경로 포함 가능 → 마스킹/제외.</p></div>
+  </div>
+</section>
+
+</main>
+<script>
+(() => {
+  const rail = document.getElementById("rail"); const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick(){const h=document.documentElement;rail.style.width=Math.min(100,Math.max(0,h.scrollTop/(h.scrollHeight-h.clientHeight)*100))+"%";let idx=0;for(let i=0;i<slides.length;i++){if(slides[i].getBoundingClientRect().top<=window.innerHeight*0.4)idx=i;}crumbNow.textContent=String(idx+1).padStart(2,"0");}
+  document.addEventListener("scroll", tick, { passive: true }); tick();
+})();
+</script>
+</body>
+</html>

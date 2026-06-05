@@ -25,6 +25,7 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 | `/cc` | Parallel multi-agent engine | Scan → Multi-Match → Parallel Execute → Synthesize |
 | `/cp` | Plan-first execution | Scan → Analyze → Generate Plan → Approve → Execute → Post-Exec Update |
 | `/cps` | Repo orientation doc | Scan docs → Assemble 4 sections → Diff gate → Write → Conditional CLAUDE.md pointer |
+| `/cr` | Self-modernization audit | Load registry → probe/web native capabilities → classify KEEP/THIN/OBSOLETE + upgrade/ergonomics → (deep) conversation mining → report + /cp handoff → stamp |
 
 - `/c <request>` picks the best one skill and runs it
 - `/cc <request>` runs ALL relevant skills as parallel Task agents, then synthesizes outputs
@@ -49,7 +50,7 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 | Skill Scanner | `skill-scanner.js` | `scanInstalledSkills()`, `formatSkillTable()`, `detectDomain()` | Scans `~/.claude/plugins/cache/`. Skills, MCP, LSP, Hybrid. 24 domain patterns. 4-level env var path resolution |
 | Keyword Matcher | `keyword-matcher.js` | `matchKeywords()`, `saveScanCache()`, `formatKeywordTable()` | Dynamic keyword map from scan results. Zero hardcoded mappings. Cache at `.lens-cache.json` |
 | Memory Store | `memory-store.js` | `loadMemory()`, `saveMemory()`, `recordSessionStart()`, `recordSkillUsage()`, `recordPlanCreation()` | Persists at `~/.claude/lens/.lens-memory.json`. Usage counts, recent skills, plan history |
-| Plugin Registry | `plugin-registry.js` | `searchRegistry()`, `KNOWN_PLUGINS` | 60+ known plugins. Suggests installable plugins when no match found |
+| Plugin Registry | `plugin-registry.js` | `searchRegistry()`, `KNOWN_PLUGINS` | Installable-plugin discovery. `KNOWN_PLUGINS` is currently **empty** (registry disabled); kept as an opt-in extension point. Per-message auto-suggest is **off by default** (`autoRecommend:false`) — native Skills auto-discovery handles routing |
 | Agent Tracker | `agent-tracker.js` | `initSession()`, `registerAgent()`, `completeAgent()`, `endSession()` | Tracks Task agent lifecycle in `.lens/agent-dashboard.json`. Atomic writes, error logs |
 | Plan Manager | `plan-manager.js` | `getPlansDir()`, `ensurePlansDir()`, `getStatePath()`, `generateSlug()`, `generateFileName()`, `generatePlanId()`, `savePlanState()`, `loadPlanState()`, `listPlans()`, `formatPlanSummary()`, `generatePlanContent()`, `parsePlanFrontmatter()`, `updatePlanStatus()`, `validatePlanStructure()`, `REQUIRED_SECTIONS`, `extractGoal()`, `extractPlanBTriggers()` | Plan file naming (`YYYY-MM-DD-slug.md`), Goal-first document generation (8-lang headers), YAML frontmatter parsing, status lifecycle, state at `.lens/plan-state.json`. v3.4+ `extractGoal` / `extractPlanBTriggers` 는 `/cc` 핸드오프 진입 시 SUCCESS_CRITERIA 와 Plan B Trigger 매칭에 사용 |
 
@@ -106,6 +107,10 @@ lens/
 | `defaultPlanLanguage` | `null` | Force plan language (null = auto-detect from user) |
 | `saveSynthesisResults` | `true` | Save /cc synthesis results to .lens/results/ |
 | `resultsDir` | `null` | Custom results directory (null = `.lens/results/`) |
+| `autoRecommend` | `false` | (v3.13: default off) Per-message skill auto-suggest. Native Skills auto-discovery routes instead |
+| `autoCommitOnComplete` | `false` | `/cc`/`/cps`: auto commit+sync after gates pass (secrets excluded, branch-first, diverged→report-only) |
+| `capabilityAuditNudge` | `true` | Show `/cr` staleness nudge at session start (Lens repo only, no network) |
+| `capabilityAuditIntervalDays` | `30` | Days before the `/cr` audit is considered stale |
 
 ## Detection Targets
 

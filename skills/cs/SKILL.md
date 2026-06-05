@@ -95,9 +95,17 @@ The skill should display the script's output verbatim — it already produces a 
 
 After invocation, summarize in 1–2 sentences if any repos diverged or failed; otherwise just confirm the count.
 
+For a machine-readable result (e.g. when chaining into follow-up automation), add `--json`:
+
+```
+<bash> "${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh" ${ACTION:-sync} --json
+```
+
+In `--json` mode the human report goes to **stderr** and the **last stdout line** is a JSON object: `{action,total,success,pulled[],pushed[],unchanged[],diverged[],failed[]}`. Parse that line; surface `diverged`/`failed` first (they need manual attention), don't bury them under the unchanged list.
+
 ## Auto-commit policy
 
-When `/cs` (or the Stop hook eventually) auto-commits dirty trees, it uses:
+When `/cs` auto-commits dirty trees, it uses:
 
 - Author: The user's configured git identity (via `git config user.name` and `user.email`)
 - Message: `chore: auto-sync YYYY-MM-DD` (single-line)

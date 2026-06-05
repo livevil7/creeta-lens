@@ -148,12 +148,19 @@ def scan_codex():
         cmd = "npm install -g @openai/codex@latest  # 설치 경로 미상, npm 가정"
         can_auto = False
         note = "설치 경로 미상 — 자동 처리 불가"
+    # VSCode 번들 codex 는 자체 alpha 릴리스 케이던스라 GitHub stable 태그와
+    # 비교하면 항상 'update available' 오탐이 난다 → latest=None(❓ unknown)으로 보수 처리.
+    if kind == "vscode":
+        latest = None
+        note += f" (GitHub stable={github_latest_tag('openai/codex')} 참고 — 번들 버전과 직접 비교 불가)"
+    else:
+        latest = github_latest_tag("openai/codex")
     return {
         "id": "cli:codex",
         "kind": "cli",
         "name": "Codex CLI",
         "installed": installed,
-        "latest": github_latest_tag("openai/codex"),
+        "latest": latest,
         "upgrade_cmd": cmd,
         "can_auto": can_auto,
         "note": note,

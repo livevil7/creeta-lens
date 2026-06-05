@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lens 현대화 감사 Pass 1 · 보고서</title>
+<meta name="lens:source" content="docs/history/2026-06-05-lens-modernization-audit.md">
+<meta name="lens:source-hash" content="040e522f9c8b">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">08</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 08 · COVER</div>
+  <div class="meta">
+    <span>2026-06-05</span><span class="dot">·</span>
+    <span class="badge">Done</span><span class="dot">·</span>
+    <span>lens meta · audit</span>
+  </div>
+  <h1 class="h-title">Lens 현대화 감사 Pass 1 — 11기능 재분석 + 대화 마이닝 신기능 제안</h1>
+  <p class="lede">
+    Claude/Codex가 어디까지 왔나(공급)와 내가 무엇을 반복하나(수요)를 양면으로 감사.
+    이종 멀티에이전트 워크플로로 기능별 독립 분석 → 적대적 검증 → 종합.
+    <code>/cr</code> 기능의 첫 실증 실행이자 그 리포트 양식의 레퍼런스.
+  </p>
+  <div class="hero">
+    <div class="num">0<span class="unit">OBSOLETE / 11 기능</span></div>
+    <div class="caption">
+      네이티브가 오케스트레이션 <strong>엔진</strong>을 흡수했지만 죽은 기능은 0.
+      <strong>2 KEEP · 9 THIN</strong> — 엔진은 위임하고 고유 코어만 생존.
+    </div>
+  </div>
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-06-05-lens-modernization-audit</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 08 · AT A GLANCE</div>
+  <h2 class="title">감사 규모</h2>
+  <p class="sub">공급 측 25 에이전트 + 수요 측 19 에이전트, 라이브 CLI probe + 실제 소스 정독.</p>
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi"><div class="l">features audited</div><div class="v">11</div><div class="desc">7스킬 + 발견/대시보드 훅 + plan/board lib + Codex 연동.</div></div>
+    <div class="kpi"><div class="l">verdicts</div><div class="v accent">2·9·0</div><div class="desc">KEEP 2 (/cs·codex) · THIN 9 · OBSOLETE 0.</div></div>
+    <div class="kpi"><div class="l">priority actions</div><div class="v">14</div><div class="desc">업그레이드·편의·드리프트 수정 임팩트순.</div></div>
+    <div class="kpi"><div class="l">new feature proposals</div><div class="v">2</div><div class="desc">/ch·/cx KEEP. 3건은 근거로 DROP.</div></div>
+    <div class="kpi"><div class="l">sessions mined</div><div class="v">82</div><div class="desc">954 인간 발화 → 8 테마.</div></div>
+    <div class="kpi"><div class="l">subagent tokens</div><div class="v">3.3M</div><div class="desc">공급 2.16M + 수요 1.16M.</div></div>
+  </div>
+</section>
+
+<!-- 3. Problem -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 08 · PROBLEM</div>
+  <h2 class="title">왜 지금 감사가 필요한가</h2>
+  <p class="sub">네이티브 4종이 /c·/cc·/cp의 절차 대부분을 prose 래퍼로 만들었다.</p>
+  <div class="compare" style="margin-top:24px">
+    <div class="panel warn">
+      <h3>네이티브가 흡수한 "엔진"</h3>
+      <p><strong>Dynamic Workflows</strong>(16동시·adversarial verify, v2.1.154+) · <strong>per-agent 모델 서브에이전트</strong> · <strong>/goal</strong>(매 턴 Haiku 평가자, v2.1.139+) · <strong>plan mode</strong>. /cc 병렬 팬아웃, /c Supervisor·QA·5회루프, /cp 목표강제·프리모템이 여기 겹친다.</p>
+    </div>
+    <div class="panel good">
+      <h3>그래도 OBSOLETE 0인 이유</h3>
+      <p>네이티브는 전부 <strong>세션 휘발성</strong>(디스크 산출물 없음), <strong>단일 Anthropic 모델 가족</strong>(cross-vendor 검증 불가), <strong>Karpathy 계약 미강제</strong>. 이 셋이 Lens 코어를 살린다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. How it works -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 08 · METHOD</div>
+  <h2 class="title">감사 방법 — 양면 4축</h2>
+  <p class="sub">공급(능력 드리프트·업그레이드·편의) + 수요(대화 마이닝). 전부 적대적 검증 통과.</p>
+  <div class="pipe cols-4" style="margin-top:24px">
+    <div class="step"><div class="n">1</div><h3>공급 드리프트</h3><div class="what">라이브 probe(<code>claude/codex --help</code>)+공식문서 vs 레지스트리 "공백 가정" → 노후도.</div></div>
+    <div class="step"><div class="n">2</div><h3>공급 업그레이드</h3><div class="what">새 네이티브(Workflows·/goal·codex exec review)로 기존 기능 강화 벡터.</div></div>
+    <div class="step"><div class="n">3</div><h3>편의</h3><div class="what">사용자 워크플로(멀티레포·자동커밋·nag싫음·cron) 기준 마찰 제거.</div></div>
+    <div class="step"><div class="n">4</div><h3>수요 마이닝</h3><div class="what">82세션·954발화 → 반복/불편/우회 → net-new 제안 → 적대 검증.</div></div>
+  </div>
+</section>
+
+<!-- 5. Decisions -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 08 · CORES</div>
+  <h2 class="title">살아남는 코어 3 + KEEP 2</h2>
+  <p class="sub">엔진은 네이티브에 위임해도 이 셋은 구조적 비대체.</p>
+  <div class="dec-list" style="margin-top:20px">
+    <div class="dec"><strong>① 디스크 영속 산출물</strong> — /cp board HTML·docs 라이프사이클, /cps 라우팅 인덱스, 감사로그. 네이티브는 전부 세션 휘발.</div>
+    <div class="dec"><strong>② cross-vendor 이종검증</strong> — codex/gpt-5.5. 네이티브 평가자·워커가 전부 Anthropic([sonnet,opus,haiku] 닫힘) → 단일가족 편향을 못 깸. <span class="accent">KEEP</span>.</div>
+    <div class="dec"><strong>③ Karpathy 4규칙 강제계약</strong> — 전역 CLAUDE.md가 요구하는 사용자-필수 계약을 Worker 프롬프트에 박음.</div>
+    <div class="dec"><strong>/cs 멀티레포 sweep</strong> — 네이티브 EnterWorktree는 단일레포 멀티워크트리뿐. 워크스페이스 전 레포 fetch+pull+commit+push는 무대체. <span class="accent">KEEP</span>.</div>
+  </div>
+</section>
+
+<!-- 6. Validation -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 08 · VERIFIED</div>
+  <h2 class="title">검증된 코드 드리프트 (별건)</h2>
+  <p class="sub">라이브 실측·소스 정독으로 확인. 추측 아님.</p>
+  <div class="timeline" style="margin-top:20px">
+    <div class="lead">감사가 우연히 잡은 실제 드리프트/버그 — 외과 수정 후보.</div>
+    <ol>
+      <li class="done"><h4>agent-tracker.js:163-168</h4><div class="det">docstring "Preserves..." ↔ 구현은 빈 대시보드 wipe. (직접 검증)</div></li>
+      <li class="done"><h4>발견/추천 레이어 hollow</h4><div class="det"><code>KNOWN_PLUGINS=[]</code>, 481세션 빈 메모리, triggers:[], score=keyword.length. CLAUDE.md:51 '60+ plugins'는 드리프트.</div></li>
+      <li class="done"><h4>cs SKILL.md:100</h4><div class="det">'Stop훅 auto-commit' 암시 ↔ stop.js git 동작 0 (미구현).</div></li>
+      <li class="done"><h4>origin 불일치 · /cu codex 오탐</h4><div class="det">설치 CreetaCorp/lens vs 스크립트 livevil7. vscode alpha를 stable과 비교해 '항상 업뎃'.</div></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 7. Files / proposals -->
+<section class="slide" id="files">
+  <div class="page-no">07 / 08 · DEMAND</div>
+  <h2 class="title">대화 마이닝 — 신기능 2 KEEP / 3 DROP</h2>
+  <p class="sub">실제 반복 패턴에 뿌리내린 것만. 흥미로워도 중복·구조불가면 거부.</p>
+  <div class="files-grid" style="margin-top:20px">
+    <div class="file-card good"><div class="fc-h">/ch · KEEP (high)</div><div class="fc-b">운영 헬스체크 <strong>디스패처</strong>. 체크 새로 정의 안 함 — 사용자가 이미 만든 런북·체크스크립트·대시보드를 발견·실행. "런북 먼저" 룰 준수.</div></div>
+    <div class="file-card good"><div class="fc-h">/cx · KEEP (med)</div><div class="fc-b">세션 핸드오프. <strong>진짜 코드 갭</strong>(initSession wipe) 외과 수정 + Stop훅이 산출물 절대경로·next-step 캡처.</div></div>
+    <div class="file-card warn"><div class="fc-h">/cv · DROP</div><div class="fc-b">라이브 검증 → 85% 이미 /cc QA. 자동 게이트는 skill 아닌 harness Stop-hook이 정답.</div></div>
+    <div class="file-card warn"><div class="fc-h">progress-pulse · DROP</div><div class="fc-b">빌트인 /loop 중복. ScheduleWakeup 훅 호출 불가(사용자 메모리가 못박음).</div></div>
+    <div class="file-card warn"><div class="fc-h">/cp 라이브뷰어 · DROP</div><div class="fc-b">근거 오귀속 + /cp 아키텍처 4건 위반. verify+Playwright 영역.</div></div>
+  </div>
+</section>
+
+<!-- 8. What's next -->
+<section class="slide" id="next">
+  <div class="page-no">08 / 08 · NEXT</div>
+  <h2 class="title">우선 착수 (임팩트×저비용)</h2>
+  <p class="sub">/cr 없이도 즉시 가능한 독립 업그레이드 + /cr 본체.</p>
+  <div class="next-grid" style="margin-top:20px">
+    <div class="next"><div class="l">#1 upgrade</div><h3>Codex review 현대화</h3><p><code>codex exec review --uncommitted --output-schema --ephemeral</code>로 전환. 라이브 실측 통과·plan-tier 무의존.</p></div>
+    <div class="next"><div class="l">#2 deprecate</div><h3>추천기 폐기</h3><p>매 메시지 자동제안 off + 죽은 KNOWN_PLUGINS 제거. 네이티브 Skills 발견에 위임.</p></div>
+    <div class="next"><div class="l">#9 ergonomics</div><h3>자동 커밋+동기화</h3><p>게이트 통과 시 묻지 말고 commit+push. 강한 사용자 룰 충족.</p></div>
+    <div class="next warn"><div class="l">/cr 본체</div><h3>주기 감사 기능</h3><p>이 리포트를 자동 생성하는 스킬. 계획=<code>docs/tasks/2026-06-05-lens-capability-modernization-audit.md</code>.</p></div>
+  </div>
+  <div class="signature">
+    <div class="quote">네이티브가 엔진을 가져갔다. 남길 것은 디스크·이종검증·계약 — 그리고 그걸 스스로 점검하는 /cr.</div>
+    <div class="right">creeta-lens · modernization audit<br>2026-06-05</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>
