@@ -108,7 +108,7 @@ lens/
 | `saveSynthesisResults` | `true` | Save /cc synthesis results to .lens/results/ |
 | `resultsDir` | `null` | Custom results directory (null = `.lens/results/`) |
 | `autoRecommend` | `false` | (v3.13: default off) Per-message skill auto-suggest. Native Skills auto-discovery routes instead |
-| `autoCommitOnComplete` | `true` | `/cc`/`/cps`: auto commit+sync after gates pass (secrets excluded, branch-first, diverged→report-only). Set `false` to opt out |
+| `autoCommitOnComplete` | `true` | `/cc`/`/cps`: auto commit+sync after gates pass. Respects `.gitignore` (does NOT extra-filter secrets — user version-controls secrets deliberately); branch-first; diverged→report-only. Set `false` to opt out |
 | `capabilityAuditNudge` | `true` | Show `/cr` staleness nudge at session start (Lens repo only, no network) |
 | `capabilityAuditIntervalDays` | `30` | Days before the `/cr` audit is considered stale |
 

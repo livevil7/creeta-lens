@@ -55,7 +55,7 @@ method: "이종 멀티에이전트 워크플로 (공급 측 25 agents + 수요 �
 | 6 | `/c`·`/cc` | Phase 4(Supervisor)+5(QA) 자작 점수제·5회 게이트를 **네이티브 `/goal` emit**으로 위임(/cp v3.7.0 선례). Supervisor/QA spawn 비용 제거 | adopt-native | high | M |
 | 7 | `/c`·`/cc` | **Monitor 폴링 에이전트 제거**(haiku 5분, ALWAYS deploy) → background exit 재호출+TodoWrite. 진행보고는 2분+ long-running만 | adopt-native | med | S |
 | 8 | 대시보드 | PostToolUse 훅이 `additionalContext`로 직전 Task status/실패사유 **모델 주입**(현 비스키마 필드는 모델에 안 닿음). write→consume 단절 해소 | upgrade | high | S |
-| 9 | `/cc`·`/cps` | 작업 종료 시 **자동 commit(+Co-Authored-By)+원격동기화** 기본화(더블게이트+QA 통과 시). live .env 제외, default 브랜치면 먼저 브랜치, diverged면 보고만 | ergonomics | high | M |
+| 9 | `/cc`·`/cps` | 작업 종료 시 **자동 commit(+Co-Authored-By)+원격동기화** 기본화(더블게이트+QA 통과 시). **`.gitignore` 존중(시크릿 임의 제외 금지 — 사용자는 민감파일을 의도적으로 버전관리: `feedback_sensitive_files_to_livevil_setting`)**, default 브랜치면 먼저 브랜치, diverged면 보고만 | ergonomics | high | M |
 | 10 | `/cc`·`/c` | **헤드리스(cron/TTY없음) 감지 시 AskUserQuestion 폴백**(자동승인 or plan-only 종료). Mac Mini 무인 파이프라인 hang 방지 | ergonomics | med | M |
 | 11 | `/cs` | `git-sync-all.sh` `--json` 모드 + diverged/failed 최상단 강조 + SKILL.md:100 'Stop훅 auto-commit' 미구현 암시 제거(stop.js git 동작 0) | fix | med | S |
 | 12 | `/cps` | `/cs` 스윕에 **START_HERE 커버리지 체크** 끼워 '진입문서 없는 레포 N개' 일괄 보고+생성(14레포 수동 비현실적) | upgrade | high | M |

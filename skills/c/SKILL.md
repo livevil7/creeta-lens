@@ -88,7 +88,7 @@ Leader · Worker · Supervisor · QA — 모든 phase가 이 4규칙을 따른�
 2. **장시간 작업 진행보고** — 2분 이상 걸리면 침묵 금지, 주기적 진행 한 줄. background/long-running 은 `/loop 2m <progress check>` 또는 ScheduleWakeup 으로 자동 보고.
 3. **즉시·끝까지 실행** — "~할까요?" 헤지·옵션 나열·작업 떠넘김("직접 해주세요") 금지. 막히면 우회해서라도 직접 끝낸다.
 4. **단, 보고-먼저 예외** — 위험(대량 삭제·배포·외부 발행)·되돌리기 어려움·**시각적 변경(UI·색상·디자인)** 은 적용 *전* 1줄 보고/미리보기 후 진행. (3 과 충돌 아님 — 일반 작업은 즉시, 위험·시각만 보고-먼저.)
-5. **완료 후 자동 커밋+동기화** — Goal 게이트 통과 시 `lens.config.json` `autoCommitOnComplete`(기본 **on**) 로 commit+push. 시크릿 제외·기본 브랜치 보호·diverged 보고만. 안전 규칙 상세는 `/cc` Phase 7.4 와 동일.
+5. **완료 후 자동 커밋+동기화** — Goal 게이트 통과 시 `lens.config.json` `autoCommitOnComplete`(기본 **on**) 로 commit+push. **`.gitignore` 존중(시크릿 임의 제외 금지 — 사용자는 민감파일을 의도적으로 버전관리)**·기본 브랜치 보호·diverged 보고만. 안전 규칙 상세는 `/cc` Phase 7.4 와 동일.
 
 ---
 

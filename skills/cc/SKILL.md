@@ -816,13 +816,13 @@ Worker #2  |  점수: {score}/100  |  ✓ 통과
 
 `lens.config.json` 의 `autoCommitOnComplete` 가 `true` 이거나 사용자의 전역 규칙이 "완료 후 커밋"을 요구하면, 다음 **안전 규칙**으로 commit + sync:
 
-1. **시크릿 제외** — `.env`·`*.local`·쿠키/세션/토큰 파일은 스테이징하지 않는다. `git status` 로 확인 후 의심 파일은 제외하고 보고.
+1. **`.gitignore` 존중 (시크릿 임의 제외 절대 금지)** — `git add -A` 는 `.gitignore` 에 없는 것만 스테이징한다. **Lens 가 추가로 ".env 같으니 빼자"는 시크릿 필터를 걸지 않는다.** 무엇을 숨길지의 SoT 는 사용자의 `.gitignore` 다. 사용자는 민감파일(쿠키·세션·크레덴셜·키)을 **의도적으로 버전관리**하므로(예: `livevil-setting` 에 commit·push) 추적된 파일은 그대로 커밋한다. (사용자 강한 룰 — `feedback_sensitive_files_to_livevil_setting`: 민감파일은 숨기지 말 것. 임의 제외는 이 룰 위반.)
 2. **기본 브랜치 보호** — 현재 브랜치가 default(`main`/`master`)면 먼저 작업 브랜치로 분기한 뒤 커밋(사용자가 default 직접 커밋을 명시 허용한 경우 제외).
 3. **커밋** — 변경을 스테이징 후 한 줄 메시지로 커밋. (커밋 메시지 trailer 규칙은 사용자/프로젝트 컨벤션 따름)
 4. **동기화** — ahead 면 push. 운영 머신(Mac Mini 등)까지 동기화가 필요한 레포면 `/cs` 패턴(pull→commit→push) 안내/실행.
 5. **diverged 면 보고만** — 원격과 갈라졌으면 자동 push 금지, "수동 해결 필요" 로 보고.
 
-기본값 `autoCommitOnComplete: true` (v3.14+, 강한 안전 레일 — 시크릿 제외·기본 브랜치 보호·diverged 보고만·force-push 금지). 끄려면 config 에서 false. **확신 없으면(시크릿 의심·diverged 등) 커밋하지 말고 변경 요약 + 제안만.**
+기본값 `autoCommitOnComplete: true` (v3.14+, 안전 레일 — `.gitignore` 존중·기본 브랜치 보호·diverged 보고만·force-push 금지). 끄려면 config 에서 false. **확신 없으면(diverged·기본 브랜치 등) 커밋하지 말고 변경 요약 + 제안만.** (시크릿 의심을 이유로 빼지 마라 — `.gitignore` 가 결정한다.)
 
 #### 7.4 plan 문서의 진행상황 갱신 (v3.4+, 핸드오프로 진입한 경우)
 
