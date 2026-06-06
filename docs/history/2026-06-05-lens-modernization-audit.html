@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lens 현대화 감사 Pass 1 · 보고서</title>
 <meta name="lens:source" content="docs/history/2026-06-05-lens-modernization-audit.md">
-<meta name="lens:source-hash" content="040e522f9c8b">
+<meta name="lens:source-hash" content="edb5008fdfef">
 <meta name="lens:builder" content="lens-cp-html">
 <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <link rel="stylesheet" href="../_shared.css">
@@ -53,7 +53,7 @@
     <div class="kpi"><div class="l">features audited</div><div class="v">11</div><div class="desc">7스킬 + 발견/대시보드 훅 + plan/board lib + Codex 연동.</div></div>
     <div class="kpi"><div class="l">verdicts</div><div class="v accent">2·9·0</div><div class="desc">KEEP 2 (/cs·codex) · THIN 9 · OBSOLETE 0.</div></div>
     <div class="kpi"><div class="l">priority actions</div><div class="v">14</div><div class="desc">업그레이드·편의·드리프트 수정 임팩트순.</div></div>
-    <div class="kpi"><div class="l">new feature proposals</div><div class="v">2</div><div class="desc">/ch·/cx KEEP. 3건은 근거로 DROP.</div></div>
+    <div class="kpi"><div class="l">new feature proposals</div><div class="v">1</div><div class="desc">/cx KEEP. /ch+3건 DROP (정정 2026-06-06).</div></div>
     <div class="kpi"><div class="l">sessions mined</div><div class="v">82</div><div class="desc">954 인간 발화 → 8 테마.</div></div>
     <div class="kpi"><div class="l">subagent tokens</div><div class="v">3.3M</div><div class="desc">공급 2.16M + 수요 1.16M.</div></div>
   </div>
@@ -121,11 +121,11 @@
 <!-- 7. Files / proposals -->
 <section class="slide" id="files">
   <div class="page-no">07 / 08 · DEMAND</div>
-  <h2 class="title">대화 마이닝 — 신기능 2 KEEP / 3 DROP</h2>
-  <p class="sub">실제 반복 패턴에 뿌리내린 것만. 흥미로워도 중복·구조불가면 거부.</p>
+  <h2 class="title">대화 마이닝 — 신기능 1 KEEP / 4 DROP</h2>
+  <p class="sub">실제 반복 패턴에 뿌리내린 것만. 흥미로워도 중복·구조불가·일반화불가면 거부.</p>
   <div class="files-grid" style="margin-top:20px">
-    <div class="file-card good"><div class="fc-h">/ch · KEEP (high)</div><div class="fc-b">운영 헬스체크 <strong>디스패처</strong>. 체크 새로 정의 안 함 — 사용자가 이미 만든 런북·체크스크립트·대시보드를 발견·실행. "런북 먼저" 룰 준수.</div></div>
-    <div class="file-card good"><div class="fc-h">/cx · KEEP (med)</div><div class="fc-b">세션 핸드오프. <strong>진짜 코드 갭</strong>(initSession wipe) 외과 수정 + Stop훅이 산출물 절대경로·next-step 캡처.</div></div>
+    <div class="file-card good"><div class="fc-h">/cx · KEEP (med)</div><div class="fc-b">세션 핸드오프. <strong>진짜 코드 갭</strong>(initSession wipe) 외과 수정 + Stop훅이 산출물 절대경로·next-step 캡처. 모든 세션이 같은 라이프사이클 = 일반화됨.</div></div>
+    <div class="file-card warn"><div class="fc-h">/ch · DROP (정정)</div><div class="fc-b">운영 헬스체크. <strong>일반화 불가</strong> — "정상"의 정의가 레포마다 달라 공통 불변식 0. 일반화 가능한 건 make/npm run 러너뿐(이미 존재). 2026-06-06 사용자 리뷰 후 드롭.</div></div>
     <div class="file-card warn"><div class="fc-h">/cv · DROP</div><div class="fc-b">라이브 검증 → 85% 이미 /cc QA. 자동 게이트는 skill 아닌 harness Stop-hook이 정답.</div></div>
     <div class="file-card warn"><div class="fc-h">progress-pulse · DROP</div><div class="fc-b">빌트인 /loop 중복. ScheduleWakeup 훅 호출 불가(사용자 메모리가 못박음).</div></div>
     <div class="file-card warn"><div class="fc-h">/cp 라이브뷰어 · DROP</div><div class="fc-b">근거 오귀속 + /cp 아키텍처 4건 위반. verify+Playwright 영역.</div></div>
