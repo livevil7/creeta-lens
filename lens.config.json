@@ -11,7 +11,7 @@
   "resultsDir": null,
   "reportFormat": "md",
   "buildBoard": true,
-  "autoCommitOnComplete": false,
+  "autoCommitOnComplete": true,
   "capabilityAuditNudge": true,
   "capabilityAuditIntervalDays": 30
 }

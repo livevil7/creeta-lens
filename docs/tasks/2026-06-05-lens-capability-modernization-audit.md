@@ -26,7 +26,7 @@ target_version: v3.13.0
 - 감사가 오래됐거나 기능 구성이 바뀌면 **creeta-lens 레포에서 세션 시작 시에만** 한 줄 알림(타 프로젝트 미출력).
 - 아직 필요한 기능이 실수로 "무의미(제거)"로 찍히지 않는다 — 죽음 판정은 **사람이 결정할 제안으로만**, 코드 자동삭제 0.
 
-> **실증 완료 (Pass 1, 2026-06-05):** 이 4차원 감사를 멀티에이전트 워크플로로 **이미 1회 실행**했다. 결과 = `docs/history/2026-06-05-lens-modernization-audit.md` (0 OBSOLETE / 2 KEEP / 9 THIN + 14 우선조치 + 신기능 제안 — `/cx` KEEP, `/ch`는 2026-06-06 사용자 리뷰 후 일반화 불가로 드롭). 원자료 = `.lens/conv-mining/audit-supply.json`·`audit-demand.json`. `/cr`은 이 패스를 **자동·주기화**하는 기능이다.
+> **실증 완료 (Pass 1, 2026-06-05):** 이 4차원 감사를 멀티에이전트 워크플로로 **이미 1회 실행**했다. 결과 = `docs/history/2026-06-05-lens-modernization-audit.md` (0 OBSOLETE / 2 KEEP / 9 THIN + 14 우선조치 + 신기능 제안 0건(`/ch`·`/cx` 둘 다 2026-06-06 사용자 리뷰 후 드롭) → 수요 가치는 "반복 명령을 스킬 기본값으로"로 재정의돼 v3.14.0 반영). 원자료 = `.lens/conv-mining/audit-supply.json`·`audit-demand.json`. `/cr`은 이 패스를 **자동·주기화**하는 기능이다.
 
 **완료의 정의 (Done = ?):**
 
@@ -131,5 +131,5 @@ Phase 0.5에서 Codex 독립 조사가 이미 수행됨(듀얼트랙 활성) →
 ## 진행상황
 - **마지막 업데이트**: 2026-06-05
 - **현재 경로**: Plan A (범위 4차원으로 확장 — 사용자 2회 추가지시 반영)
-- **Pass 1 감사 실증 완료**: `docs/history/2026-06-05-lens-modernization-audit.md` (+HTML, board). 원자료 `.lens/conv-mining/*.json`. 신기능 `/cx`(+`/ch`는 후속 드롭) + 14 우선조치 도출.
-- **재개 포인트**: Phase 5 사용자 검토 — (a) `/cr` 본체 빌드(A1~A6), (b) 즉시 우선조치(#1 Codex review·#2 추천기 폐기·#9 자동커밋 등), (c) `/cx` 신기능 별도 계획 (`/ch`는 일반화 불가로 드롭 — 2026-06-06)
+- **Pass 1 감사 실증 완료**: `docs/history/2026-06-05-lens-modernization-audit.md` (+HTML, board). 원자료 `.lens/conv-mining/*.json`. 신기능 0건(`/ch`·`/cx` 드롭) + 14 우선조치 도출 → 수요 가치=반복 명령 기본값화(v3.14.0).
+- **재개 포인트**: v3.13.0(엔지니어링/코어 — 배포 완료) + v3.14.0(사용자 관점 반복명령→기본값 — 본 릴리스). 남은 코어 리팩토링(#6 /goal 위임·#7 Monitor 제거·#13 /cp 토큰·#12 /cps·#14 lens-upgrade)은 후순위 — 착수 시 별도 `/cp` 계획.
