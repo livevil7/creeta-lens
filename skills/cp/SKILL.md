@@ -1,20 +1,20 @@
 ---
 name: "cp"
-description: "Lens Plan v3.15.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
+description: "Lens Plan v3.16.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.15.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
+| cp | Lens Plan v3.16.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.15.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.16.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -937,4 +937,5 @@ docs/
 - **산출물 링크는 풀 경로** — 보고/안내 시 deliverable 파일은 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로의 클릭 가능 링크로 제시 (`docs/tasks/{id}.md`, `docs/tasks/{id}.html`, `docs/board_<repo>.html`).
 - **듀얼트랙 (v3.9+)** — **Standard+ 에서 항상** Codex 와 병렬 조사(P0.5) + 합성(P2.4). **Fast 등급은 skip** (속도 등급 섹션). Codex 부재/실패는 graceful degrade (Claude 단독 + 플래그). 상세: `docs/rules/codex-integration.md`. (대조: `/cpp` 는 Codex 협의가 양보 불가 하드 게이트.)
 - **용도 분기 (v3.15+)** — `/cp` = 빠른 수정·표준 계획. **깊은 빌드레디 계획(프로토타입·전방위 fan-out·되묻기 0)은 `/cpp` 로 안내.** Deep 신호 감지 시 진행 전 `/cpp` 제안.
+- **5분 진행보고 (v3.16+, 공통 규칙)** — Standard 등급에서 Codex 대기·large 조사 등 5분 이상 걸리는 구간은 침묵 금지, **5분 주기** 진행 한 줄(`/loop 5m`·ScheduleWakeup). `/cc`·`/cp`·`/cpp`·`/ccp` 공통.
 - Phase 순서 (Standard 기준) — Goal (P0) → **Codex 병렬 조사 (P0.5)** → Plan A (P1) → Plan B (P2) → **듀얼 합성·교차검증 (P2.4)** → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). **Fast 등급은 P0.5·P2·P2.4·P2.6(HTML)·P3 를 skip** 하고 Goal→Plan A→md+board→승인 으로 직행. Goal 먼저, 방법은 그 다음. **완료된 Standard PLAN = {md, html, board} 원자적 3-파일 세트**, **Fast PLAN = {md, board}**.

@@ -1,3 +1,21 @@
+## [3.16.0] - 2026-06-11
+
+`/cc`(실행)의 검증·완결 측 형제 **`/ccp`** 신설로 2×2 매트릭스(plan/execute × 표준/딥) 완성. 사용자 요청: "구현된 게 무엇이든 무슨 수를 써서라도(Playwright 등) 진짜 작동하는지 자가 검증하고, 안 되면 고쳐서 확실히 마무리." Codex 교차 협의(`/cpp` S4 하드게이트)로 안전장치 보강. 더불어 4개 오케스트레이션 스킬에 5분 진행보고 공통 규칙.
+
+### Added (v3.16.0)
+
+- **신규 skill `/ccp` (Lens Power Verify) — 적대적 검증·수복 엔진** (`skills/ccp/SKILL.md`). 이미 만들어진 것(출처 불문 — 다른 세션·수동·PR·방금 빌드)을 받아: P0 입력+"작동"의 정의 → P1 **실제 실행 베이스라인**(Playwright/앱/curl, read-only) → P2 **4 렌즈 적대적 다중검증**(Task 병렬 Skeptic; 기능·엣지오류·회귀통합·UX운영, UI면 +접근성/반응형, API면 +보안/권한, 각자 refute 기본) → P3 **만장일치 게이트**(blocking refute 1+면 fail, warning은 수용/보류 기록) → P4 **최소 수복**(실패 축만, pass 축 freeze) → P5 재검증 루프 → P6 **증거 리포트**(verified true/false). 경계(Codex 합의): `/cc`=만들면서 검증 vs `/ccp`=이미 만들어진 것 독립 감사. 다운그레이드 가드(미구현이면 `/cc` 권유).
+- **Codex 교차 협의 반영 안전장치**: read-only 검증 우선, **파괴적 변경(배포·DB migration·대량삭제·외부 결제/메일·프로덕션 쓰기)은 dry-run 또는 승인 없이 금지**. 무한루프 방지 — 최대 5회 + 시간/토큰 예산 + 동일실패 2회 전략전환 + 3회 도달 시 승인. 못 끝내면 done 금지 → verified=false + blocking + 다음 액션(정직한 종료).
+
+### Changed (v3.16.0)
+
+- **5분 진행보고 공통 규칙** (`skills/cc`·`cp`·`cpp`·`ccp`). 장시간 작업 시 5분 주기 진행 한 줄을 4개 오케스트레이션 스킬의 기본 규칙으로 통일. `/cc` 사용자 향 기본값 #2 를 "2분"→"5분"으로 정렬(Monitor Agent 는 이미 5분 주기였음 — 일관성 확보). `/cp`·`/cpp` 절대규칙에 5분 규칙 1줄 추가, `/ccp` 는 native.
+- **인벤토리 동기화**: `CLAUDE.md` Skills 표(+`/ccp` 행) + v3.16.0 feat 노트, `README.md`(`/ccp` 섹션 + 페어 안내), `scripts/bump-version.sh`(skills/ccp/SKILL.md 배너 동기화 추가, 12→13 파일). `/cpp` 절대규칙에 "검증·수복은 `/ccp`" 포인터 추가.
+
+### Fixed (v3.16.0)
+
+- (없음 — 신규 기능 + 공통 규칙 릴리스)
+
 ## [3.15.0] - 2026-06-11
 
 `/cp` 와 `/cpp` 를 **fast/deep 페어**로 분리. 사용자 피드백: "빠르게 수정하고 빠른 계획 세우는 용도 vs 깊은 계획 세우는 용도, 용도에 맞게 유용하게." `/cp` 는 small 작업에도 Codex·Pre-mortem·HTML 을 강제해 "빠르지" 않았다 — 속도 등급으로 슬림화. `/cpp` 는 "실행만 하면 완성본" 수준의 빌드레디 계획 엔진으로 신설. 인기 spec-driven 프레임워크(GitHub Spec Kit, AWS Kiro, obra Superpowers, BMAD) 벤치마크 반영.

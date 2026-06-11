@@ -1,4 +1,4 @@
-# Lens v3.15.0
+# Lens v3.16.0
 
 **Never wonder which plugin to use again.**
 
@@ -139,6 +139,22 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 | `/cpp fix a typo` | Downgrade guard — suggests `/cp` instead (too heavy for trivial work) |
 
 **When to use which**: quick/standard → `/cp` · deep/prototype/zero-follow-up → `/cpp`.
+
+### `/ccp` — Power Verify (adversarial verification & repair)
+
+```
+/ccp <what to make sure actually works>
+```
+
+`/ccp` (Lens Power Verify) takes **anything already built** (a feature, PR, screen, or work from another session) and **proves it actually works by really running it** — spinning up Playwright, hitting endpoints, observing real behavior. It runs **4 adversarial skeptics in parallel** (functional, edge/error, regression/integration, UX/ops — UI adds accessibility/responsive, API adds security/permissions), each trying to *refute* that it works. If any reproduces a blocking failure, it does a **minimal repair** (failed axes only, passed axes frozen) and re-verifies — until done, or it honestly reports `verified=false` with the blockers. Safety-gated: read-only first, destructive changes (deploy/DB/payment/mass-delete) require approval; capped at 5 iterations + a budget. Codex-reviewed design.
+
+| You type | What happens |
+| --- | --- |
+| `/ccp make sure the checkout flow really works` | Runs it via Playwright → 4 skeptics try to break it → repairs blockers → evidence report |
+| `/ccp does this PR actually do what it claims` | Independent adversarial audit of existing work, not a rebuild |
+| `/ccp build a new screen` | Downgrade guard — suggests `/cc` instead (nothing built yet to verify) |
+
+**The boundary**: `/cc` verifies what *it* built; `/ccp` independently audits something *already* built. **The deep pair**: `/cpp` plans → (build) → `/ccp` proves it works.
 
 ### `/cps` — Generate a repo orientation document
 

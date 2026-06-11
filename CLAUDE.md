@@ -4,9 +4,10 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.15.0**
+- Current: **v3.16.0**
 - Updated: 2026-06-11
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.16.0 feat: 신규 skill **`/ccp`** (Lens Power Verify) — 적대적 검증·수복 엔진. 이미 만들어진 것(출처 불문 — 다른 세션·수동·PR·방금 빌드)을 받아 **실제 실행(Playwright/앱/curl)으로 작동 증명** → **4 렌즈 적대적 다중검증**(기능·엣지·회귀·UX, UI면 +접근성/반응형, API면 +보안/권한) → **만장일치 게이트**(blocking refute 1+면 fail) → 최소 수복(실패 축만, pass 축 freeze) → 증거 리포트(verified true/false). 경계(Codex 합의): `/cc`=만들면서 검증, `/ccp`=이미 만들어진 것 독립 감사. **안전장치**(Codex): read-only 우선·파괴적(배포·DB·결제·대량삭제) 승인 게이트·5회+예산 cap·동일실패 2회 전략전환·정직한 종료(verified=false). 더불어 **5분 진행보고 공통 규칙** — `/cc`(2→5분)·`/cp`·`/cpp`·`/ccp` 모두 장시간 작업 시 5분 주기 진행보고. 상세: `CHANGELOG.md` + `docs/tasks/2026-06-11-ccp-power-verify.md`.
 - v3.15.0 feat: 신규 skill **`/cpp`** (Lens Power Plan) — 빌드레디 심층 계획 엔진. `/cp` 와 의도된 **fast/deep 페어**. 사용자 언어 목표(고정)만 잠그고 본문은 **주제 적응형**(고정 Plan A/B 폐기), 전방위 fan-out 조사(6축 병렬 서브에이전트), 도메인 딥스펙(UI→ASCII 와이어프레임+상태+문구+데이터바인딩), **Codex 교차 협의 양보불가 하드게이트**(미감지=정지·보고), 빌드레디 태스크(경로+변경+검증+[P]/의존), EARS 검증. 벤치마크: GitHub Spec Kit(constitution/clarify/analyze)·AWS Kiro(EARS/waves)·obra Superpowers(writing-plans). 더불어 **`/cp` 슬림화** — 속도 등급(Fast/Standard) 도입: Fast 는 Codex·Plan B·Pre-mortem·HTML 슬라이드 skip 후 Goal→Plan A→md+board→승인 직행(빠른 수정용), Deep 신호는 `/cpp` 로 라우팅. Goal 은 등급 무관 항상 필수. 상세: `CHANGELOG.md` + `docs/tasks/2026-06-11-cpp-power-plan.md`.
 - v3.11.0 feat: codex 호출 + Claude 실행을 **깊게+빠르게**로 통일(토큰 비용 비고려). codex 표준 호출에 `-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=priority -o "$OUT"`(깊이·속도 독립 다이얼), `-o` 본문 수거+고유 파일명. `/cc` Worker/Supervisor/QA → `opus` 고정(Monitor만 haiku). 군더더기 제거: blocking timeout(background 모델과 모순) + 취약한 stdout awk 파싱. 모델 drift 정리(GPT-5.2→gpt-5.5). 실측 근거: low 추론은 xhigh보다 토큰 6배+속도 이득 0. 상세: `CHANGELOG.md` + `docs/rules/codex-integration.md` §4·§5·§7.
 - v3.10.0 feat: 신규 skill **`/cps`** (Lens Start) — 어떤 레포든 `docs/START_HERE.md`(레포 first-read 진입점 + 질문 라우팅)를 실제 docs 스캔 기반으로 생성. 인벤토리는 추론 금지(허구 경로 0, 근거 부족은 `(Not documented yet)`), 기존 파일은 diff+승인 게이트(비파괴), CLAUDE.md 포인터는 없을 때만 1줄 조건부 주입. 더불어 **`/cp done` 강화** — 새 task 만이 아니라 `docs/tasks/` 의 기존 task 를 전수 재평가해 "완료추정/진행중/수동확인필요" 자동 분류 + 완료추정 일괄 아카이브 제안(신호 상충 시 안전쪽 우선, 자동삭제 금지, DONE Phase 2~4 불변). 상세: `CHANGELOG.md`.
@@ -26,6 +27,7 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 | `/cc` | Parallel multi-agent engine | Scan → Multi-Match → Parallel Execute → Synthesize |
 | `/cp` | Plan-first (fast/standard) | Speed tiers: Fast = Goal + checklist + board; Standard = Codex + Plan A/B + pre-mortem + HTML. Deep → /cpp |
 | `/cpp` | Power Plan (deep, build-ready) | Goal+장면 → Clarify-to-zero → fan-out 조사(6축) → domain deep-spec → **Codex 협의(필수)** → build-ready tasks → EARS → approve |
+| `/ccp` | Power Verify (검증·수복) | 이미 만들어진 것 → 실제 실행 베이스라인 → 4렌즈 적대적 검증 → 만장일치 게이트 → 최소 수복(안전장치) → 증거 리포트(verified true/false) |
 | `/cps` | Repo orientation doc | Scan docs → Assemble 4 sections → Diff gate → Write → Conditional CLAUDE.md pointer |
 | `/cr` | Self-modernization audit | Load registry → probe/web native capabilities → classify KEEP/THIN/OBSOLETE + upgrade/ergonomics → (deep) conversation mining → report + /cp handoff → stamp |
 

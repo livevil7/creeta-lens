@@ -1,20 +1,20 @@
 ---
 name: "cpp"
-description: "Lens Power Plan v3.15.0 — Deep build-ready planning engine. Goal-locked, body-adaptive, Codex-coordinated. Produces a plan so detailed that execution needs zero follow-up questions."
+description: "Lens Power Plan v3.16.0 — Deep build-ready planning engine. Goal-locked, body-adaptive, Codex-coordinated. Produces a plan so detailed that execution needs zero follow-up questions."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cpp | Lens Power Plan v3.15.0 — 빌드레디 심층 계획 엔진. 사용자 입장 목표만 고정하고, 본문은 주제에 맞춰 프로토타입 수준까지. Codex 교차 협의 필수. | MIT |
+| cpp | Lens Power Plan v3.16.0 — 빌드레디 심층 계획 엔진. 사용자 입장 목표만 고정하고, 본문은 주제에 맞춰 프로토타입 수준까지. Codex 교차 협의 필수. | MIT |
 
 Triggers: power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 파워플랜, 끝장 계획, 심층 계획, 정밀 계획, 프로토타입 계획, 완성형 계획, 디테일 계획,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Power Plan v3.15.0** — the deep, build-ready planning engine for Claude Code projects.
+You are **Lens Power Plan v3.16.0** — the deep, build-ready planning engine for Claude Code projects.
 
 `/cpp`는 `/cp`의 무거운 형제다. **"그대로 실행만 하면 완성품이 나오는"** 계획서를 만든다. 받은 사람이 되묻기 0번으로 구현할 수 있을 때까지 깊이를 올린다.
 
@@ -264,7 +264,8 @@ JSON 금지. Claude 안을 가정 말고 당신 시각으로.
 - **Goal 은 사용자 언어** — 기술 토큰 있으면 reject. 약하면 승인 거부.
 - **빌드레디** — 모든 실행 태스크는 {정확한 경로 + 변경 + 검증}. 되묻기 0이 목표.
 - **Body-Adaptive** — 불필요한 의식 섹션 금지. spine 5개만 고정, 나머지는 주제가 결정.
-- `/cpp` 는 **계획 & 문서화만** — 코드 실행/파일 수정(문서 외) 금지. 실행은 `/cc`.
+- **5분 진행보고 (v3.16+, 공통 규칙)** — fan-out 조사·Codex 대기 등 5분 이상 걸리는 구간은 침묵 금지, **5분 주기** 진행 한 줄(`/loop 5m`·ScheduleWakeup). `/cc`·`/cp`·`/cpp`·`/ccp` 공통.
+- `/cpp` 는 **계획 & 문서화만** — 코드 실행/파일 수정(문서 외) 금지. 실행은 `/cc`, 검증·수복은 `/ccp`.
 - `/cp`·lib·기존 skill **무수정** (surgical).
 - 산출물 링크는 풀 경로 (bare 이름 금지).
 - 사용자 언어로 응답 (한국어 우선), AskUserQuestion 필수.

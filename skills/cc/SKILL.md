@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.15.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
+description: "Lens Multi v3.16.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.15.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.16.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.15.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.16.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, a Monitor agent tracks progress in real-time, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -91,7 +91,7 @@ Leader · Worker(병렬) · Supervisor · QA — 모든 phase가 이 4규칙을 
 > 사용자가 매번 다시 지시하던 것을 **스킬 레벨 기본 동작**으로 박는다. 전역 CLAUDE.md 가 없거나 안 읽혀도(cron·타 머신) 적용. 사용자의 명시적 반대에만 양보.
 
 1. **산출물 경로 자동 보고** — 최종 보고(Phase 7)에 생성·변경한 파일/이미지/문서의 **풀 경로(프로젝트 루트 기준)** 를 항상 포함. 사용자가 "어디 저장했어?" 를 묻게 만들지 마라.
-2. **장시간 작업 진행보고** — 2분 이상 걸리면 침묵 금지, 주기적 진행 한 줄. (Monitor Agent 외에도) background/long-running 은 `/loop 2m` 또는 ScheduleWakeup 활용.
+2. **장시간 작업 진행보고 (5분 규칙 — 공통)** — 5분 이상 걸리면 침묵 금지, **5분 주기** 진행 한 줄. (Monitor Agent 외에도) background/long-running 은 `/loop 5m` 또는 ScheduleWakeup 활용. (`/cc`·`/cp`·`/cpp`·`/ccp` 공통 기본 규칙.)
 3. **즉시·끝까지 실행** — "~할까요?" 헤지·옵션 나열·작업 떠넘김 금지. 막히면 우회해서라도 직접 끝낸다.
 4. **단, 보고-먼저 예외** — 위험(대량 삭제·배포·외부 발행)·되돌리기 어려움·**시각적 변경(UI·색상·디자인)** 은 적용 *전* 1줄 보고/미리보기 후 진행. (3 과 충돌 아님.)
 5. **완료 후 자동 커밋+동기화** — Phase 7.4 참조. `autoCommitOnComplete` 기본 **on**.
@@ -261,10 +261,10 @@ original_request: {원본 요청}
 > - **파괴적/되돌리기 어려운 작업**(대량 삭제·배포·외부 발행): 자동 진행 금지 → **plan-only 로 계획만 출력하고 종료**, 사람이 상호작용 세션에서 재실행하도록 안내.
 > 이 폴백은 Phase 1.5·경로전환(5.x)·경고모드(6.2) 등 **모든 `AskUserQuestion` 게이트에 공통 적용**. 상호작용 세션(`LENS_NONINTERACTIVE` 미설정)에선 기존대로 승인 필수.
 
-**AskUserQuestion** (header: "Lens Multi v3.15.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.16.0 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.15.0 — 실행 계획
+Lens Multi v3.16.0 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -599,7 +599,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.15.0 — 반복 {N}/5
+Lens Multi v3.16.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -744,7 +744,7 @@ Lens Multi v3.15.0 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.15.0 — 최종 결과                       ║
+║   Lens Multi v3.16.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -899,7 +899,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.15.0 — 최종 결과
+Lens Multi v3.16.0 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 
