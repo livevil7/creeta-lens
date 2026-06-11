@@ -1,3 +1,21 @@
+## [3.15.0] - 2026-06-11
+
+`/cp` 와 `/cpp` 를 **fast/deep 페어**로 분리. 사용자 피드백: "빠르게 수정하고 빠른 계획 세우는 용도 vs 깊은 계획 세우는 용도, 용도에 맞게 유용하게." `/cp` 는 small 작업에도 Codex·Pre-mortem·HTML 을 강제해 "빠르지" 않았다 — 속도 등급으로 슬림화. `/cpp` 는 "실행만 하면 완성본" 수준의 빌드레디 계획 엔진으로 신설. 인기 spec-driven 프레임워크(GitHub Spec Kit, AWS Kiro, obra Superpowers, BMAD) 벤치마크 반영.
+
+### Added (v3.15.0)
+
+- **신규 skill `/cpp` (Lens Power Plan) — 빌드레디 심층 계획 엔진** (`skills/cpp/SKILL.md`). `/cp` 의 무거운 형제. 9-스테이지 파이프라인: S0 🎯Goal(사용자 언어)+🎬사용장면+📜Constitution(LOCKED) → S1 Clarify-to-Zero(사전 모호성 전량 제거) → S2 전방위 fan-out 조사(Task 도구 6축 병렬 서브에이전트) → S3 Body-Adaptive 딥스펙(도메인 라우터; UI→ASCII 와이어프레임+요소별 상태/문구/데이터바인딩/반응형) → **S4 Codex 교차 협의·합성(양보불가 하드게이트 — 미감지 시 graceful degrade 금지, 정지·보고)** → S5 빌드레디 태스크(정확한 경로+변경+검증+`[P]`/의존, 10–20분 단위) → S6 ✅EARS 검증(WHEN/THEN/SHALL) → S7 Self-Check("되묻기 0?" 체크리스트) → S8 Approve → `/cc` 핸드오프. spine 5개(목표·Constitution·EARS검증·빌드레디실행·진행상황)만 고정, 나머지 본문은 주제 적응형. 다운그레이드 가드(trivial 은 `/cp` 권유). 기존 라이프사이클(docs/tasks·board·/cc 핸드오프) 재사용, lib·`/cp` 무수정.
+- **벤치마크 채택**: Constitution(Spec Kit `constitution.md`), Clarify-to-Zero(Spec Kit `/clarify`), 교차일관성 게이트(Spec Kit `/analyze` → Codex 격상), EARS 검증(AWS Kiro), 의존성 wave+10–20분 사이징(Kiro), 빌드레디 태스크 포맷=경로+변경+검증(obra Superpowers writing-plans). 미채택: BMAD 다중 페르소나(과함), 별도 CLI, 7-커맨드 분리.
+
+### Changed (v3.15.0)
+
+- **`/cp` 슬림화 — 속도 등급(Fast/Standard) 도입** (`skills/cp/SKILL.md`). `/cp` 를 **빠른 수정·표준 계획 lane** 으로 재포지셔닝. **Fast 등급**(오타·변수명·한두 파일·빠른 스케치): Codex(P0.5/P2.4)·Plan B·Pre-mortem(P3)·HTML 슬라이드 모두 skip → Goal(간결)→Plan A→md+board→승인 직행. **Standard 등급**(medium): 현행 전체 흐름 유지. **Deep 신호**("프로토타입까지", "아주 디테일하게", "전방위 조사", 화면 전체 설계) 감지 시 진행 전 `/cpp` 제안. **Goal 은 등급 무관 항상 필수** (양보 금지는 등급과 독립). 속도 등급 섹션이 per-phase "항상/필수" 규칙보다 우선. P0.5·산출물 게이트·Pre-mortem·절대규칙에 Fast 예외 명시. Standard PLAN={md,html,board}, Fast PLAN={md,board}.
+- **인벤토리 동기화**: `CLAUDE.md` Skills 표(+`/cpp` 행, `/cp` fast/standard 표기) + v3.15.0 feat 노트, `README.md`(`/cpp` 섹션 + `/cp` 속도등급 표기), `scripts/bump-version.sh`(skills/cpp/SKILL.md 배너 동기화 추가, 11→12 파일).
+
+### Fixed (v3.15.0)
+
+- (없음 — 신규 기능 + 리포지셔닝 릴리스)
+
 ## [3.14.1] - 2026-06-06
 
 ### Fixed (v3.14.1)

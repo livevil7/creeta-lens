@@ -43,7 +43,7 @@ fi
 
 TODAY=$(date +%Y-%m-%d)
 
-echo "=== Updating 11 files ==="
+echo "=== Updating 12 files ==="
 
 # Regex patterns match ANY v MAJOR.MINOR(.PATCH)? — the patch segment is
 # optional so 2-part banners (e.g. "Lens v3.1", "Lens Multi v3.4") are caught
@@ -77,7 +77,11 @@ echo "[6/11] skills/cc/SKILL.md"
 
 # 7. skills/cp/SKILL.md
 sed "${SEDI[@]}" -E "s/Lens Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
-echo "[7/11] skills/cp/SKILL.md"
+echo "[7/12] skills/cp/SKILL.md"
+
+# 7b. skills/cpp/SKILL.md (Lens Power Plan banner — note: matched BEFORE "Lens Plan" would mis-hit, but distinct prefix "Lens Power Plan" is exact here)
+sed "${SEDI[@]}" -E "s/Lens Power Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Power Plan v$NEW_VERSION/g" skills/cpp/SKILL.md
+echo "[8/12] skills/cpp/SKILL.md"
 
 # 8. skills/cs/SKILL.md (banner + "currently X.Y.Z" prose)
 sed "${SEDI[@]}" -E "s/Lens Sync v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Sync v$NEW_VERSION/g" skills/cs/SKILL.md
@@ -122,12 +126,13 @@ COUNT=$(grep -rl "v$NEW_VERSION\|\"$NEW_VERSION\"" \
   skills/c/SKILL.md \
   skills/cc/SKILL.md \
   skills/cp/SKILL.md \
+  skills/cpp/SKILL.md \
   skills/cs/SKILL.md \
   CLAUDE.md \
   README.md \
   CHANGELOG.md 2>/dev/null | wc -l)
 
-echo "Files with v$NEW_VERSION: $COUNT/11"
+echo "Files with v$NEW_VERSION: $COUNT/12"
 
 # Check stale version remnants — any v[0-9].[0-9].[0-9] that is NOT the new
 # version, across version-bearing files (excludes CHANGELOG and docs/history

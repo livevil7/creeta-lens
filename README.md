@@ -1,4 +1,4 @@
-# Lens v3.14.1
+# Lens v3.15.0
 
 **Never wonder which plugin to use again.**
 
@@ -115,13 +115,30 @@ Key behaviors:
 /cp <what you want to do>
 ```
 
-Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execution. The plan is saved as a markdown file and presented for your approval.
+Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execution. The plan is saved as a markdown file and presented for your approval. `/cp` is the **fast/standard lane** — quick fixes and standard plans. Speed tiers (Fast/Standard) scale the ceremony to the task size; for deep build-ready plans, it points you to `/cpp`.
 
 | You type | What happens |
 | --- | --- |
-| `/cp build auth with JWT` | Generates a work plan, saves to `docs/2026-02-28-jwt-auth.md`, asks for approval |
+| `/cp fix this typo` | Fast tier — concise Goal + checklist + approve (skips Codex/pre-mortem) |
+| `/cp build auth with JWT` | Standard tier — full plan, saves to `docs/2026-02-28-jwt-auth.md`, asks for approval |
 | `/cp refactor the API layer` | Creates a step-by-step plan, saves to `docs/`, waits for your go-ahead |
 | `/cp` (no args) | Shows full skill inventory (same as `/c`) |
+
+### `/cpp` — Power Plan (deep, build-ready)
+
+```
+/cpp <what you want to do>
+```
+
+`/cpp` (Lens Power Plan) is the **deep lane** — the heavy sibling of `/cp`. It produces a plan so detailed that execution needs **zero follow-up questions**: user-language Goal, fan-out investigation (6 axes, parallel subagents), a domain-adaptive deep spec (UI → ASCII wireframe + element-by-element states/copy/data-binding), a **mandatory Codex cross-coordination gate** (non-negotiable — stops and reports if Codex is missing), and a build-ready task plan (exact path + change + verify + `[P]`/deps). Benchmarked against GitHub Spec Kit, AWS Kiro (EARS), and obra Superpowers.
+
+| You type | What happens |
+| --- | --- |
+| `/cpp build the inspection-approval screen` | Fan-out research → ASCII wireframe + states + copy → Codex coordination → build-ready tasks |
+| `/cpp design the bidding API` | Endpoint contracts + schema + error taxonomy + sequence, verified with Codex |
+| `/cpp fix a typo` | Downgrade guard — suggests `/cp` instead (too heavy for trivial work) |
+
+**When to use which**: quick/standard → `/cp` · deep/prototype/zero-follow-up → `/cpp`.
 
 ### `/cps` — Generate a repo orientation document
 

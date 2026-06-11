@@ -1,22 +1,38 @@
 ---
 name: "cp"
-description: "Lens Plan v3.14.1 — Documentation management engine. Auto-detects: plan new tasks, complete & record history, organize messy docs."
+description: "Lens Plan v3.15.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.14.1 — Documentation management engine. Auto-detects mode: plan tasks, record completions, organize project docs. | MIT |
+| cp | Lens Plan v3.15.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.14.1**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.15.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
+
+---
+
+## 속도 등급 — 빠른 /cp vs 깊은 /cpp (v3.15+)
+
+`/cp` 는 **빠른 수정·표준 계획**의 도구입니다. 끝장 심층 계획(프로토타입까지 그리고, 전방위 fan-out 조사, 빌드레디 태스크, Codex 필수 협의)은 형제 스킬 **`/cpp` (Lens Power Plan)** 를 씁니다. 둘은 용도가 다른 한 쌍입니다.
+
+| 등급 | 언제 | /cp 가 하는 것 | 생략 |
+|------|------|----------------|------|
+| **Fast** | 오타·변수명·한두 파일 수정, 빠른 계획 스케치 | 🎯 Goal(간결) + Plan A 체크리스트 + 저장 + board + 승인 | Codex(P0.5/P2.4)·Plan B·Pre-mortem(P3)·HTML 슬라이드 모두 skip |
+| **Standard** | medium(1–2일) 작업 | 현행 전체 흐름 (Goal→Codex→Plan A/B→합성→문서→HTML+board→Pre-mortem→승인) | — |
+| **→ Deep** | large·UI 프로토타입·"아주 디테일하게"·되묻기 0 필요 | `/cp` 범위 초과 → **`/cpp` 제안** | (권유만, 강제 아님) |
+
+- **자동 판정**: 요청 규모로 Fast/Standard 추정. **Deep 신호**("프로토타입까지", "아주 디테일하게", "전방위 조사", 화면 전체 설계 등)가 보이면 진행 전에 **`/cpp` 를 먼저 제안**(AskUserQuestion). 사용자가 `/cp` 고수 시 Standard 로 진행.
+- **Goal 은 등급 무관 항상 필수** — Fast 라도 🎯 목표(사람 언어) + Done 한 문장은 쓴다. (Goal 양보 금지는 등급과 독립.)
+- **우선순위**: 이 표는 아래 각 Phase 의 "항상/필수" 규칙보다 **우선**한다. Fast 등급에서 생략으로 표시된 Phase(P0.5 Codex·P2.4 합성·Plan B·P2.6 HTML 슬라이드·P3 Pre-mortem)는 실행하지 않는다. board 와 md 는 모든 등급에서 생성.
 
 ---
 
@@ -183,7 +199,7 @@ large 규모는 목표를 **사람 언어 서브골 리스트**로 쪼갠다. �
 
 > Goal 정의 직후, **Claude 와 Codex 가 동시에 독립 조사**한다. Codex 는 Claude 계획의 "검토자"가 아니라 **공동 조사자** — 레포를 스스로 읽고 자기 접근안과 리스크를 낸다. 두 결과는 Phase 2.4 에서 합성한다.
 
-**적용 범위**: trivial (오타·변수명·한 줄 수정) 은 skip. 그 외 모든 규모 적용. 상세 호출 규칙: `docs/rules/codex-integration.md` §8.5.
+**적용 범위**: **Fast 등급(small·빠른 계획)은 skip** (속도 등급 섹션이 우선). Standard(medium)+ 에서 적용. trivial(오타·변수명·한 줄 수정)은 당연 skip. 상세 호출 규칙: `docs/rules/codex-integration.md` §8.5.
 
 1. **Codex 감지** — 3단계 fallback (PATH → VSCode 확장 번들 → 부재). 부재 시 "Codex 미설치 — Claude 단독 계획" 플래그 후 Phase 1 로 진행 (듀얼 비활성, 나머지 흐름 동일).
 2. **병렬 킥오프** — Codex 를 **백그라운드로** 실행(Bash `run_in_background: true`)해 Claude 의 Phase 1 작업과 진짜 병렬이 되게 한다. **프로젝트 루트에서** 호출 (Codex 가 파일 접근). 아래 프롬프트:
@@ -335,7 +351,7 @@ Phase 3(Pre-mortem)은 이 HTML 생성과 독립 — Pre-mortem 이 실패해도
 
 ### Phase 3: Pre-mortem (Opus + Codex 병렬)
 
-Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적으로 리스크 분석** 을 수행합니다. 결과는 문서의 `## ⚠️ 사전 리스크` 섹션에 출처를 병기해 저장합니다.
+Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적으로 리스크 분석** 을 수행합니다. 결과는 문서의 `## ⚠️ 사전 리스크` 섹션에 출처를 병기해 저장합니다. (**Fast 등급은 Pre-mortem skip** — 속도 등급 섹션 우선.)
 
 **Pre-mortem 의 새 역할 (v3.4+)**: 단순 리스크 나열이 아니라 **"Plan A 약점 → Plan B Trigger 연결"** 을 도출. 발견된 약점이 이미 Plan B Trigger 와 매칭되는지 확인 → 매칭되지 않으면 Phase 2 로 회귀해 Plan B 에 새 Trigger 추가.
 
@@ -449,7 +465,7 @@ N+2. [Plan A step 2] — execution level (status: pending)
    - `docs/tasks/{id}.html` 존재하는가?
    - `docs/board_<repo>.html` 존재하는가?
    
-   미충족 시 (html 또는 board 부재) Phase 2.6 으로 회귀해 생성 완료 후 재진입. 완료된 PLAN 의 정의 = 이 3개 파일의 원자적 집합.
+   미충족 시 (html 또는 board 부재) Phase 2.6 으로 회귀해 생성 완료 후 재진입. 완료된 Standard PLAN 의 정의 = 이 3개 파일의 원자적 집합. **Fast 등급은 예외** — md + board 만 필수, HTML 슬라이드는 생략 가능 (속도 등급 섹션 우선).
 
 게이트 미통과 시 사유 표시하며 Phase 0 또는 Phase 2 로 회귀.
 
@@ -919,5 +935,6 @@ docs/
 - 전문가 관점 — 주니어가 놓칠 통찰 제시
 - AskUserQuestion 필수 — 일반 텍스트로 선택지 물어보지 않음
 - **산출물 링크는 풀 경로** — 보고/안내 시 deliverable 파일은 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로의 클릭 가능 링크로 제시 (`docs/tasks/{id}.md`, `docs/tasks/{id}.html`, `docs/board_<repo>.html`).
-- **듀얼트랙 (v3.9+)** — trivial 제외 항상 Codex 와 병렬 조사(P0.5) + 합성(P2.4). Codex 부재/실패는 graceful degrade (Claude 단독 + 플래그). 상세: `docs/rules/codex-integration.md`.
-- Phase 순서 절대 — Goal (P0) → **Codex 병렬 조사 (P0.5)** → Plan A (P1) → Plan B (P2) → **듀얼 합성·교차검증 (P2.4)** → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6, Phase 5 진입 필수)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). Goal 먼저, 방법은 그 다음. **완료된 PLAN 의 정의 = {md, html, board} 원자적 3-파일 세트** (Phase 5.0 산출물 게이트 강제).
+- **듀얼트랙 (v3.9+)** — **Standard+ 에서 항상** Codex 와 병렬 조사(P0.5) + 합성(P2.4). **Fast 등급은 skip** (속도 등급 섹션). Codex 부재/실패는 graceful degrade (Claude 단독 + 플래그). 상세: `docs/rules/codex-integration.md`. (대조: `/cpp` 는 Codex 협의가 양보 불가 하드 게이트.)
+- **용도 분기 (v3.15+)** — `/cp` = 빠른 수정·표준 계획. **깊은 빌드레디 계획(프로토타입·전방위 fan-out·되묻기 0)은 `/cpp` 로 안내.** Deep 신호 감지 시 진행 전 `/cpp` 제안.
+- Phase 순서 (Standard 기준) — Goal (P0) → **Codex 병렬 조사 (P0.5)** → Plan A (P1) → Plan B (P2) → **듀얼 합성·교차검증 (P2.4)** → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). **Fast 등급은 P0.5·P2·P2.4·P2.6(HTML)·P3 를 skip** 하고 Goal→Plan A→md+board→승인 으로 직행. Goal 먼저, 방법은 그 다음. **완료된 Standard PLAN = {md, html, board} 원자적 3-파일 세트**, **Fast PLAN = {md, board}**.
