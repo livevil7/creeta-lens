@@ -1,20 +1,20 @@
 ---
 name: "cp"
-description: "Lens Plan v3.16.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
+description: "Lens Plan v3.17.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.16.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
+| cp | Lens Plan v3.17.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.16.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.17.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -26,7 +26,7 @@ You are **Lens Plan v3.16.0**, the documentation management engine for Claude Co
 
 | 등급 | 언제 | /cp 가 하는 것 | 생략 |
 |------|------|----------------|------|
-| **Fast** | 오타·변수명·한두 파일 수정, 빠른 계획 스케치 | 🎯 Goal(간결) + Plan A 체크리스트 + 저장 + board + 승인 | Codex(P0.5/P2.4)·Plan B·Pre-mortem(P3)·HTML 슬라이드 모두 skip |
+| **Fast** | 오타·변수명·한두 파일 수정, 빠른 계획 스케치 | 🎯 What + ❓ Why (각 한 줄) + 🛠 Plan A 체크리스트 + ✅ Review + 저장 + board + 승인 | Codex(P0.5/P2.4)·Plan B·Pre-mortem(P3)·HTML 슬라이드 모두 skip |
 | **Standard** | medium(1–2일) 작업 | 현행 전체 흐름 (Goal→Codex→Plan A/B→합성→문서→HTML+board→Pre-mortem→승인) | — |
 | **→ Deep** | large·UI 프로토타입·"아주 디테일하게"·되묻기 0 필요 | `/cp` 범위 초과 → **`/cpp` 제안** | (권유만, 강제 아님) |
 
@@ -145,9 +145,17 @@ You are **Lens Plan v3.16.0**, the documentation management engine for Claude Co
 
 > **이 모드의 제1 원칙**: **Goal 은 절대 양보 금지.** Plan A/B 와 Pre-mortem 은 모두 Goal 에 종속된 보조 자료다. Goal 이 약하면 Phase 5 Approve 를 거부하고 Modify 강제. `/cc` 로 핸드오프된 뒤에도 `/cc` 는 Goal 의 성공 기준이 모두 yes 되기 전엔 done 처리를 차단한다.
 
-### Phase 0: 목표(Goal) 정의 — 사람 언어 우선 (최우선)
+### Phase 0: 🎯 What(목표) + ❓ Why(왜) 정의 — 사람 언어 우선 (최우선)
 
-이 task 의 **목표** 를 먼저 정의한다. 방법은 그 다음이다.
+이 task 의 **목표(What)** 와 **그걸 하는 이유(Why)** 를 먼저 정의한다. 방법(How)은 그 다음이다.
+
+> **What / Why / How / Review — 계획의 4대 골격 (v3.17+)**: 모든 `/cp` 계획서는 네 주제로 선다.
+> - **🎯 What — 목표**: 무엇이 가능해지는가 (사람 언어).
+> - **❓ Why — 왜**: 이걸 왜 하는가 — 푸는 문제·동기, 안 하면 생기는 비용.
+> - **🛠 How — 방법**: 어떻게 — Plan A / Plan B (Phase 1~2).
+> - **✅ Review — 검증**: 됐다는 증거를 어떻게 확인하나 (✅검증 표).
+>
+> What·Why 는 이 Phase 에서, How 는 Plan A/B 에서, Review 는 ✅검증 표에서 채운다. **Fast 등급도 네 주제를 모두 쓰되 각 한 줄로 압축 가능 (생략 불가).**
 
 > **2층 원칙 (v3.8+)**: 목표는 두 층으로 나눠 쓴다. 섞지 않는다.
 > - **🎯 목표 (사람 언어)** — 완료되면 *무엇이 가능해지는가*. 사용자가 읽고 yes/no 판단하는 문장. **함수명·HTTP 코드·SQL·클래스명·경로 등 기술 토큰 금지.**
@@ -155,9 +163,10 @@ You are **Lens Plan v3.16.0**, the documentation management engine for Claude Co
 >
 > 목표 문장은 사용자를 위한 것, 검증 표는 기계를 위한 것.
 
-1. **🎯 목표 (사람 언어)** — "이게 끝나면 무엇이 가능해지는가" 를 사람 말로. 예: "신규 방문자가 이메일로 회원가입을 끝까지 마칠 수 있다" (나쁨: "POST /api/users 가 201 반환")
-2. **✅ 검증** — 각 목표가 됐다는 신호 + 확인 방법(명령/관측) + 통과 판정 + 종류(auto/manual). 기술 용어 허용. ≥1행 필수. (별도 `✅ 검증` 표)
-3. **"Done = ?" 한 문장** — 마지막 확인 시나리오를 사람 언어 한 문장으로. 누가 봐도 yes/no 판정 가능.
+1. **🎯 What — 목표 (사람 언어)** — "이게 끝나면 무엇이 가능해지는가" 를 사람 말로. 예: "신규 방문자가 이메일로 회원가입을 끝까지 마칠 수 있다" (나쁨: "POST /api/users 가 201 반환")
+2. **❓ Why — 왜 해야 하는가** — 이 작업이 푸는 문제·동기와 *안 하면 생기는 비용*. 사람 언어 1~3줄 (Fast 는 한 줄). Why 가 비면 "잘못된 문제를 잘 푸는 계획"이 된다 — Rule 1(Think Before Coding)의 문서화.
+3. **✅ Review — 검증** — 각 목표가 됐다는 신호 + 확인 방법(명령/관측) + 통과 판정 + 종류(auto/manual). 기술 용어 허용. ≥1행 필수. (별도 `✅ 검증` 표)
+4. **"Done = ?" 한 문장** — 마지막 확인 시나리오를 사람 언어 한 문장으로. 누가 봐도 yes/no 판정 가능.
 
 #### 0.0 Goal 인터뷰 (요청이 모호하거나 사람 목표가 불명확할 때)
 
@@ -170,10 +179,11 @@ You are **Lens Plan v3.16.0**, the documentation management engine for Claude Co
 
 #### Goal 품질 게이트 (Phase 5 진입 전 자동 검사)
 
-네 조건 모두 충족 안 되면 Phase 5 에서 Approve 거부, Modify 강제.
+다섯 조건 모두 충족 안 되면 Phase 5 에서 Approve 거부, Modify 강제.
 
 - 🎯 목표 문장이 **사람 언어**인가? — 함수명·HTTP 코드·SQL·클래스명·경로 같은 기술 토큰이 목표 문장에 있으면 **reject → 검증 표로 이동**.
 - 🎯 목표가 **"무엇이 가능해지는가"** 형태인가? (나쁨: "API 개선" / 좋음: "신규 방문자가 회원가입을 완료할 수 있다")
+- ❓ **Why 가 명시**됐는가? — 이 작업이 푸는 문제·동기가 한 줄 이상 있는가. 비면 reject (Fast 라도 한 줄 필수).
 - **각 목표가 ✅ 검증 ≥1행으로 매핑**되는가? — 매핑 안 되는 목표 = 너무 모호 = reject.
 - 각 검증 행에 **실행 가능한 명령/관측 + pass 판정**이 있고, **Done 시나리오** 가 사람 언어 한 문장으로 명시됐는가?
 
@@ -268,7 +278,7 @@ Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude �
 ```markdown
 # {제목}
 
-## 🎯 목표 — 무엇이 가능해지는가 (사람 언어)
+## 🎯 What — 목표 (무엇이 가능해지는가, 사람 언어)
 
 **이 작업이 끝나면 가능해지는 것:** (기술 용어 금지 — 사용자가 읽고 판단)
 - {사람 언어 목표 1 — 예: "신규 방문자가 이메일로 회원가입을 끝까지 마칠 수 있다"}
@@ -278,7 +288,50 @@ Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude �
 
 > {마지막 확인 시나리오 한 문장 — 사람 언어, 누가 봐도 yes/no}
 
-## ✅ 검증 — 이게 됐다는 증거 (기계가 판정)
+## ❓ Why — 왜 해야 하는가
+
+- **푸는 문제 / 동기**: {지금 무엇이 불편·불가능한가, 왜 지금 하는가}
+- **안 하면**: {방치 시 생기는 비용·리스크}
+
+## 🛠 How — 어떻게 (Plan A / Plan B)
+
+### Plan A — 권장 경로
+
+#### 왜 이게 1순위인가
+{기술적 근거 / 프로젝트 컨벤션}
+
+#### 단계
+- [ ] step 1: …
+- [ ] step 2: …
+
+#### 막힐 수 있는 지점 (→ Plan B 트리거)
+- {지점 X}: {증상} → Plan B 로 전환
+
+### Plan B — Fallback 경로
+
+#### Trigger
+Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
+
+#### 왜 이 대안인가
+{trade-off}
+
+#### 단계
+- [ ] step 1: …
+- [ ] step 2: …
+
+### 🔀 듀얼 합성 (Claude ‖ Codex)
+(Phase 2.4 에서 채움. Codex 미사용이면 "단일 모델 — Codex 미사용" 한 줄)
+
+**합의 (고신뢰):**
+- {둘 다 동의한 접근/리스크}
+
+**분기 → 해소:**
+- {분기 지점}: Claude={…} / Codex={…} → 채택={…} (근거: {코드 재확인 결과 또는 trade-off})
+
+### ⚠️ 사전 리스크 (Pre-mortem)
+(Phase 3 Pre-mortem 에서 자동 채움)
+
+## ✅ Review — 검증 (이게 됐다는 증거, 기계가 판정)
 
 각 목표가 됐다는 증거. 여기부터 기술 용어 허용. 결과는 대화(transcript)에 증거가 남아야 한다 (네이티브 /goal 평가자·QA 가 pass/fail 판정 가능하도록). `종류`: auto=명령으로 자동 실행 / manual=사람이 눈으로 확인.
 
@@ -288,42 +341,6 @@ Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude �
 | 2 | {신호 2} | DB users 테이블 조회 | row ≥1 | auto |
 | 3 | {신호 3} | 로그인 화면에서 시도 | 성공 화면 | manual |
 
-## Plan A — 권장 경로
-
-### 왜 이게 1순위인가
-{기술적 근거 / 프로젝트 컨벤션}
-
-### 단계
-- [ ] step 1: …
-- [ ] step 2: …
-
-### 막힐 수 있는 지점 (→ Plan B 트리거)
-- {지점 X}: {증상} → Plan B 로 전환
-
-## Plan B — Fallback 경로
-
-### Trigger
-Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
-
-### 왜 이 대안인가
-{trade-off}
-
-### 단계
-- [ ] step 1: …
-- [ ] step 2: …
-
-## 🔀 듀얼 합성 (Claude ‖ Codex)
-(Phase 2.4 에서 채움. Codex 미사용이면 "단일 모델 — Codex 미사용" 한 줄)
-
-**합의 (고신뢰):**
-- {둘 다 동의한 접근/리스크}
-
-**분기 → 해소:**
-- {분기 지점}: Claude={…} / Codex={…} → 채택={…} (근거: {코드 재확인 결과 또는 trade-off})
-
-## ⚠️ 사전 리스크 (Pre-mortem)
-(Phase 3 Pre-mortem 에서 자동 채움)
-
 ## 진행상황
 - **마지막 업데이트**: YYYY-MM-DD
 - **현재 경로**: Plan A / Plan B
@@ -332,7 +349,8 @@ Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
 
 #### 문서 품질 규칙
 
-- **🎯 목표**: 사람 언어로 "무엇이 가능해지는가". 기술 토큰(함수/HTTP/SQL/클래스명/경로) 금지 — 있으면 ✅검증 표로 내린다. 나쁜 예: "POST /api/users — JWT 인증, 201 응답" / 좋은 예: "신규 방문자가 이메일로 회원가입을 끝까지 마칠 수 있다"
+- **🎯 What (목표)**: 사람 언어로 "무엇이 가능해지는가". 기술 토큰(함수/HTTP/SQL/클래스명/경로) 금지 — 있으면 ✅검증 표로 내린다. 나쁜 예: "POST /api/users — JWT 인증, 201 응답" / 좋은 예: "신규 방문자가 이메일로 회원가입을 끝까지 마칠 수 있다"
+- **❓ Why (왜)**: 푸는 문제·동기를 사람 언어로. Fast 는 한 줄, Standard+ 는 "안 하면" 비용까지. 비면 게이트 reject.
 - **Done = ?**: 사람 언어 한 문장. 누가 봐도 yes/no 판정 가능.
 - **✅ 검증**: 각 목표가 검증 표로 매핑돼야 함 (목표당 ≥1행). "확인 방법"은 실행 가능한 명령/관측, "통과 판정"은 pass 기준, "종류"는 auto(명령 실행)/manual(사람 확인). 기술 용어는 여기서 허용. 모호어("정상 동작") 금지 — 대화에 증거가 남아 /goal·QA 가 판정 가능해야 함.
 - **Plan A 단계**: 달성 가능한 단위로 분해. 각 단계 끝에 "verify: …" 명시 권장.
@@ -457,7 +475,7 @@ N+2. [Plan A step 2] — execution level (status: pending)
 
 #### 5.0 진입 전 자동 검사
 
-1. **Goal 게이트** — 🎯목표가 사람 언어인가(기술 토큰 0개) / 각 목표가 ✅검증 ≥1행으로 매핑되나 / Done 한 문장 명시. 목표 문장에 함수·HTTP코드·SQL·클래스명·경로 있으면 reject → 검증 표로 이동.
+1. **Goal 게이트** — 🎯 What 이 사람 언어인가(기술 토큰 0개) / ❓ Why 가 명시됐나(문제·동기) / 각 목표가 ✅검증 ≥1행으로 매핑되나 / Done 한 문장 명시. 목표 문장에 함수·HTTP코드·SQL·클래스명·경로 있으면 reject → 검증 표로 이동.
 2. **Plan B 게이트** — medium+ 면 필수, small 은 생략 사유 명시
 3. **Pre-mortem 게이트** — Blocker 키워드 발견 시 Modify 강제 모드
 4. **산출물 게이트** — PLAN 모드 진입 전, 세 개 산출물이 모두 존재하는지 검증:
@@ -503,7 +521,10 @@ plan_id: {plan-id-from-frontmatter}
 original_request: {사용자 원본 요청}
 
 [GOAL — 사람 언어, 최우선·절대 양보 금지]
-{🎯 목표 섹션 본문 전체 — 사람 언어 목표 + Done 한 문장}
+{🎯 What 섹션 본문 전체 — 사람 언어 목표 + Done 한 문장}
+
+[WHY — 왜 하는가, 실행자가 Plan B 전환·트레이드오프 판단 시 참조]
+{❓ Why 섹션 본문 — 푸는 문제·동기·안 하면 생기는 비용}
 
 [SUCCESS_CRITERIA — TodoWrite 의 최상위 항목으로 등록할 것 (= 🎯 사람 목표 그대로)]
 - [ ] {사람 목표 1}
@@ -646,7 +667,7 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
 |------|----------|------|
 | **완료 추정** | 체크리스트 ≥80% 완료 **또는** 검증표 모든 행 통과 신호 **또는** 진행상황에 버전 출시/배포 기록 있음 | 아래 1.3 으로 일괄 제안 |
 | **진행중** | 체크리스트 <80% **또는** 진행상황에 "재개 포인트" 명시 있음 | 제외 (현황 보고만) |
-| **수동 확인 필요** | 표준 구조(YAML frontmatter + `## 🎯 목표`/`## Goal` + `## Plan A` + `## 진행상황`)를 갖추지 못해 체크리스트/검증표/진행상황을 신뢰성 있게 파싱할 수 없는 경우 (구버전 포맷) | 제외 (완료 추정 묶음에 안 넣음) |
+| **수동 확인 필요** | 표준 구조(YAML frontmatter + `## 🎯 What`/`## 🎯 목표`/`## Goal` + (`## 🛠 How` 또는 `## Plan A`) + `## 진행상황`)를 갖추지 못해 체크리스트/검증표/진행상황을 신뢰성 있게 파싱할 수 없는 경우 (구버전 포맷) | 제외 (완료 추정 묶음에 안 넣음) |
 
 **강한 완료 신호 (tie-break 예외)**: task 가 명시한 **대상 버전**(예: `**대상 버전**: v3.4.0`, 제목/`refs`/본문의 버전)이 레포의 `CHANGELOG.md` / `CLAUDE.md` Version 섹션에 **출시 기록**으로 확인되면 — 체크박스가 미체크(0%)거나 "재개 포인트"가 남아있거나 구버전 포맷이어도 — **완료 추정으로 올린다**. (출시됐다 = 사실상 done. 완료를 체크박스 대신 ✅·버전으로 기록한 옛 task 가 영원히 안 정리되는 것을 막는다.) 최종 아카이브는 여전히 사용자 승인이므로 안전은 승인 게이트가 담당한다.
 
@@ -929,6 +950,7 @@ docs/
 ## 절대 규칙
 
 - **Goal 은 절대 양보 금지** — Phase 0 게이트 통과 못한 Goal 로 Phase 5 진입 불가, `/cc` 핸드오프 시 Goal 빈 페이로드 금지
+- **What / Why / How / Review (v3.17+)** — 모든 계획서는 🎯What · ❓Why · 🛠How · ✅Review 4주제로 선다. **Why(왜)는 신규 필수** — 문제·동기 한 줄 이상 없으면 Goal 게이트 reject. Fast 등급도 4주제 각 한 줄로 압축하되 생략 불가.
 - `/cp` 는 **계획 & 문서화만** — 코드 실행, 파일 수정 (문서 외) 금지
 - 자동 저장 필수 — "저장할까요?" 묻지 않음
 - 사용자 언어로 응답 (한국어 우선)
@@ -938,4 +960,4 @@ docs/
 - **듀얼트랙 (v3.9+)** — **Standard+ 에서 항상** Codex 와 병렬 조사(P0.5) + 합성(P2.4). **Fast 등급은 skip** (속도 등급 섹션). Codex 부재/실패는 graceful degrade (Claude 단독 + 플래그). 상세: `docs/rules/codex-integration.md`. (대조: `/cpp` 는 Codex 협의가 양보 불가 하드 게이트.)
 - **용도 분기 (v3.15+)** — `/cp` = 빠른 수정·표준 계획. **깊은 빌드레디 계획(프로토타입·전방위 fan-out·되묻기 0)은 `/cpp` 로 안내.** Deep 신호 감지 시 진행 전 `/cpp` 제안.
 - **5분 진행보고 (v3.16+, 공통 규칙)** — Standard 등급에서 Codex 대기·large 조사 등 5분 이상 걸리는 구간은 침묵 금지, **5분 주기** 진행 한 줄(`/loop 5m`·ScheduleWakeup). `/cc`·`/cp`·`/cpp`·`/ccp` 공통.
-- Phase 순서 (Standard 기준) — Goal (P0) → **Codex 병렬 조사 (P0.5)** → Plan A (P1) → Plan B (P2) → **듀얼 합성·교차검증 (P2.4)** → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). **Fast 등급은 P0.5·P2·P2.4·P2.6(HTML)·P3 를 skip** 하고 Goal→Plan A→md+board→승인 으로 직행. Goal 먼저, 방법은 그 다음. **완료된 Standard PLAN = {md, html, board} 원자적 3-파일 세트**, **Fast PLAN = {md, board}**.
+- Phase 순서 (Standard 기준) — What+Why (P0) → **Codex 병렬 조사 (P0.5)** → Plan A=How (P1) → Plan B=How (P2) → **듀얼 합성·교차검증 (P2.4)** → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). 문서 골격은 **What→Why→How→Review** 순. **Fast 등급은 P0.5·P2·P2.4·P2.6(HTML)·P3 를 skip** 하고 What+Why→Plan A→md+board→승인 으로 직행(4주제 각 한 줄). What·Why 먼저, How·Review 는 그 다음. **완료된 Standard PLAN = {md, html, board} 원자적 3-파일 세트**, **Fast PLAN = {md, board}**.

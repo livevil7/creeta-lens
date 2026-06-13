@@ -1,4 +1,4 @@
-# Lens v3.16.0
+# Lens v3.17.0
 
 **Never wonder which plugin to use again.**
 
@@ -115,7 +115,7 @@ Key behaviors:
 /cp <what you want to do>
 ```
 
-Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execution. The plan is saved as a markdown file and presented for your approval. `/cp` is the **fast/standard lane** — quick fixes and standard plans. Speed tiers (Fast/Standard) scale the ceremony to the task size; for deep build-ready plans, it points you to `/cpp`.
+Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execution. Every plan is built on four themes — **What (goal) → Why (the problem/motivation) → How (Plan A/B) → Review (verification)** — with **Why** a required gate so you never finely solve the wrong problem. The plan is saved as a markdown file and presented for your approval. `/cp` is the **fast/standard lane** — quick fixes and standard plans. Speed tiers (Fast/Standard) scale the ceremony to the task size; for deep build-ready plans, it points you to `/cpp`.
 
 | You type | What happens |
 | --- | --- |
@@ -140,13 +140,13 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 
 **When to use which**: quick/standard → `/cp` · deep/prototype/zero-follow-up → `/cpp`.
 
-### `/ccp` — Power Verify (adversarial verification & repair)
+### `/ccp` — Power Verify (full review + QA + repair)
 
 ```
 /ccp <what to make sure actually works>
 ```
 
-`/ccp` (Lens Power Verify) takes **anything already built** (a feature, PR, screen, or work from another session) and **proves it actually works by really running it** — spinning up Playwright, hitting endpoints, observing real behavior. It runs **4 adversarial skeptics in parallel** (functional, edge/error, regression/integration, UX/ops — UI adds accessibility/responsive, API adds security/permissions), each trying to *refute* that it works. If any reproduces a blocking failure, it does a **minimal repair** (failed axes only, passed axes frozen) and re-verifies — until done, or it honestly reports `verified=false` with the blockers. Safety-gated: read-only first, destructive changes (deploy/DB/payment/mass-delete) require approval; capped at 5 iterations + a budget. Codex-reviewed design.
+`/ccp` (Lens Power Verify) is the **QA/fix partner to `/cc`**: where `/cc` **builds**, `/ccp` takes what was **built or is already running** (a feature, PR, screen, work from another session, or a live service) and runs a **full review → QA → repair**. It **proves it actually works by really running it** — spinning up Playwright, hitting endpoints, observing real behavior — via **4 adversarial skeptics in parallel** (functional, edge/error, regression/integration, UX/ops — UI adds accessibility/responsive, API adds security/permissions), each trying to *refute* that it works. If any reproduces a blocking failure, it does a **minimal repair** (failed axes only, passed axes frozen) and re-verifies — until done, or it honestly reports `verified=false` with the blockers. Safety-gated: read-only first, destructive changes (deploy/DB/payment/mass-delete) require approval; capped at 5 iterations + a budget. Codex-reviewed design.
 
 | You type | What happens |
 | --- | --- |
@@ -154,7 +154,7 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 | `/ccp does this PR actually do what it claims` | Independent adversarial audit of existing work, not a rebuild |
 | `/ccp build a new screen` | Downgrade guard — suggests `/cc` instead (nothing built yet to verify) |
 
-**The boundary**: `/cc` verifies what *it* built; `/ccp` independently audits something *already* built. **The deep pair**: `/cpp` plans → (build) → `/ccp` proves it works.
+**The boundary**: `/cc` **builds** (with build-time QA as it goes); `/ccp` independently does a **full review + QA + repair** of something *already built or running*. **The core pair**: `/cc` builds → `/ccp` proves it works & fixes it. (`/cpp` plans → `/cc` builds → `/ccp` verifies.)
 
 ### `/cps` — Generate a repo orientation document
 
