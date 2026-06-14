@@ -1,4 +1,4 @@
-# Lens v3.17.0
+# Lens v3.18.0
 
 **Never wonder which plugin to use again.**
 
@@ -130,7 +130,7 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 /cpp <what you want to do>
 ```
 
-`/cpp` (Lens Power Plan) is the **deep lane** — the heavy sibling of `/cp`. It produces a plan so detailed that execution needs **zero follow-up questions**: user-language Goal, fan-out investigation (6 axes, parallel subagents), a domain-adaptive deep spec (UI → ASCII wireframe + element-by-element states/copy/data-binding), a **mandatory Codex cross-coordination gate** (non-negotiable — stops and reports if Codex is missing), and a build-ready task plan (exact path + change + verify + `[P]`/deps). Benchmarked against GitHub Spec Kit, AWS Kiro (EARS), and obra Superpowers.
+`/cpp` (Lens Power Plan) is the **deep lane** — the heavy sibling of `/cp`. It produces a plan so detailed that execution needs **zero follow-up questions**: user-language Goal, fan-out investigation (6 axes, parallel subagents), a domain-adaptive deep spec (UI → ASCII wireframe + element-by-element states/copy/data-binding), a **mandatory Codex cross-coordination gate** (non-negotiable — stops and reports if Codex is missing), and a build-ready task plan (exact path + change + verify + `[P]`/deps). Benchmarked against GitHub Spec Kit, AWS Kiro (EARS), and obra Superpowers. It carries **no length cap** (v3.18) — large work yields a long, fully-itemized checklist, not a compressed summary; the concise, capped lane stays `/cp`.
 
 | You type | What happens |
 | --- | --- |
@@ -138,7 +138,7 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 | `/cpp design the bidding API` | Endpoint contracts + schema + error taxonomy + sequence, verified with Codex |
 | `/cpp fix a typo` | Downgrade guard — suggests `/cp` instead (too heavy for trivial work) |
 
-**When to use which**: quick/standard → `/cp` · deep/prototype/zero-follow-up → `/cpp`.
+**When to use which**: quick/standard (concise, capped) → `/cp` · deep/large/zero-follow-up (no length cap, full checklist) → `/cpp`.
 
 ### `/ccp` — Power Verify (full review + QA + repair)
 

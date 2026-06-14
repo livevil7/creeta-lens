@@ -4,6 +4,7 @@
 > **reference 구현 (작성 전 반드시 Read):**
 > - history 양식 (완료 보고서, 8슬라이드): `report-history.example.html`
 > - task 양식 (계획 보고서, 6슬라이드): `report-plan.example.html`
+> - task-deep 양식 (대형 계획 보고서, **/cpp 전용, 슬라이드 무제한**): 아래 "task-deep 양식" 절. example 은 task 양식을 재사용하되 Plan 슬라이드만 N장으로 복제.
 >
 > **md SoT 원칙**: HTML 은 `docs/` 의 md plan/history 에서 파생된 *뷰*다. 상태/요약을 HTML 에
 > 원본으로 저장하지 않는다. 각 HTML `<head>` 에 출처를 기록한다:
@@ -94,6 +95,24 @@
 | Plan | `#plan` | `## 체크리스트` (Phase/단계) | `.pipe .step` 또는 `.timeline` |
 | Risks | `#risks` | `## ⚠️ 사전 리스크` | `.next-grid .next.warn` |
 | Resume | `#resume` | `## 재개 포인트` | `.next` 또는 `.timeline` |
+
+### task-deep 양식 (대형 계획 보고서, /cpp 전용) — 슬라이드 무제한
+순서: **Cover → At a glance → Goal → Plan 1..N → Risks → Resume**
+
+`/cpp` 가 만드는 대형 기획안 전용. task 양식과 같되 **Plan 을 1장으로 압축하지 않는다** — 태스크가 많으면 Plan 슬라이드를 그룹/wave 별로 N장(`#plan-1`, `#plan-2`, …)으로 나눠 **태스크를 전량** 싣는다. 누락 금지가 최우선.
+
+| 슬라이드 | id | 원본 md 매핑 | CSS 컴포넌트 |
+|----------|-----|--------------|--------------|
+| Cover | `#cover` | 제목 + 의도 첫 문장 + 핵심 숫자 | `.meta(.badge.task) .h-title .lede .hero` |
+| At a glance | `#glance` | 목표 개수 / 태스크 수 / wave 수 | `.kpi-grid .kpi` |
+| Goal | `#goal` | `## 🎯 What`(목표 체크리스트) + `❓ Why` 한 줄 | `.goal-list .goal(.done)` |
+| **Plan 1..N** | `#plan-1`, `#plan-2`, … | `## 🛠 How`(빌드레디 태스크) — 슬라이드당 한 wave/그룹, **태스크 전량** | `.pipe .step` 또는 `.timeline` |
+| Risks | `#risks` | `## ⚠️ 리스크` | `.next-grid .next.warn` |
+| Resume | `#resume` | `## 진행상황` | `.next` 또는 `.timeline` |
+
+- **page-no**: `NN / 총개수 · SECTION` — 총개수는 실제 생성된 슬라이드 수(**동적, 6 고정 아님**). Plan 이 여러 장이면 `· PLAN 2/3` 처럼 표기.
+- **분할 기준**: 태스크 ~8개당 또는 wave 경계로 1슬라이드. 한 슬라이드에 욱여넣어 잘라내지 않는다.
+- task(6장)·history(8장) 양식은 그대로 — task-deep 는 **/cpp 만** 사용한다.
 
 ## 일관성 규칙 (배치 불문 고정)
 

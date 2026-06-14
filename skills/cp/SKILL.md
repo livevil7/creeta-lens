@@ -1,20 +1,20 @@
 ---
 name: "cp"
-description: "Lens Plan v3.17.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
+description: "Lens Plan v3.18.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.17.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
+| cp | Lens Plan v3.18.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.17.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.18.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -624,9 +624,9 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
 
 1. `<md-path>` 의 md 파일을 **Read**.
 2. `${CLAUDE_PLUGIN_ROOT}/templates/report-conversion-spec.md` 를 **Read** — 양식 규칙 흡수.
-3. md 경로에서 폴더 판별 (`tasks` / `history`) → 양식별 reference **Read**:
-   - `docs/tasks/` 하위 → `${CLAUDE_PLUGIN_ROOT}/templates/report-plan.example.html`
-   - `docs/history/` 하위 → `${CLAUDE_PLUGIN_ROOT}/templates/report-history.example.html`
+3. **양식 판별** — 먼저 md frontmatter 의 `planner: cpp` 를 확인. **있으면 task-deep**(슬라이드 무제한, Plan N장 — `report-conversion-spec.md` 의 task-deep 절) → reference 는 `report-plan.example.html` 재사용(Plan 슬라이드만 N장 복제). cpp 문서가 task 6장으로 회귀하지 않게 하는 핵심 분기. 없으면 폴더로 판별:
+   - `docs/tasks/` 하위 → task 양식(6장) → `${CLAUDE_PLUGIN_ROOT}/templates/report-plan.example.html`
+   - `docs/history/` 하위 → history 양식(8장) → `${CLAUDE_PLUGIN_ROOT}/templates/report-history.example.html`
    - 그 외 → task 양식 기본 적용
 4. md 내용을 **의미 단위로 슬라이드 재구성**. 원문에 없는 수치 지어내기 금지.
 5. md 와 **같은 폴더**에 HTML Write (`<md-path>` 와 동일한 basename + `.html`).
