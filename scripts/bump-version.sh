@@ -52,32 +52,32 @@ echo "=== Updating 13 files ==="
 
 # 1. .claude-plugin/plugin.json
 sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
-echo "[1/10] .claude-plugin/plugin.json"
+echo "[1/13] .claude-plugin/plugin.json"
 
 # 2. .claude-plugin/marketplace.json (version + ref)
 sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/marketplace.json
 sed "${SEDI[@]}" -E "s/\"ref\": \"v[0-9]+\.[0-9]+\.[0-9]+\"/\"ref\": \"v$NEW_VERSION\"/" .claude-plugin/marketplace.json
-echo "[2/10] .claude-plugin/marketplace.json"
+echo "[2/13] .claude-plugin/marketplace.json"
 
 # 3. hooks/hooks.json
 sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/hooks.json
-echo "[3/10] hooks/hooks.json"
+echo "[3/13] hooks/hooks.json"
 
 # 4. hooks/session-start.js (multiple occurrences)
 sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/session-start.js
-echo "[4/10] hooks/session-start.js"
+echo "[4/13] hooks/session-start.js"
 
 # 5. skills/c/SKILL.md
 sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens v$NEW_VERSION/g" skills/c/SKILL.md
-echo "[5/11] skills/c/SKILL.md"
+echo "[5/13] skills/c/SKILL.md"
 
 # 6. skills/cc/SKILL.md
 sed "${SEDI[@]}" -E "s/Lens Multi v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Multi v$NEW_VERSION/g" skills/cc/SKILL.md
-echo "[6/11] skills/cc/SKILL.md"
+echo "[6/13] skills/cc/SKILL.md"
 
 # 7. skills/cp/SKILL.md
 sed "${SEDI[@]}" -E "s/Lens Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
-echo "[7/12] skills/cp/SKILL.md"
+echo "[7/13] skills/cp/SKILL.md"
 
 # 7b. skills/cpp/SKILL.md (Lens Power Plan banner — note: matched BEFORE "Lens Plan" would mis-hit, but distinct prefix "Lens Power Plan" is exact here)
 sed "${SEDI[@]}" -E "s/Lens Power Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Power Plan v$NEW_VERSION/g" skills/cpp/SKILL.md
@@ -90,16 +90,16 @@ echo "[9/13] skills/ccp/SKILL.md"
 # 8. skills/cs/SKILL.md (banner + "currently X.Y.Z" prose)
 sed "${SEDI[@]}" -E "s/Lens Sync v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Sync v$NEW_VERSION/g" skills/cs/SKILL.md
 sed "${SEDI[@]}" -E "s/currently [0-9]+\.[0-9]+\.[0-9]+/currently $NEW_VERSION/g" skills/cs/SKILL.md
-echo "[8/11] skills/cs/SKILL.md"
+echo "[10/13] skills/cs/SKILL.md"
 
 # 9. CLAUDE.md (Current version + Updated date)
 sed "${SEDI[@]}" -E "s/Current: \*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
 sed "${SEDI[@]}" -E "s/Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Updated: $TODAY/" CLAUDE.md
-echo "[9/11] CLAUDE.md"
+echo "[11/13] CLAUDE.md"
 
 # 10. README.md (title)
 sed "${SEDI[@]}" -E "s/^# Lens v[0-9]+\.[0-9]+\.[0-9]+/# Lens v$NEW_VERSION/" README.md
-echo "[10/11] README.md"
+echo "[12/13] README.md"
 
 # 10. CHANGELOG.md - prepend new section header (user fills in details).
 # Uses awk because git-bash sed can choke on multi-line substitutions.
@@ -116,7 +116,7 @@ NR==1 {
 }
 { print }
 ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
-echo "[11/11] CHANGELOG.md (template added - fill in details)"
+echo "[13/13] CHANGELOG.md (template added - fill in details)"
 
 echo ""
 echo "=== Verification ==="

@@ -20,9 +20,9 @@
 - CHANGELOG에 "Added" 섹션이 있으면 → MINOR 이상
 - CHANGELOG에 "Fixed"/"Changed"만 있으면 → PATCH
 
-## 2. 버전이 기록된 파일 (9곳)
+## 2. 버전이 기록된 파일 (13곳 — `scripts/bump-version.sh` 가 일괄 처리)
 
-**모든 파일을 동시에 같은 버전으로 업데이트해야 한다.**
+**모든 파일을 동시에 같은 버전으로 업데이트해야 한다.** 수동 대신 **`bash scripts/bump-version.sh <X.Y.Z>`** 를 쓰면 아래 13파일을 자동 범프하고 stale 검증까지 한다.
 
 | # | 파일 | 위치 | 형식 |
 |---|------|------|------|
@@ -33,8 +33,12 @@
 | 5 | `skills/c/SKILL.md` | `Lens vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
 | 6 | `skills/cc/SKILL.md` | `Lens Multi vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
 | 7 | `skills/cp/SKILL.md` | `Lens Plan vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 8 | `CLAUDE.md` | `Current: **vX.Y.Z**` + `Updated: YYYY-MM-DD` + Recent Changes | Markdown |
-| 9 | `CHANGELOG.md` | `## [X.Y.Z] - YYYY-MM-DD` 섹션 추가 | Markdown |
+| 8 | `skills/cpp/SKILL.md` | `Lens Power Plan vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
+| 9 | `skills/ccp/SKILL.md` | `Lens Power Verify vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
+| 10 | `skills/cs/SKILL.md` | `Lens Sync vX.Y.Z` + `currently X.Y.Z` | YAML + Markdown |
+| 11 | `CLAUDE.md` | `Current: **vX.Y.Z**` + `Updated: YYYY-MM-DD` + Recent Changes | Markdown |
+| 12 | `README.md` | `# Lens vX.Y.Z` (title) | Markdown |
+| 13 | `CHANGELOG.md` | `## [X.Y.Z] - YYYY-MM-DD` 섹션 추가 | Markdown |
 
 ### 검색 명령어 (빠뜨린 곳 확인)
 
@@ -83,9 +87,9 @@ git commit -m "fix: updatePlanStatus regex safety"
 - Added/Changed/Fixed/Removed 순서
 - 해당 없는 섹션은 생략
 
-### Step 3: 9곳 버전 범프
+### Step 3: 13곳 버전 범프 (자동 권장)
 
-위 표의 9개 파일을 모두 새 버전으로 업데이트한다.
+`bash scripts/bump-version.sh <X.Y.Z>` 로 위 표의 13개 파일을 일괄 업데이트한다(수동 시 누락 위험).
 
 **주의사항**:
 - `marketplace.json`은 `version`과 `source.ref` 2곳 모두 변경

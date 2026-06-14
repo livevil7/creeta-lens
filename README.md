@@ -1,4 +1,4 @@
-# Lens v3.18.0
+# Lens v3.18.1
 
 **Never wonder which plugin to use again.**
 

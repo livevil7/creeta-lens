@@ -25,7 +25,7 @@ Codex 는 단순 "Claude 결과 검토자"가 아니라 **공동 조사자·공�
 - `/cp PLAN` **Phase 3 — Pre-mortem**: 통합안의 최종 리스크 점검 (Phase 0.5 에서 Codex 조사가 이미 돌았으면 Opus 단독, 아니면 Codex 병렬).
 - `/cc` **Phase 4.5 — 코드리뷰 게이트**: 매 반복의 코드 변경을 Codex 가 독립 리뷰. Supervisor pass + Codex pass 둘 다여야 진행.
 
-**trivial 작업(오타·변수명·한 줄 수정)은 모든 지점 skip** — 불필요한 호출 회피. Codex 부재/실패는 항상 graceful degrade (Claude/Supervisor 단독 진행 + 플래그 기록, 블로킹 금지).
+**trivial 작업(오타·변수명·한 줄 수정)은 모든 지점 skip** — 불필요한 호출 회피. Codex 부재/실패는 항상 graceful degrade (Claude/Supervisor 단독 진행 + 플래그 기록, 블로킹 금지). **단 예외 — `/cpp` S4 교차 협의는 하드 게이트**(Constitution 2조): 미감지/미인증 시 degrade 하지 않고 **정지·보고**한다(사용자가 "Codex 없이 진행" 명시 시만 1회 우회). 위 graceful degrade 는 `/cp`·`/cc` 의 듀얼검증 지점에 적용된다.
 
 ## 2. 사전 조건 감지
 

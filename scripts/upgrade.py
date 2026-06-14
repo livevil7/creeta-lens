@@ -336,11 +336,23 @@ def phase1_marketplace(ctx: Context) -> None:
     log_ok("fetched")
 
     log_step("Fast-forward pull")
-    if not ctx.dry_run:
-        branch = run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=MARKETPLACE_DIR,
-        ).stdout.strip() or "main"
+    branch = run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=MARKETPLACE_DIR,
+    ).stdout.strip() or "main"
+    # Count how far local is behind origin (read-only — safe in dry-run too).
+    # Without this, dry-run skipped the pull and still printed "up to date",
+    # masking a behind marketplace and reporting a stale version in Phase 2.
+    behind = run(
+        ["git", "rev-list", "--count", f"HEAD..origin/{branch}"],
+        cwd=MARKETPLACE_DIR,
+        check=False,
+    ).stdout.strip()
+    if not behind or behind == "0":
+        log_ok("marketplace already up to date")
+    elif ctx.dry_run:
+        log_ok(f"(dry-run) would fast-forward {behind} commit(s) to origin/{branch}")
+    else:
         pull = run(
             ["git", "pull", "--ff-only", "origin", branch],
             cwd=MARKETPLACE_DIR,
@@ -350,7 +362,7 @@ def phase1_marketplace(ctx: Context) -> None:
             log_err("fast-forward failed (divergent history)")
             log_warn(pull.stderr.strip() or pull.stdout.strip())
             fatal("Cannot ff-merge; resolve marketplace history manually")
-    log_ok("marketplace up to date")
+        log_ok(f"fast-forwarded {behind} commit(s)")
 
 
 # ─────────────────────────────────────────────────────────────

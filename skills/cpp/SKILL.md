@@ -1,20 +1,20 @@
 ---
 name: "cpp"
-description: "Lens Power Plan v3.18.0 — Deep build-ready planning engine. Goal-locked, body-adaptive, Codex-coordinated. Produces a plan so detailed that execution needs zero follow-up questions."
+description: "Lens Power Plan v3.18.1 — Deep build-ready planning engine. Goal-locked, body-adaptive, Codex-coordinated. Produces a plan so detailed that execution needs zero follow-up questions."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cpp | Lens Power Plan v3.18.0 — 빌드레디 심층 계획 엔진. 사용자 입장 목표만 고정하고, 본문은 주제에 맞춰 프로토타입 수준까지. Codex 교차 협의 필수. | MIT |
+| cpp | Lens Power Plan v3.18.1 — 빌드레디 심층 계획 엔진. 사용자 입장 목표만 고정하고, 본문은 주제에 맞춰 프로토타입 수준까지. Codex 교차 협의 필수. | MIT |
 
 Triggers: power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 파워플랜, 끝장 계획, 심층 계획, 정밀 계획, 프로토타입 계획, 완성형 계획, 디테일 계획,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Power Plan v3.18.0** — the deep, build-ready planning engine for Claude Code projects.
+You are **Lens Power Plan v3.18.1** — the deep, build-ready planning engine for Claude Code projects.
 
 `/cpp`는 `/cp`의 무거운 형제다. **"그대로 실행만 하면 완성품이 나오는"** 계획서를 만든다. 받은 사람이 되묻기 0번으로 구현할 수 있을 때까지 깊이를 올린다.
 
@@ -160,7 +160,7 @@ trivial(오타·한 줄) 제외 항상 수행. **Task 도구로 아래 6축을 �
 1. **Codex 감지** — `docs/rules/codex-integration.md` 3단계 fallback (PATH → VSCode 확장 번들 → 부재).
    - **부재/미인증 시**: graceful degrade **금지**. 진행을 멈추고 사용자에게 보고:
      `⚠️ Codex 필수(양보 불가)인데 미감지/미인증입니다. 설치·인증을 확인하거나, 이 턴에 "Codex 없이 진행"이라고 명시해 주세요.` → 사용자 응답 대기.
-2. **독립 협의** — Codex 를 프로젝트 루트에서 **표준 호출**(`-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=priority -o "$OUT"`)로 호출, S3 딥스펙 + S2 조사보고를 주고 다음을 요청:
+2. **독립 협의** — Codex 를 프로젝트 루트에서 **표준 호출**(`-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast -o "$OUT"`)로 호출, S3 딥스펙 + S2 조사보고를 주고 다음을 요청:
 
 ```text
 이 빌드레디 계획을 독립적으로 검증하세요. 순수 텍스트, 한국어. **단어 수 제한 없음** — 항목당 한 줄로 간결하게(코딩 용어 주저리 금지), 빠진 것 없이 전부.
@@ -260,7 +260,7 @@ JSON 금지. Claude 안을 가정 말고 당신 시각으로.
 ## 생태계 통합 / 한계
 
 - **라이프사이클 동일** — `docs/tasks/` 저장 → board·`/cc` 핸드오프·`/cp done` 정리가 그대로 작동.
-- **done-sweep 주의** — `/cp` 의 완료 정리는 `## Plan A` 표준 섹션을 찾는다. `/cpp` 적응형 문서는 그게 없을 수 있어 **"수동 확인 필요"로 분류될 수 있음** (안전한 degrade — 자동 삭제 안 됨, 사용자가 눈으로 완료 확인). cpp 문서는 `진행상황` + 체크리스트를 반드시 포함해 완료 추정이 가능하게 한다.
+- **done-sweep 호환** — `/cp` 의 완료 정리는 `## 🛠 How` 또는 `## Plan A` + `## 진행상황` 을 찾는다(v3.17+ What/Why/How/Review 골격 반영). `/cpp` 문서는 spine 에 `## 🛠 How` 와 `진행상황` 을 **반드시 포함**하므로 done-sweep 이 자동 분류할 수 있다(과거 'Plan A 부재로 수동 확인' 우려는 How 골격 도입으로 해소). 체크리스트도 유지해 완료 추정을 돕는다.
 - **Codex 의존** — S4 는 하드 게이트. Codex 미설치 박스에서 `/cpp` 는 정지·보고 (Constitution 2조).
 
 ---

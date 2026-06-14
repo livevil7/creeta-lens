@@ -1,3 +1,19 @@
+## [3.18.1] - 2026-06-14
+
+v3.18.0 후속 — Codex 교차검증이 짚은 기존 드리프트 6건 정합성 수정(분량-캡 변경과 무관한 청소).
+
+### Changed (v3.18.1)
+
+- **`/cpp` S4 Codex 표준 호출 `service_tier=priority` → `fast`** — codex-integration.md §4 표준과 통일(priority는 fast의 레거시 별칭). `skills/cpp/SKILL.md`
+- **release-guide 버전 파일 9곳 → 13곳** — 실제 `bump-version.sh` 대상(cpp·ccp·cs·README 포함)과 일치 + 자동 사용 권장. `docs/rules/release-guide.md`
+- **`/cpp` done-sweep 호환 설명 갱신** — `## Plan A` 만 찾는다는 옛 설명을 현행 `## 🛠 How 또는 ## Plan A + ## 진행상황`(v3.17 골격)으로. `skills/cpp/SKILL.md`
+
+### Fixed (v3.18.1)
+
+- **`codex-integration.md` graceful-degrade ↔ `/cpp` 하드게이트 모순** — "Codex 부재 시 항상 degrade"가 `/cpp` Constitution 2조와 충돌하던 것을 "`/cpp` S4는 예외(정지·보고)"로 해소. `docs/rules/codex-integration.md`
+- **`bump-version.sh` 진행 출력 라벨** — `[5/11]`·`[8/13]` 등 분모 혼재를 `[1/13]`~`[13/13]`로 통일. `scripts/bump-version.sh`
+- **`upgrade.py` dry-run이 marketplace behind를 "up to date"로 오표시** — fetch 후 behind 커밋 수(read-only)를 세어 `(dry-run) would fast-forward N commit(s)`로 정확히 보고, 실제 실행도 `fast-forwarded N`. `scripts/upgrade.py`
+
 ## [3.18.0] - 2026-06-14
 
 `/cpp` 를 **대형 기획안 전담**으로 재포지셔닝 — Codex 협의·HTML 슬라이드 등 모든 글자수/분량 캡을 해제하고, 큰 작업이면 항목 전량을 빠짐없이 싣게 한다. `/cp` 는 기존처럼 **간결한 기획안**(캡 유지). 분량 제한의 원래 목적("코딩 용어 주저리 차단")은 총량 캡이 아니라 **"항목당 사용자 언어로 한 줄 + 전량 + 체크리스트"** 규칙으로 달성.
