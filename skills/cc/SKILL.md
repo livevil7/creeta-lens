@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.18.1 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
+description: "Lens Multi v3.19.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.18.1 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.19.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.18.1**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.19.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, a Monitor agent tracks progress in real-time, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -264,10 +264,10 @@ original_request: {원본 요청}
 > - **파괴적/되돌리기 어려운 작업**(대량 삭제·배포·외부 발행): 자동 진행 금지 → **plan-only 로 계획만 출력하고 종료**, 사람이 상호작용 세션에서 재실행하도록 안내.
 > 이 폴백은 Phase 1.5·경로전환(5.x)·경고모드(6.2) 등 **모든 `AskUserQuestion` 게이트에 공통 적용**. 상호작용 세션(`LENS_NONINTERACTIVE` 미설정)에선 기존대로 승인 필수.
 
-**AskUserQuestion** (header: "Lens Multi v3.18.1 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.19.0 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.18.1 — 실행 계획
+Lens Multi v3.19.0 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -547,17 +547,18 @@ Supervisor 모델 = `opus` 고정 (품질 우선 — 토큰 비용 비고려). W
 SCHEMA=$(mktemp /tmp/codex_schema_XXXXXX.json)
 printf '%s' '{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","fail"]},"high_findings":{"type":"array","items":{"type":"string"}}},"required":["verdict","high_findings"]}' > "$SCHEMA"
 RES=$(mktemp /tmp/codex_review_XXXXXX.json)
-"$CODEX_BIN" exec review --uncommitted \
-  -m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast \
+timeout 180 "$CODEX_BIN" exec review --uncommitted \
+  -m gpt-5.5 -c model_reasoning_effort=high -c service_tier=fast \
   --output-schema "$SCHEMA" --ephemeral --json > "$RES" 2>/dev/null
 # 결과: $RES 의 최종 메시지에 {"verdict","high_findings"} JSON
+# 깊이=high (전체 diff=대규모 → xhigh 폭증 회피) · 180초 초과(exit 124)면 degrade. 상세: codex-integration.md §4·§7.
 ```
 
   ⚠️ **반드시 `codex exec review`** (bare `codex review` 는 `--output-schema`/`--ephemeral` 미노출). `$CODEX_BIN` 은 §2 감지값. 상세: `docs/rules/codex-integration.md` §8.5.
 
 3. **판정** — `$RES` 의 구조화 출력에서 `verdict == "fail"` **또는** `high_findings` 비어있지 않으면 **FAIL**. (awk PASS/FAIL 휴리스틱·`[high]` 텍스트 파싱 불필요 — 스키마가 강제.)
 
-4. **Fallback (구버전 codex)** — `codex exec review` 미지원이면 §4 자유형 호출(`-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast -o "$OUT"`)로 변경 diff + 아래 프롬프트, 마지막 줄 `PASS`/`FAIL` + `[high]` 파싱으로 graceful degrade:
+4. **Fallback (구버전 codex)** — `codex exec review` 미지원이면 §4 자유형 호출(`timeout 180 ... -m gpt-5.5 -c model_reasoning_effort=high -c service_tier=fast -o "$OUT"`)로 변경 diff + 아래 프롬프트, 마지막 줄 `PASS`/`FAIL` + `[high]` 파싱으로 graceful degrade (180초 초과 시 §7 부분 수집/degrade):
 
 ```text
 다음 코드 변경을 리뷰하세요. 순수 텍스트, 한국어. 각 지적은 [심각도 high/med/low] + 파일:라인 + 무엇이 + 왜. 마지막 줄에 PASS 또는 FAIL 한 단어만.
@@ -566,7 +567,7 @@ RES=$(mktemp /tmp/codex_review_XXXXXX.json)
 ## 변경 내용
 {git diff}
 ```
-5. **미응답/실패** — gate 시점에 미완이면 기다리지 않고 "Codex 리뷰 실패: {요약}" 기록, Supervisor 단독 게이트로 진행 (블로킹 금지 — Codex 부재와 동일 취급).
+5. **미응답/실패/180s 초과(exit 124)** — `timeout 180`(§4) 초과 또는 gate 시점에 미완이면 기다리지 않고 "Codex 리뷰 실패/미완: {요약}" 기록, Supervisor 단독 게이트로 진행 (블로킹 금지 — Codex 부재와 동일 취급). 상세: codex-integration.md §7.
 
 ---
 
@@ -602,7 +603,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.18.1 — 반복 {N}/5
+Lens Multi v3.19.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -747,7 +748,7 @@ Lens Multi v3.18.1 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.18.1 — 최종 결과                       ║
+║   Lens Multi v3.19.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -902,7 +903,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.18.1 — 최종 결과
+Lens Multi v3.19.0 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 

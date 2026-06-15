@@ -4,8 +4,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.18.1**
-- Updated: 2026-06-14
+- Current: **v3.19.0**
+- Updated: 2026-06-15
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.18.0 feat: **`/cpp` 대형 기획안 재포지셔닝** — Codex 협의·HTML 슬라이드 등 모든 글자수/분량 캡 해제, 큰 작업이면 항목 전량 수록. `/cp`=간결(캡 유지). 분량캡의 원래 목적(코딩 주저리 차단)을 **"항목당 사용자 언어 한 줄+전량+체크리스트"**로 대체. 신규 **task-deep HTML 양식**(슬라이드 무제한, Plan N장), `/cp html` 이 `planner: cpp` 감지해 task-deep 위임(6장 회귀 차단). 상세: `CHANGELOG.md`.
 - v3.17.0 feat: 계획 스킬(`/cp`·`/cpp`)을 **What / Why / How / Review** 4대 골격으로 통일 + **❓ Why(왜) 신규 필수 섹션**(문제·동기·안 하면 생기는 비용 — 비면 게이트 reject, Fast 도 한 줄 필수). `/cp` 문서 템플릿 What→Why→How→Review 재배치(Plan A/B 는 How 하위로, 내용 보존)·Goal 게이트 4→5조건, `/cpp` spine 5→6섹션·S0/S7 Why, `/cc` 핸드오프에 `[WHY]` 블록. 더불어 **`/cc`↔`/ccp` 경계 재조준** — `/cc`=개발(빌드), `/ccp`=개발됐거나 가동 중인 것 전체 리뷰→QA→수정(핵심 페어 `/cc`→`/ccp`, 메커니즘 불변). 상세: `CHANGELOG.md`.

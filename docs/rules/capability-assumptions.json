@@ -194,7 +194,7 @@
       "affects_lens": [
         "docs/rules/codex-integration.md"
       ],
-      "purpose": "codex-integration.md 하드코딩(gpt-5.5, service_tier=priority, xhigh)이 codex 바이너리 변경에 깨지지 않는지 — /cp·/cc 모든 codex 호출의 SoT",
+      "purpose": "codex-integration.md 호출 파라미터(gpt-5.5, service_tier=fast, depth=xhigh/high 입력규모 분기, timeout 180s)가 codex 바이너리 변경에 깨지지 않는지 — /cp·/cc·/cpp 모든 codex 호출의 SoT",
       "assumed_native_gap": "n/a (Lens 자체 하드코딩 가정의 유효성)",
       "gap_closed_signal": "gpt-5.5가 서버에서 폐기되면 -m gpt-5.5가 런타임 400. service_tier=priority가 정식 fast 별칭에서 제거되면 파싱 실패. codex --version/config-reference 변경으로 감지",
       "signal_method": "both",
@@ -202,8 +202,8 @@
       "official_sources": [
         "https://github.com/openai/codex/releases"
       ],
-      "false_obsolete_risk": "현재 전부 실측 통과(EXIT 0) — 조기 제거 금지. 단 모델명/service_tier 서버측 검증이라 미래 깨짐 대비 fallback만 보강",
-      "last_reviewed": "2026-06-06"
+      "false_obsolete_risk": "현재 전부 실측 통과(EXIT 0) — 조기 제거 금지. 단 모델명/service_tier 서버측 검증이라 미래 깨짐 대비 fallback만 보강. timeout 180s 는 coreutils(클라이언트측)이라 서버 드리프트 무관",
+      "last_reviewed": "2026-06-15"
     }
   ]
 }

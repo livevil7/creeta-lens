@@ -73,13 +73,15 @@ codex login status
 
 ```bash
 OUT=$(mktemp /tmp/codex_XXXXXX.txt)   # 고유 파일명 — 병렬 호출 충돌 방지
-codex exec --skip-git-repo-check \
+DEPTH=xhigh                            # 소규모; 대규모 리뷰·협의는 high (§"깊이 분기")
+timeout 180 codex exec --skip-git-repo-check \
   -m gpt-5.5 \
-  -c model_reasoning_effort=xhigh \
+  -c model_reasoning_effort="$DEPTH" \
   -c service_tier=fast \
   -o "$OUT" \
   "프롬프트 내용"
-# 응답 본문은 "$OUT" 에 깔끔히 떨어진다 (§5 참조)
+RC=$?                                  # 124 = 180초 초과 (§7)
+# 응답 본문은 "$OUT" 에 떨어진다 (§5). RC==124 면 부분 본문 수거 or degrade.
 ```
 
 ### 플래그 설명
@@ -87,13 +89,25 @@ codex exec --skip-git-repo-check \
 - `exec` — 비대화형 1회 응답 모드. TUI를 띄우지 않고 결과 출력
 - `--skip-git-repo-check` — 현재 디렉토리가 git repo가 아니어도 실행 허용. Pre-mortem은 repo와 무관하므로 필수
 - `-m gpt-5.5` — 모델 명시 고정. config 기본값에 의존하지 않고 항상 동일 모델 사용 (이 codex 확장 빌드가 노출하는 모델)
-- `-c model_reasoning_effort=xhigh` — **깊이 다이얼**: 최고 추론 강도. 토큰 비용은 고려하지 않는다 (방침)
-- `-c service_tier=fast` — **속도 다이얼**: API 부하 시 큐 우선권. *별개 다이얼*이라 xhigh와 동시 적용 가능. (현행 codex 0.137+ 정식 키는 `fast`; 과거 `priority` 는 동일 동작의 **레거시 별칭**으로 아직 매핑되나 미래 제거 대비 `fast` 로 통일. 라이브 실측 EXIT 0)
+- `timeout 180` — **상한 가드(v3.19+)**: codex 가 180초 안에 못 끝내면 강제 종료(exit 124). 무한 동기 대기를 차단한다. 초과 시 §7 — `-o` 부분 본문이 있으면 "미완" 표기로 수거, 없으면 degrade. (coreutils `timeout` — git-bash/mac/linux 공통)
+- `-c model_reasoning_effort="$DEPTH"` — **깊이 다이얼**: 입력 규모로 분기(§"깊이 분기"). 소규모(pre-mortem 200단어·빠른 조사)=`xhigh`, 대규모(전체 diff 리뷰·딥스펙 전량 협의)=`high`. 토큰 비용 비고려 방침은 유지하되, 대규모 xhigh 의 시간 비선형 폭증만 회피.
+- `-c service_tier=fast` — **속도 다이얼**: API 부하 시 큐 우선권. *별개 다이얼*이라 깊이와 동시 적용 가능. (현행 codex 0.137+ 정식 키는 `fast`; 과거 `priority` 는 동일 동작의 **레거시 별칭**으로 아직 매핑되나 미래 제거 대비 `fast` 로 통일. 라이브 실측 EXIT 0)
 - `-o "$OUT"` — 최종 답변 본문만 파일로 출력. 메타(`session id`/`tokens used`) 섞인 stdout을 awk로 파싱할 필요가 없다
 
-### 왜 xhigh + fast 인가
+### 깊이 분기 — 소규모 xhigh / 대규모 high (v3.19+)
 
-깊이와 속도는 **독립 다이얼**이다. `reasoning_effort` 는 추론 토큰량(품질·깊이), `service_tier` 는 큐 우선권(지연)을 조절한다 — 한쪽이 다른 쪽을 깎지 않는다. 실측(gpt-5.5): `low` 는 `xhigh` 보다 **토큰을 ~6배 더 쓰면서 속도 이득이 없었다** (소규모 작업). 따라서 codex 에선 xhigh 가 소규모에서 오히려 싸고 빠르다 → 항상 xhigh. `fast`(구 `priority`) 는 raw 속도가 아니라 **부하 시 큐 우선권**이라 소규모엔 무효과(compute-bound)일 수 있으나, 큰 작업/혼잡 시 보험이며 해는 없다.
+깊이와 속도는 **독립 다이얼**이다. `reasoning_effort` 는 추론 토큰량(품질·깊이), `service_tier` 는 큐 우선권(지연)을 조절한다 — 한쪽이 다른 쪽을 깎지 않는다.
+
+**xhigh 는 입력이 작을 때만 빠르다.** 실측(gpt-5.5): 소규모에서 `low` 는 `xhigh` 보다 토큰 ~6배 + 속도 이득 0 → 소규모는 xhigh 가 오히려 싸고 빠르다. **그러나 입력이 크면(전체 diff 리뷰·딥스펙 전량 협의) xhigh 의 추론 시간은 비선형으로 폭증**한다. `service_tier=fast` 는 raw 속도가 아니라 **혼잡 시 큐 우선권**이라 compute-bound 인 이 폭증을 깎지 못한다. 따라서 깊이를 입력 규모로 분기한다:
+
+| 호출 지점 | 입력 규모 | DEPTH |
+|---|---|---|
+| Pre-mortem (200단어 제한) | 작음 | `xhigh` |
+| `/cp` P0.5 독립 조사 | 중 (background·비대기) | `xhigh` |
+| `/cc` P4.5 코드리뷰 (전체 diff) | **큼** | `high` |
+| `/cpp` S4 교차 협의 (딥스펙 전량) | **큼** | `high` |
+
+소규모 xhigh 는 메모리 룰(소규모 xhigh always) 그대로 보존한다. **대규모만 high 로 내려 시간을 잡고, 모든 지점에 `timeout 180`(§7) 을 공통 적용**한다. `fast`(구 `priority`) 는 큰 작업/혼잡 시 보험이며 해는 없다 → 유지.
 
 ### 모델·티어 드리프트 대비 (버전 무관 fallback)
 
@@ -150,22 +164,32 @@ JSON 형식 사용하지 말고 한국어로 답변.
 - **3가지 시나리오 강제**: 단일 실패 모드가 아닌 다중 관점 유도
 - **한국어 명시**: gpt-5.5는 영문 응답 기본값이므로 명시적 지시 필요
 
-## 7. 에러 처리 — 기다리지 않는다 (숫자 timeout 없음)
+## 7. 에러 처리 — 180초 상한 + 부분 수집/degrade (v3.19+)
 
-호출은 background 병렬(§8.5)이라 Claude 는 codex 를 기다리며 멈추지 않는다. **gate(Phase 2.4 / 5)에 도달했을 때 결과가 ready 면 수거, 아니면 degrade** — Claude 단독으로 진행한다. codex 가 느리든 영원히 hang 하든 Claude 작업은 막히지 않으며, orphan 프로세스는 세션 종료(Stop 훅)가 정리한다. 따라서 **별도의 숫자 timeout(과거 30초)을 두지 않는다.**
+모든 codex 호출은 `timeout 180`(§4) 으로 감싼다. 두 층위의 보호가 있다:
+
+1. **background 비대기 지점**(`/cp` P0.5 조사 등): Claude 는 애초에 기다리지 않고 자기 작업을 진행하다 gate 에서 ready 면 수거·미완이면 degrade. (기존 동작 — `timeout` 은 orphan 강제 정리 보너스.)
+2. **동기·하드게이트 지점**(`/cpp` S4, `/cc` P4.5 더블게이트): codex 결과를 받아야 진행하므로 **실제로 대기**한다. 여기서 `timeout 180` 이 **무한 대기를 끊는 핵심**이다. 180초 초과(exit 124) 시:
+   - **`-o $OUT` 자유형**: `$OUT` 에 부분 본문이 있으면 **"⚠️ Codex 부분 결과(180s 초과·미완)"** 로 표기해 수거·반영한다. 비어있으면 degrade. (codex 가 최종본만 쓰면 부분 수거 불가 — best-effort.)
+   - **`--json` 구조화 review**: 부분 JSON 은 파싱 불가 → degrade("Codex 리뷰 미완 — 단독 게이트").
+
+codex 가 느리든 hang 하든 180초면 무조건 끊긴다. orphan 프로세스는 `timeout` kill + 세션 종료(Stop 훅)가 정리한다.
 
 | 상황 | 대응 |
 |------|------|
-| **gate 시점에 미완** | 기다리지 않고 degrade — "Codex 미완 — 단독 진행" 플래그 기록 |
+| **180초 초과 (exit 124)** | $OUT 부분 본문 있으면 "미완" 표기 수거, 없으면 degrade. **무한 대기 금지.** |
+| **gate 시점에 미완 (background)** | 기다리지 않고 degrade — "Codex 미완 — 단독 진행" 플래그 기록 |
 | **인증 만료 / 호출 실패** | "Codex 실패: {요약}" 기록 후 Claude/Opus 단독 진행 |
 | **stderr 에러** | 결과 섹션에 "Codex 에러" 블록으로 포함 (블로킹 금지) |
+
+> **하드게이트 예외 주의**: `/cpp` S4 는 Codex *부재/미인증* 시 degrade 금지(정지·보고)지만, *180초 초과* 는 다르다 — codex 는 응답 중이었으므로 부분 결과를 "미완 협의"로 반영하고 진행하되, 커버리지 공백이 남으면 S5 회귀로 보강(§8.5). 무한 대기로 사용자를 잡지 않는다.
 
 ## 8. 비용 및 성능 가이드
 
 | 항목 | 값 |
 |------|-----|
 | Pre-mortem 1회당 토큰 사용량 | 가변 — **비용 비고려**(깊이·속도 우선 방침). xhigh 는 소규모에서 오히려 토큰이 적음 |
-| 응답 시간 | 소규모 ~5–10초 (xhigh). 부하 시 priority 가 큐 우선권 |
+| 응답 시간 | 소규모 pre-mortem ~5–10초(xhigh). 대규모 리뷰·협의=high + `timeout 180` 상한(§7). 부하 시 fast 가 큐 우선권 |
 | 과금 | ChatGPT Plus/Pro/Max 구독 시 별도 과금 없음 |
 
 ### 주의사항
@@ -194,10 +218,12 @@ Pre-mortem 은 repo 무관(`--skip-git-repo-check`)이지만, **조사·코드�
   ```bash
   SCHEMA=$(mktemp /tmp/codex_schema_XXXXXX.json)   # {verdict: pass|fail, high_findings:[...]}
   RES=$(mktemp /tmp/codex_review_XXXXXX.json)
-  codex exec review --uncommitted \
-    -m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast \
+  timeout 180 codex exec review --uncommitted \
+    -m gpt-5.5 -c model_reasoning_effort=high -c service_tier=fast \
     --output-schema "$SCHEMA" --ephemeral --json > "$RES" 2>/dev/null
   # 판정: $RES 의 verdict==fail 또는 high_findings 비어있지 않음 → FAIL
+  # 깊이=high (전체 diff 는 대규모 입력 → xhigh 폭증 회피, §"깊이 분기").
+  # exit 124(180s 초과) → 구조화 JSON 불완전이면 degrade (§7).
   ```
 
   - `--uncommitted` (또는 `--base <branch>`) — Codex 가 작업트리 변경을 직접 읽음. **수동 diff 주입 제거**.

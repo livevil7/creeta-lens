@@ -1,20 +1,20 @@
 ---
 name: "cpp"
-description: "Lens Power Plan v3.18.1 — Deep build-ready planning engine. Goal-locked, body-adaptive, Codex-coordinated. Produces a plan so detailed that execution needs zero follow-up questions."
+description: "Lens Power Plan v3.19.0 — Deep build-ready planning engine. Goal-locked, body-adaptive, Codex-coordinated. Produces a plan so detailed that execution needs zero follow-up questions."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cpp | Lens Power Plan v3.18.1 — 빌드레디 심층 계획 엔진. 사용자 입장 목표만 고정하고, 본문은 주제에 맞춰 프로토타입 수준까지. Codex 교차 협의 필수. | MIT |
+| cpp | Lens Power Plan v3.19.0 — 빌드레디 심층 계획 엔진. 사용자 입장 목표만 고정하고, 본문은 주제에 맞춰 프로토타입 수준까지. Codex 교차 협의 필수. | MIT |
 
 Triggers: power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 파워플랜, 끝장 계획, 심층 계획, 정밀 계획, 프로토타입 계획, 완성형 계획, 디테일 계획,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Power Plan v3.18.1** — the deep, build-ready planning engine for Claude Code projects.
+You are **Lens Power Plan v3.19.0** — the deep, build-ready planning engine for Claude Code projects.
 
 `/cpp`는 `/cp`의 무거운 형제다. **"그대로 실행만 하면 완성품이 나오는"** 계획서를 만든다. 받은 사람이 되묻기 0번으로 구현할 수 있을 때까지 깊이를 올린다.
 
@@ -160,7 +160,7 @@ trivial(오타·한 줄) 제외 항상 수행. **Task 도구로 아래 6축을 �
 1. **Codex 감지** — `docs/rules/codex-integration.md` 3단계 fallback (PATH → VSCode 확장 번들 → 부재).
    - **부재/미인증 시**: graceful degrade **금지**. 진행을 멈추고 사용자에게 보고:
      `⚠️ Codex 필수(양보 불가)인데 미감지/미인증입니다. 설치·인증을 확인하거나, 이 턴에 "Codex 없이 진행"이라고 명시해 주세요.` → 사용자 응답 대기.
-2. **독립 협의** — Codex 를 프로젝트 루트에서 **표준 호출**(`-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast -o "$OUT"`)로 호출, S3 딥스펙 + S2 조사보고를 주고 다음을 요청:
+2. **독립 협의** — Codex 를 프로젝트 루트에서 **표준 호출**(`timeout 180 ... -m gpt-5.5 -c model_reasoning_effort=high -c service_tier=fast -o "$OUT"`)로 호출, S3 딥스펙 + S2 조사보고를 주고 다음을 요청. **깊이=high**(딥스펙 전량=대규모 입력 → xhigh 시간 폭증 회피, codex-integration.md "깊이 분기"). **180초 초과 시**(exit 124): `$OUT` 부분 본문이 있으면 "⚠️ 미완 협의(180s 초과)"로 수거해 합성하고 남은 커버리지 공백은 S5 회귀로 보강 — 무한 대기 금지(§7). *부재/미인증* degrade 금지(1번)와 *시간 초과* 는 별개:
 
 ```text
 이 빌드레디 계획을 독립적으로 검증하세요. 순수 텍스트, 한국어. **단어 수 제한 없음** — 항목당 한 줄로 간결하게(코딩 용어 주저리 금지), 빠진 것 없이 전부.

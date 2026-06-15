@@ -1,20 +1,20 @@
 ---
 name: "cp"
-description: "Lens Plan v3.18.1 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
+description: "Lens Plan v3.19.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.18.1 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
+| cp | Lens Plan v3.19.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.18.1**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.19.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -403,7 +403,7 @@ Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적
 `docs/rules/codex-integration.md` 의 감지 로직으로 Codex CLI 존재 확인:
 
 1. `command -v codex` 또는 VSCode 확장 경로 확인
-2. 존재하면: Bash tool 로 **§4 표준 호출**(`-m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=priority -o "$OUT"`) 그대로 호출
+2. 존재하면: Bash tool 로 **§4 표준 호출**(`timeout 180 ... -m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast -o "$OUT"`) 그대로 호출 (pre-mortem=소규모라 깊이는 `xhigh` 유지 + 180초 상한·§7. `fast`=구 `priority` 통일)
 3. 부재하면: skip 하고 "Codex 미설치 — Opus 단독 pre-mortem" 플래그 기록
 
 Codex 프롬프트:

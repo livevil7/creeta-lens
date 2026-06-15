@@ -1,3 +1,22 @@
+## [3.19.0] - 2026-06-15
+
+Codex 리뷰·협의가 `xhigh` 로 무한정 걸리던 문제 해결 — 모든 codex 호출에 **`timeout 180s` 상한**을 걸고, 깊이를 **입력 규모로 분기**(대규모 리뷰·협의는 `xhigh`→`high`)했다. 소규모 pre-mortem 의 `xhigh` 는 유지(메모리 룰 보존). speed 다이얼(`service_tier=fast`)은 compute-bound 인 `xhigh` 폭증을 못 깎으므로 **깊이·상한**으로 해결.
+
+### Added (v3.19.0)
+
+- **codex 호출 180초 상한 (`timeout 180`)** — 모든 codex 호출(`/cp` P0.5·P3, `/cc` P4.5, `/cpp` S4)을 coreutils `timeout` 으로 감싼다. 초과(exit 124) 시: `-o $OUT` 자유형은 부분 본문 있으면 "⚠️ 미완"으로 수거·없으면 degrade, `--json` 구조화 리뷰는 degrade. **하드게이트(`/cpp` S4·`/cc` 더블게이트)의 무한 동기 대기 차단.** `docs/rules/codex-integration.md` §4·§7, `skills/{cp,cc,cpp}/SKILL.md`
+- **깊이 입력규모 분기 (`model_reasoning_effort`)** — 소규모(pre-mortem 200단어·`/cp` P0.5 조사)=`xhigh` 유지 / 대규모(`/cc` P4.5 전체 diff 리뷰·`/cpp` S4 딥스펙 전량 협의)=`high`. `xhigh` 는 입력이 크면 추론 시간이 비선형 폭증하는데 `service_tier=fast` 는 큐 우선권일 뿐 이를 못 깎기 때문. `docs/rules/codex-integration.md` §"깊이 분기"
+
+### Changed (v3.19.0)
+
+- **§7 에러처리 "숫자 timeout 없음" → "180초 상한 + 부분 수집/degrade"** — 기존 "background 라 안 기다린다" 전제가 하드게이트(`/cpp` S4·`/cc` 더블게이트) 지점에서 깨지던 것을, 180초 상한 + 부분 수집으로 명시 차단. `docs/rules/codex-integration.md`
+- **`§4 왜 xhigh+fast` → `§깊이 분기` 재작성** — "항상 xhigh"를 "소규모 xhigh / 대규모 high + timeout 공통"으로. 호출 지점별 DEPTH 표 추가. `docs/rules/codex-integration.md`
+- **capability-assumptions `codex-model-tier-drift` purpose 갱신** — 감시 대상 파라미터를 `service_tier=fast` + depth 분기 + timeout 으로 정확화. `docs/rules/capability-assumptions.json`
+
+### Fixed (v3.19.0)
+
+- **`/cp` Phase 3.2 Codex pre-mortem `service_tier=priority` 잔여 드리프트** — v3.18.1 에서 `/cpp` S4 만 `fast` 로 통일하고 놓쳤던 `/cp` pre-mortem 호출을 `fast` 로 통일. `skills/cp/SKILL.md`
+
 ## [3.18.1] - 2026-06-14
 
 v3.18.0 후속 — Codex 교차검증이 짚은 기존 드리프트 6건 정합성 수정(분량-캡 변경과 무관한 청소).
