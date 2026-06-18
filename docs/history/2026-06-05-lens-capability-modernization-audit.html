@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lens 자가 현대화 감사 (/cr) · 보고서</title>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<meta name="lens:source" content="docs/history/2026-06-05-lens-capability-modernization-audit.md">
+<meta name="lens:source-hash" content="0438be563bc2">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">08</b></div>
+
+<main class="deck">
+
+<!-- ── 1. Cover ───────────────────────────────────── -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 08 · COVER</div>
+  <div class="meta">
+    <span>2026-06-06</span>
+    <span class="dot">·</span>
+    <span class="badge">Done</span>
+    <span class="dot">·</span>
+    <span>Lens · creeta-lens</span>
+  </div>
+
+  <h1 class="h-title">Lens 자가 현대화 감사 (<code>/cr</code>) — 기능별 의미·목적 주기 재분석</h1>
+  <p class="lede">
+    Lens가 자기 자신의 모든 기능을 Claude/Codex의 최근 네이티브 발전과 사용자
+    세션 패턴에 비춰 주기적으로 재평가하는 온디맨드 감사 스킬. 한 번의 명령으로
+    <strong>4차원 양면 감사</strong>를 돌려 KEEP/UPGRADE/OBSOLETE/NEW 분류 리포트를 산출한다.
+  </p>
+
+  <div class="hero">
+    <div class="num">4<span class="unit">차원</span></div>
+    <div class="caption">
+      <strong>공급-드리프트 · 공급-업그레이드 · 편의 · 수요-마이닝</strong>의 양면 감사를
+      <code>/cr</code> 한 명령으로. OBSOLETE 자동삭제 <strong>0건</strong>, 네트워크 호출 <strong>0회</strong>(알림). v3.13.0 배포.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-06-05-lens-capability-modernization-audit</span>
+  </div>
+</section>
+
+<!-- ── 2. At a glance ─────────────────────────────── -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 08 · AT A GLANCE</div>
+  <h2 class="title">숫자로 본 결과</h2>
+  <p class="sub">새 스킬 1개 + 신규 lib·레지스트리 + 훅 배선. Pass 1 감사로 실증까지 마침.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">audit dimensions</div>
+      <div class="v">4</div>
+      <div class="desc">공급-드리프트 · 공급-업그레이드 · 편의 · <strong>수요-마이닝</strong>의 양면 감사.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">release</div>
+      <div class="v accent">v3.13.0</div>
+      <div class="desc"><code>scripts/bump-version.sh</code>로 <strong>11곳 일괄 범프</strong> + CHANGELOG Added + GitHub Release.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">auto-deletions</div>
+      <div class="v good">0</div>
+      <div class="desc">OBSOLETE 판정이 있어도 코드/스킬 <strong>자동삭제 금지</strong> — 사람 결정 제안으로만.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">nudge network calls</div>
+      <div class="v good">0</div>
+      <div class="desc">SessionStart 알림은 로컬 상태 파일만 read, <strong>fail-soft</strong>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">verify signals</div>
+      <div class="v">8</div>
+      <div class="desc">분류 완전성 · 근거 부착 · 핸드오프 · 스코프 · degrade 등 ✅ 표.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">registry seed rows</div>
+      <div class="v">11</div>
+      <div class="desc">Pass 1 감사의 <code>registry_seed</code>를 레지스트리 시드로 사용.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 3. Problem ────────────────────────────────── -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 08 · PROBLEM</div>
+  <h2 class="title">기능이 "여전히 유효한가"를 아무도 묻지 않았다</h2>
+  <p class="sub">
+    Claude/Codex의 네이티브 능력은 계속 발전한다. Lens 기능이 메우던 공백이
+    조용히 닫혀도 알 길이 없었다 — 더 얇아질 수 있는 기능, 무의미해진 기능, 새로 필요한 기능.
+  </p>
+
+  <div class="compare">
+    <div class="panel warn">
+      <div class="ph">
+        <span class="tag">Before</span>
+        <h3>드리프트 무감지</h3>
+      </div>
+      <p class="note">네이티브가 따라잡아도 Lens 기능은 그대로 남는다. "지금도 유효한가 / 더 얇게 만들 수 있나 / 무의미해졌나"를 1회성 수작업으로만 알 수 있었다.</p>
+      <p class="note" style="margin-top:0; border-top:none; padding-top:0;">반복 비용이 커서 재도출이 매번 처음부터. 일관성도 없음.</p>
+    </div>
+
+    <div class="panel good">
+      <div class="ph">
+        <span class="tag">After</span>
+        <h3><code>/cr</code> 한 명령 → 분류 리포트</h3>
+      </div>
+      <p class="note">레지스트리(공백 가정) ↔ 라이브 신호(네이티브 현재 능력)의 <strong>diff</strong>로 매 감사가 재도출이 아니라 대조가 된다 — 싸고 일관됨.</p>
+      <p class="note" style="margin-top:0; border-top:none; padding-top:0;">KEEP/UPGRADE/OBSOLETE/NEW + confidence + evidence + 고신뢰 건 <code>/cp</code> 자동 핸드오프.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 4. How it works ─────────────────────────────── -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 08 · PIPELINE</div>
+  <h2 class="title"><code>/cr</code> 가 도는 길</h2>
+  <p class="sub">레지스트리 로드 → 라이브 대조 → 분류 → 산출 → 핸드오프 → stamp. 알림은 별도 훅.</p>
+
+  <div class="pipe" style="margin-top:24px">
+    <div class="step">
+      <div class="n">A</div>
+      <h3>Load</h3>
+      <p class="what">레지스트리 + Lens 버전 로드. <strong>SoT = 실제 SKILL.md·hooks·lib</strong>(START_HERE 신뢰 금지).</p>
+      <div class="files"><span class="nm">capability-assumptions.json</span></div>
+    </div>
+    <div class="step">
+      <div class="n">B</div>
+      <h3>Probe + Fetch</h3>
+      <p class="what">로컬 <strong>probe</strong>(네이티브 명령·노출 모델) + 공식 allowlist 라이브 <strong>fetch</strong>를 표적 쿼리로 묶어 quota 절약.</p>
+      <div class="files"><span class="nm">web · probe · both</span></div>
+    </div>
+    <div class="step">
+      <div class="n">C·D·E</div>
+      <h3>Classify → Render</h3>
+      <p class="what"><strong>KEEP/UPGRADE/OBSOLETE/NEW</strong> + confidence + evidence URL. md 리포트 → HTML 덱 + board 재빌드.</p>
+      <div class="files"><span class="nm">docs/history/&lt;date&gt;-...md/html</span></div>
+    </div>
+    <div class="step">
+      <div class="n">F·G</div>
+      <h3>Handoff → Stamp</h3>
+      <p class="what">고신뢰 건은 <code>docs/tasks/</code>에 <code>/cp</code> task로(삭제 아님). <code>capability-audit.js stamp</code>로 상태 갱신.</p>
+      <div class="files"><span class="nm">capability-audit-state.json</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 5. Key decisions ────────────────────────────── -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 08 · KEY DECISIONS</div>
+  <h2 class="title">왜 이렇게 설계했나</h2>
+  <p class="sub">머신 독립 · 단순 안전 · false-obsolete 회피가 모든 분기의 기준이었다.</p>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <div class="n">01</div>
+      <div>
+        <h3>온디맨드 스킬 + 세션 알림 (cron 아님)</h3>
+        <p>Lens는 여러 머신에 배포되는 플러그인. cron 대신 온디맨드 + staleness 알림이 머신 독립적이고 기존 <code>/cu</code> 패턴과 일치한다. <strong>포터빌리티</strong> 우선.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">02</div>
+      <div>
+        <h3>레지스트리 = <code>JSON</code></h3>
+        <p>Claude(markdown) vs Codex(JSON) 분기. 사용자 "machine-readable" 명시 + 훅의 <strong>레지스트리-해시 staleness 트리거</strong>가 안정적 직렬화를 요구 → JSON 채택.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">03</div>
+      <div>
+        <h3>상태 = 프로젝트-로컬</h3>
+        <p>전역이면 모든 프로젝트에서 nag. <code>/cr</code>은 lens 레포에서만 의미 있으므로 <strong>로컬 상태가 알림 스코프를 자연히 한정</strong>. 덤으로 해시 변경 재감사 신호.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">04</div>
+      <div>
+        <h3>fetch 실패 = <code>UNKNOWN</code>-default</h3>
+        <p>추측으로 OBSOLETE를 찍는 게 최악(false-obsolete). 더 단순하고 안전한 UNKNOWN 표기. 버전-앵커 오프라인 판정은 <strong>과설계라 제거</strong>.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">05</div>
+      <div>
+        <h3><code>probe</code> 신호 타입 허용</h3>
+        <p>체인지로그는 능력을 다 안 알려준다 — 실행 중인 환경이 더 권위 있는 신호(Pre-mortem P1·P2). 로컬 확정 가능 신호는 <code>signal_method: probe</code>.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">06</div>
+      <div>
+        <h3>OBSOLETE 자동삭제 0</h3>
+        <p>고신뢰 건도 <strong>삭제가 아니라</strong> <code>/cp</code> task 핸드오프. 죽음 판정은 사람이. 모호하면 KEEP. 코드/스킬 자동삭제 금지.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 6. Validation ─────────────────────────────── -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 08 · VALIDATION</div>
+  <h2 class="title">이게 됐다는 증거</h2>
+  <p class="sub">8개 검증 신호 + Pass 1 멀티에이전트 실증. 자동·수동 판정 혼합.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">감사가 빠짐없이 분류하고, 비-KEEP엔 근거가 붙고, 알림 스코프가 lens 레포로 한정되는지 확인.</div>
+    <ol>
+      <li>
+        <h4>분류 완전성 + 근거 부착</h4>
+        <div class="det">리포트 분류 행 수 = 레지스트리 항목 수(<strong>누락 0</strong>). 모든 비-KEEP 행에 공식 체인지로그 URL+버전(<strong>근거 없는 비-KEEP = 0</strong>).</div>
+      </li>
+      <li>
+        <h4>핸드오프 + 3종 산출</h4>
+        <div class="det">고신뢰 건이 <code>docs/tasks/</code>에 대응 <code>/cp</code> task로 생성. <code>docs/history/&lt;id&gt;.md/.html</code> + board 카드 노출.</div>
+      </li>
+      <li>
+        <h4>알림 스코프 + 타이머 리셋</h4>
+        <div class="det">creeta-lens=알림 출력 / 타 레포=미출력. stamp 후 <code>lastAuditAt</code> 갱신 → 재시작 시 알림 소멸.</div>
+      </li>
+      <li>
+        <h4>안전장치 + degrade</h4>
+        <div class="det">OBSOLETE 판정이 있어도 <code>git status</code> 변경분 = 문서·신규파일만. 네트워크 차단 시 비-KEEP을 <strong>UNKNOWN</strong>으로 표기, OBSOLETE 추측 0.</div>
+      </li>
+      <li>
+        <h4>Pass 1 실증 (2026-06-05)</h4>
+        <div class="det">4차원 감사를 멀티에이전트로 1회 실행 → <code>2026-06-05-lens-modernization-audit.md</code>(<strong>0 OBSOLETE / 2 KEEP / 9 THIN + 14 우선조치 + 신기능 0</strong>). 원자료 <code>.lens/conv-mining/*.json</code>.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ── 7. Files ────────────────────────────────────── -->
+<section class="slide" id="files">
+  <div class="page-no">07 / 08 · ARTIFACTS</div>
+  <h2 class="title">변경 파일</h2>
+  <p class="sub">신규 스킬·lib·레지스트리 3종 + 훅·config 배선 + 문서·릴리스.</p>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <div class="gh"><h3>New core</h3><span class="cnt">3</span></div>
+      <ul>
+        <li><span>skills/cr/SKILL.md</span></li>
+        <li><span>docs/rules/capability-assumptions.json</span></li>
+        <li><span>lib/capability-audit.js</span></li>
+      </ul>
+      <p class="note"><code>/cr</code> 스킬 + machine-readable 레지스트리 + 상태/알림 헬퍼.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Wiring</h3><span class="cnt">2</span></div>
+      <ul>
+        <li><span>hooks/session-start.js</span></li>
+        <li><span>lens.config.json</span></li>
+      </ul>
+      <p class="note">lens 레포 한정 muted 알림(네트워크 0, fail-soft) + <code>capabilityAuditIntervalDays</code>(30)·<code>capabilityAuditNudge</code>(true).</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Docs + Release</h3><span class="cnt">3</span></div>
+      <ul>
+        <li><span>CLAUDE.md</span><span class="meta">skill table</span></li>
+        <li><span>README.md</span><span class="meta">+/cr</span></li>
+        <li><span>CHANGELOG · tag</span><span class="meta">v3.13.0</span></li>
+      </ul>
+      <p class="note"><code>scripts/bump-version.sh 3.13.0</code>로 <strong>11곳 일괄 범프</strong> + GitHub Release.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 8. Next ───────────────────────────────────── -->
+<section class="slide" id="next">
+  <div class="page-no">08 / 08 · WHAT'S NEXT</div>
+  <h2 class="title">남은 일 · 주의</h2>
+  <p class="sub">수요 가치는 v3.14.0으로. 코어 리팩토링은 별도 계획으로 분리 — 미완이 아님.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next">
+      <div class="l">Follow-up · A</div>
+      <h3>수요 가치 → v3.14.0</h3>
+      <p>Pass 1 신기능 0건(<code>/ch</code>·<code>/cx</code> 드롭). 수요 가치는 <strong>"반복 명령을 스킬 기본값으로"</strong>로 재정의돼 v3.14.0에 반영.</p>
+    </div>
+    <div class="next">
+      <div class="l">Follow-up · B</div>
+      <h3>코어 리팩토링 (별도 /cp)</h3>
+      <p>#6 <code>/goal</code> 위임 · #7 Monitor 제거 · #12 <code>/cps</code> · #13 <code>/cp</code> 토큰 · #14 lens-upgrade. <strong>의도적으로 분리된 후속</strong> — 본 task 범위 밖.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">Note · C</div>
+      <h3>드리프트(언급만)</h3>
+      <p><code>START_HERE.md</code> 6스킬(/cu 누락) · SessionStart "Quick Commands" 하드코딩(/cps·/cs·/cu 누락)은 <strong>범위 밖으로 명시</strong>.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">Note · D</div>
+      <h3>수명 — 카드 누적</h3>
+      <p><code>/cr</code> 매 실행 = <code>docs/history/</code>에 새 감사 파일 1개. 의도된 <strong>audit trail</strong>이나 board 카드가 누적 증가한다.</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">라이브 데이터가 없을 때 추측으로 OBSOLETE를 찍는 것이 최악 — 정직한 UNKNOWN이 옳다.</div>
+    <div class="right">creeta-lens · Lens<br>2026-06-06</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

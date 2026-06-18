@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>/cu scope · winget UTF-8 · /cc UI/UX 의무 할당 · 보고서</title>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<meta name="lens:source" content="docs/history/2026-06-18-cu-scope-winget-cc-uiux-pro.md">
+<meta name="lens:source-hash" content="b2b81dceb16a">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">07</b></div>
+
+<main class="deck">
+
+<!-- ── 1. Cover ───────────────────────────────────── -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 07 · COVER</div>
+  <div class="meta">
+    <span>2026-06-18</span>
+    <span class="dot">·</span>
+    <span class="badge">Done</span>
+    <span class="dot">·</span>
+    <span>Lens · CreetaCorp</span>
+  </div>
+
+  <h1 class="h-title">/cu plugin scope · winget UTF-8 · /cc UI/UX 스킬 의무 할당</h1>
+  <p class="lede">
+    <code>/cu</code>의 local/project scope 플러그인 갱신 실패와 winget UTF-8 디코드 크래시를
+    한 번에 고치고, <code>/cc</code> 화면·UI 서브태스크에 ui-ux-pro-max 스킬을 의무 할당한
+    Lens 자체 개선 작업.
+  </p>
+
+  <div class="hero">
+    <div class="num">v3.20.0<span class="unit">release</span></div>
+    <div class="caption">
+      소스 2개 + <strong>bump 13파일</strong> 수정 후 commit <code>4f1f606</code> · tag push ·
+      GitHub Release <strong>Latest</strong> 지정. 활성 캐시 핫미러로 이 PC에 즉시 적용.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-06-18-cu-scope-winget-cc-uiux-pro</span>
+  </div>
+</section>
+
+<!-- ── 2. At a glance ─────────────────────────────── -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 07 · AT A GLANCE</div>
+  <h2 class="title">숫자로 본 변경</h2>
+  <p class="sub">버그 2건 수정 + 스킬 정책 1건 추가를 한 릴리스로 묶어 전파.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">release</div>
+      <div class="v accent">3.20.0</div>
+      <div class="desc">3.19.0 → 3.20.0 bump. commit <code>4f1f606</code> · tag push.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">bugs fixed</div>
+      <div class="v good">2</div>
+      <div class="desc">scope 미스매치 + winget <strong>cp949 디코드 크래시</strong>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">source files</div>
+      <div class="v">2</div>
+      <div class="desc"><code>scripts/cu.py</code> + <code>skills/cc/SKILL.md</code>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">version bump files</div>
+      <div class="v">13</div>
+      <div class="desc">plugin·marketplace·CHANGELOG·README 등 배너 일괄.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">context7 update</div>
+      <div class="v good">exit 0</div>
+      <div class="desc"><code>--scope local</code> 갱신 정상 복구.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">GitHub release</div>
+      <div class="v good">Latest</div>
+      <div class="desc"><code>isLatest=true</code> 검증.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 3. Problem ────────────────────────────────── -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 07 · PROBLEM</div>
+  <h2 class="title">/cu가 플러그인 갱신에 두 번 걸려 넘어졌다</h2>
+  <p class="sub">
+    local scope 플러그인을 user scope로만 갱신하려다 실패하고, winget 출력은
+    cp949 디코드 크래시로 비어버려 gh를 "미감지"로 오탐했다.
+  </p>
+
+  <div class="compare">
+    <div class="panel warn">
+      <div class="ph">
+        <span class="tag">Before</span>
+        <h3>silent failure</h3>
+      </div>
+      <div class="post-list">
+        <div class="post-row"><span>context7 (local)</span><span class="pd">not installed at scope user</span></div>
+        <div class="post-row"><span>playwright (local)</span><span class="pd">not installed at scope user</span></div>
+        <div class="post-row"><span>winget reader thread</span><span class="pd">UnicodeDecodeError 0xe2</span></div>
+        <div class="post-row"><span>gh detection</span><span class="pd">winget 미감지—수동 안내 (오탐)</span></div>
+      </div>
+      <p class="note">scope를 user로 가정 + winget UTF-8 박스문자를 cp949로 읽음 → 갱신 깨짐 · 출력 공백 · 오탐 연쇄.</p>
+    </div>
+
+    <div class="panel good">
+      <div class="ph">
+        <span class="tag">After</span>
+        <h3>실측 scope + UTF-8 디코딩</h3>
+      </div>
+      <div class="post-list">
+        <div class="post-row"><span>context7 (local)</span><span class="pd">update --scope local · exit 0</span></div>
+        <div class="post-row"><span>playwright (local)</span><span class="pd">projectPath를 cwd로 실행</span></div>
+        <div class="post-row"><span>winget reader thread</span><span class="pd">utf-8 / errors=replace · 생존</span></div>
+        <div class="post-row"><span>gh detection</span><span class="pd">can_auto=True (소스 감지)</span></div>
+      </div>
+      <p class="note">installed_plugins.json의 실제 scope를 읽어 전달하고, 출력을 UTF-8로 강제 디코딩.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 4. Key decisions ────────────────────────────── -->
+<section class="slide" id="decisions">
+  <div class="page-no">04 / 07 · KEY DECISIONS</div>
+  <h2 class="title">왜 이렇게 고쳤나</h2>
+  <p class="sub">가정 대신 실측, 소스 수정만으로 그치지 않고 전파까지.</p>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <div class="n">01</div>
+      <div>
+        <h3>scope를 실측해 전달</h3>
+        <p><code>_plugin_scope_info()</code>로 <code>installed_plugins.json</code>의 실제 scope를 읽어 <code>--scope &lt;scope&gt;</code>로 넘기고, <strong>local/project scope는 projectPath를 cwd로</strong> 실행. user scope만 가정하던 게 버그의 뿌리.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">02</div>
+      <div>
+        <h3>run()에 UTF-8 강제</h3>
+        <p><code>encoding="utf-8", errors="replace"</code> 추가. winget의 <strong>UTF-8 박스문자(0xe2…)</strong>에서 리더 스레드가 죽던 연쇄를 끊고, scan stderr 노이즈도 제거.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">03</div>
+      <div>
+        <h3>ui-ux-pro-max 재설치 안 함</h3>
+        <p>이미 <code>~/.claude/skills/ui-ux-pro-max</code>에 설치돼 있음을 확인. <code>/cc</code> Phase 1.3에 <strong>기존 "필수 실행 스킬" 메커니즘</strong>으로 의무 할당만 추가, 미설치 머신은 네이티브 베스트프랙티스로 graceful degrade.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">04</div>
+      <div>
+        <h3>bump + 핫미러 동시 전파</h3>
+        <p>marketplace <code>source.ref</code>가 <strong>고정 태그</strong>라 소스 수정만으론 dormant. 3.19.0 → 3.20.0 bump·commit·tag·push로 정식 전파 + 활성 캐시(<code>cache/CreetaCorp/lens/3.19.0</code>)에 핫미러로 즉시 적용.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 5. Validation ─────────────────────────────── -->
+<section class="slide" id="validate">
+  <div class="page-no">05 / 07 · VALIDATION</div>
+  <h2 class="title">어떻게 믿을 수 있나</h2>
+  <p class="sub">추정 아닌 실측. 세 가지 통과 신호로 확인.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">scan · 갱신 · 릴리스 세 지점을 직접 돌려 결과를 관찰.</div>
+    <ol>
+      <li>
+        <h4>/cu scan — 크래시 소거 + 감지 복구</h4>
+        <div class="det"><code>/cu scan</code>에서 <strong>cp949 traceback이 사라짐</strong>. gh가 winget 소스를 감지해 <code>can_auto=True</code> 반환.</div>
+      </li>
+      <li>
+        <h4>local scope 갱신 — exit 0</h4>
+        <div class="det"><code>context7</code> plugin <code>update --scope local</code>이 <strong>exit 0</strong>. local scope 플러그인 갱신 경로 정상화 확인.</div>
+      </li>
+      <li>
+        <h4>GitHub Release — Latest 확정</h4>
+        <div class="det">v3.20.0 (commit <code>4f1f606</code>) tag push 후 GitHub Release <code>isLatest=true</code>. marketplace 전파 경로 검증.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ── 6. Files ────────────────────────────────────── -->
+<section class="slide" id="files">
+  <div class="page-no">06 / 07 · ARTIFACTS</div>
+  <h2 class="title">변경한 파일</h2>
+  <p class="sub">소스 2개, version bump 13개, 메모리 2건.</p>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <div class="gh"><h3>Source</h3><span class="cnt">2</span></div>
+      <ul>
+        <li><span>scripts/cu.py</span><span class="meta">scope + UTF-8</span></li>
+        <li><span>skills/cc/SKILL.md</span><span class="meta">Phase 1.3</span></li>
+      </ul>
+      <p class="note"><code>_plugin_scope_info()</code> · <code>run()</code> 디코딩 · UI/UX 의무 할당.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Version bump</h3><span class="cnt">13</span></div>
+      <ul>
+        <li><span>plugin.json · marketplace.json</span></li>
+        <li><span>CHANGELOG.md · CLAUDE.md · README.md</span></li>
+        <li><span>hooks ×2</span></li>
+        <li><span>skills SKILL.md ×6 배너</span></li>
+      </ul>
+      <p class="note">3.19.0 → <strong>3.20.0</strong> 일괄 갱신.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Memory</h3><span class="cnt">2</span></div>
+      <ul>
+        <li><span>cu-winget-false-negative-windows.md</span></li>
+        <li><span>MEMORY.md</span><span class="meta">index</span></li>
+      </ul>
+      <p class="note">"<strong>v3.20.0에서 코드 수정됨</strong>—수동 워크어라운드 불필요"로 갱신.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 7. Next ───────────────────────────────────── -->
+<section class="slide" id="next">
+  <div class="page-no">07 / 07 · WHAT'S NEXT</div>
+  <h2 class="title">남은 일</h2>
+  <p class="sub">둘 다 선택 사항. 타 머신 반영과 라벨 정리.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next">
+      <div class="l">Follow-up · A</div>
+      <h3>타 머신 반영</h3>
+      <p>Mac Mini 등 다른 머신은 <code>/lens-upgrade</code>로 <strong>3.20.0</strong>을 반영하면 동일 수정이 적용됨. (선택)</p>
+    </div>
+    <div class="next">
+      <div class="l">Follow-up · B</div>
+      <h3>이 PC 라벨 정리</h3>
+      <p>활성 캐시 핫미러로 이미 동작 중이나, 라벨 정리를 위해 이 PC도 <code>/lens-upgrade</code> + <strong>재시작</strong>. (선택)</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">가정 대신 실측 — scope는 installed_plugins.json에서, 출력은 UTF-8로.</div>
+    <div class="right">creeta-lens · history<br>2026-06-18</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+
+  function tick() {
+    const h = document.documentElement;
+    const pct = h.scrollTop / (h.scrollHeight - h.clientHeight) * 100;
+    rail.style.width = Math.min(100, Math.max(0, pct)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      const r = slides[i].getBoundingClientRect();
+      if (r.top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>
