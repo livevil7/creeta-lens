@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.19.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
+description: "Lens Multi v3.20.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.19.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.20.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.19.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.20.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, a Monitor agent tracks progress in real-time, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -248,6 +248,10 @@ original_request: {원본 요청}
 
 `docs/rules/`와 설치된 skills를 확인하여 각 서브태스크에 맞는 skill이 있는지 검토합니다. 매칭되는 skill이 있으면 Worker 프롬프트에 포함합니다. 없으면 Worker는 general-purpose 로 동작합니다.
 
+**화면·UI 구현 서브태스크는 `ui-ux-pro-max` 스킬 의무 할당 (MUST):** 서브태스크가 사용자 인터페이스를 만들거나 바꾸는 일(웹페이지·랜딩·대시보드·관리자·컴포넌트, `.html`/`.tsx`/`.jsx`/`.vue`/`.svelte` 작성·수정, 또는 레이아웃·색상·타이포그래피·스타일·애니메이션·반응형 작업)이면 그 Worker 의 할당 스킬을 `ui-ux-pro-max` 로 박는다. Worker 는 Phase 3.2 의 "필수 실행 스킬 (SKIP 금지)" 규칙대로 **첫 액션으로 `ui-ux-pro-max` 를 invoke** 한 뒤 구현을 시작하고, 보고 첫 줄에 `Skill invoked: ui-ux-pro-max` 를 포함한다. 순수 백엔드/로직/데이터/문서 서브태스크는 제외.
+
+- **미설치 시 graceful degrade**: `ui-ux-pro-max` 가 이 머신의 Skill 인벤토리에 없으면 하드 실패하지 말고, 해당 Worker 에 "ui-ux-pro-max 부재 — 네이티브 UI/UX 베스트프랙티스(접근성·반응형·일관된 스페이싱/타이포·대비)로 진행" 을 명시하고 general-purpose 로 진행한다. 이 경우 Supervisor 의 스킬 호출 감사(Phase 4)는 해당 서브태스크에 적용하지 않는다. (설치가 필요하면 최종 보고에서 사용자에게 안내 — `/cc` 실행 도중 자동 설치는 하지 않는다.)
+
 #### 1.4 모델 할당
 
 모든 Worker는 `opus`로 할당합니다 (품질 우선 — 토큰 비용 비고려). 난이도 라벨(Easy/Medium/Hard)은 진행 표시·우선순위 참고용으로만 유지하며, 모델은 난이도와 무관하게 항상 opus:
@@ -264,10 +268,10 @@ original_request: {원본 요청}
 > - **파괴적/되돌리기 어려운 작업**(대량 삭제·배포·외부 발행): 자동 진행 금지 → **plan-only 로 계획만 출력하고 종료**, 사람이 상호작용 세션에서 재실행하도록 안내.
 > 이 폴백은 Phase 1.5·경로전환(5.x)·경고모드(6.2) 등 **모든 `AskUserQuestion` 게이트에 공통 적용**. 상호작용 세션(`LENS_NONINTERACTIVE` 미설정)에선 기존대로 승인 필수.
 
-**AskUserQuestion** (header: "Lens Multi v3.19.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.20.0 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.19.0 — 실행 계획
+Lens Multi v3.20.0 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -603,7 +607,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.19.0 — 반복 {N}/5
+Lens Multi v3.20.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -748,7 +752,7 @@ Lens Multi v3.19.0 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.19.0 — 최종 결과                       ║
+║   Lens Multi v3.20.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -903,7 +907,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.19.0 — 최종 결과
+Lens Multi v3.20.0 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 

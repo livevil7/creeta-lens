@@ -59,7 +59,8 @@ def run(cmd, **kw):
     if cmd and isinstance(cmd, list):
         cmd = [_resolve(cmd[0])] + cmd[1:]
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=120, **kw)
+        p = subprocess.run(cmd, capture_output=True, text=True,
+                            encoding="utf-8", errors="replace", timeout=120, **kw)
         return p.returncode, (p.stdout or "").strip(), (p.stderr or "").strip()
     except FileNotFoundError:
         return 127, "", "not found"
@@ -378,10 +379,40 @@ def _upgrade_lens():
     return subprocess.call(["bash", str(script), "--yes"])
 
 
+def _plugin_scope_info(full_name):
+    """Return (scope, project_path) for an installed plugin from the registry.
+
+    `claude plugin update` defaults to --scope user; plugins installed at
+    local/project scope fail with "not installed at scope user" unless the
+    actual scope is passed. local/project scopes also resolve by cwd, so we
+    return the projectPath to run the update from.
+    """
+    reg = PLUGINS_DIR / "installed_plugins.json"
+    if not reg.exists():
+        return None, None
+    try:
+        data = json.loads(reg.read_text(encoding="utf-8"))
+    except Exception:
+        return None, None
+    entries = (data.get("plugins") or {}).get(full_name) or []
+    if not entries:
+        return None, None
+    e = entries[0]
+    return e.get("scope"), e.get("projectPath")
+
+
 def _upgrade_plugin_generic(full_name):
     claude = _resolve("claude")
-    print(f">>> {claude} plugin update {full_name}")
-    return subprocess.call([claude, "plugin", "update", full_name])
+    scope, project_path = _plugin_scope_info(full_name)
+    cmd = [claude, "plugin", "update", full_name]
+    if scope:
+        cmd += ["--scope", scope]
+    # local/project scopes resolve by cwd → run from the plugin's project dir
+    cwd = None
+    if scope in ("local", "project") and project_path and Path(project_path).exists():
+        cwd = project_path
+    print(">>> " + " ".join(cmd) + (f"   (cwd={cwd})" if cwd else ""))
+    return subprocess.call(cmd, cwd=cwd)
 
 
 def _upgrade_codex_npm():

@@ -1,3 +1,14 @@
+## [3.20.0] - 2026-06-18
+
+### Added (v3.20.0)
+- **/cc — 화면·UI 구현 시 `ui-ux-pro-max` 스킬 의무 할당**: Leader 의 Skill 매칭(Phase 1.3)에서, 사용자 인터페이스를 만들거나 바꾸는 서브태스크(웹페이지·랜딩·대시보드·컴포넌트, `.html`/`.tsx`/`.jsx`/`.vue`/`.svelte`, 레이아웃·색상·타이포·스타일·반응형)는 해당 Worker 에 `ui-ux-pro-max` 를 강제 할당한다. 기존 "필수 실행 스킬(SKIP 금지)" 메커니즘을 그대로 타며, 미설치 머신에서는 네이티브 UI/UX 베스트프랙티스로 graceful degrade(하드 실패 금지, Supervisor 스킬 감사 면제).
+
+### Changed (v3.20.0)
+
+### Fixed (v3.20.0)
+- **/cu (cu.py) — local/project scope 플러그인 업데이트 실패 수정**: `_upgrade_plugin_generic` 이 `claude plugin update` 를 scope 미지정(기본 user)으로 호출해, local scope 로 설치된 플러그인(예: context7·playwright)이 `not installed at scope user` 로 실패하던 문제. 이제 `installed_plugins.json` 에서 실제 scope 를 읽어 `--scope <scope>` 를 붙이고, local/project scope 는 해당 `projectPath` 를 cwd 로 실행한다.
+- **/cu (cu.py) — Windows cp949 디코드 크래시로 인한 gh winget 오탐 수정**: `run()` 이 기본 로케일(cp949)로 서브프로세스 출력을 디코드하다 winget 의 UTF-8 박스문자(0xe2…)에서 reader 스레드가 `UnicodeDecodeError` 로 죽어, `winget list` 출력이 비어 gh 가 "winget 미감지 — 수동 안내"로 잘못 분류되던 문제. `encoding="utf-8", errors="replace"` 강제로 winget 소스 감지(can_auto)와 scan stderr 노이즈를 함께 해결.
+
 ## [3.19.0] - 2026-06-15
 
 Codex 리뷰·협의가 `xhigh` 로 무한정 걸리던 문제 해결 — 모든 codex 호출에 **`timeout 180s` 상한**을 걸고, 깊이를 **입력 규모로 분기**(대규모 리뷰·협의는 `xhigh`→`high`)했다. 소규모 pre-mortem 의 `xhigh` 는 유지(메모리 룰 보존). speed 다이얼(`service_tier=fast`)은 compute-bound 인 `xhigh` 폭증을 못 깎으므로 **깊이·상한**으로 해결.
