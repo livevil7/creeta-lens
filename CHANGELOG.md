@@ -1,3 +1,13 @@
+## [3.21.1] - 2026-06-25
+
+`/cc` 가 **병렬 에이전트를 안 띄우고 스킬을 안 쓰는** 회귀 수정. 13에이전트 조사 + 적대적 검증으로 근본원인 3건 확정.
+
+### Fixed (v3.21.1)
+
+- **🔴 Worker 가 Task 도구에 바인딩돼 있지 않음 (병렬 미실행 회귀)** — v2.0 재작성 이후 cc/SKILL.md 어느 버전에도 "Task 도구를 호출해 Worker 를 spawn 하라"는 명시 지시가 없었다(`Task 도구`/`spawn`/`subagent_type` 멘션 0건). Phase 3.2 가 "모든 Worker 를 시작합니다"라는 추상 표현뿐이라, Leader 가 이를 병렬 Task 호출로 해석 못 하면 혼자 순차 처리하거나 텍스트 나열만 하고 멈췄다. **Phase 3.2 에 "각 서브태스크마다 Task 도구를 1회씩, 한 어시스턴트 턴에서 N번 병렬 호출(순차 await 금지)" 구체 directive 복원** + Monitor(3.1)·Supervisor(4.0)·절대규칙에 "Task 도구로 spawn" 명시. `skills/cc/SKILL.md`
+- **🔴 Supervisor 스킬 감사 슬래시 불일치 (스킬 무시 회귀, v3.20.0 도입)** — Worker 는 `Skill invoked: ui-ux-pro-max`(슬래시 없음)로 보고하는데 Supervisor 감사는 `Skill invoked: /{skill_name}`(앞 슬래시)을 찾아, 스킬을 **정상 호출한 Worker 도 0점 → 재할당 루프 → 5회 소진**. 감사 매칭 문자열(라인 506·508)의 앞 슬래시 제거로 Worker 출력과 byte 단위 통일. `skills/cc/SKILL.md`
+- **🟡 Phase 1.3 스킬 매칭 절차 명시 (graceful-degrade 편향 차단)** — "설치된 skills 를 확인하여"라는 추상 지시를, 세션 주입 `## Installed Skills (Auto-Scanned)` 표를 SoT 로 참조하고 **표에 명시적으로 부재할 때만** general-purpose 강등하도록 구체화. `skills/cc/SKILL.md`
+
 ## [3.21.0] - 2026-06-25
 
 계획서가 **실행 TodoWrite 보다 짧게 요약**되던 문제 해결 — `/cp`·`/cpp` 의 "간결/한 줄/캡" brevity 조항이 "전량 적되 누락 금지"와 모순돼 모델이 brevity 쪽을 따르며 필수 내용을 빼던 근본 원인을, **"간결=군더더기 제거이지 누락이 아니다"** 최상위 override 로 차단. 더불어 계획서가 담아야 할 **필수 섹션을 확장**(6하원칙 Why · 실행전략&자원 · 시사점/주의점/Side Effect · 검증 수단 명시).

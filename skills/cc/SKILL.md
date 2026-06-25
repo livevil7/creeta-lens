@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.21.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
+description: "Lens Multi v3.21.1 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.21.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.21.1 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.21.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.21.1**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, a Monitor agent tracks progress in real-time, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -246,7 +246,7 @@ original_request: {원본 요청}
 
 #### 1.3 Skill 매칭 확인
 
-`docs/rules/`와 설치된 skills를 확인하여 각 서브태스크에 맞는 skill이 있는지 검토합니다. 매칭되는 skill이 있으면 Worker 프롬프트에 포함합니다. 없으면 Worker는 general-purpose 로 동작합니다.
+세션 시작 시 주입된 **`## Installed Skills (Auto-Scanned)` 표**(session-start hook 이 컨텍스트 상단에 제공)와 `docs/rules/`를 SoT 로, 각 서브태스크에 맞는 skill 이 있는지 검토합니다. 매칭되는 skill 이 있으면 Worker 프롬프트에 포함합니다. **그 표에 해당 스킬이 명시적으로 부재할 때만** general-purpose 로 강등합니다 — 불확실하다고 함부로 강등하지 말고 먼저 표를 보라. 표가 컨텍스트에 없으면 `~/.claude/plugins/cache/` 를 Bash 로 스캔해 확인합니다.
 
 **화면·UI 구현 서브태스크는 `ui-ux-pro-max` 스킬 의무 할당 (MUST):** 서브태스크가 사용자 인터페이스를 만들거나 바꾸는 일(웹페이지·랜딩·대시보드·관리자·컴포넌트, `.html`/`.tsx`/`.jsx`/`.vue`/`.svelte` 작성·수정, 또는 레이아웃·색상·타이포그래피·스타일·애니메이션·반응형 작업)이면 그 Worker 의 할당 스킬을 `ui-ux-pro-max` 로 박는다. Worker 는 Phase 3.2 의 "필수 실행 스킬 (SKIP 금지)" 규칙대로 **첫 액션으로 `ui-ux-pro-max` 를 invoke** 한 뒤 구현을 시작하고, 보고 첫 줄에 `Skill invoked: ui-ux-pro-max` 를 포함한다. 순수 백엔드/로직/데이터/문서 서브태스크는 제외.
 
@@ -268,10 +268,10 @@ original_request: {원본 요청}
 > - **파괴적/되돌리기 어려운 작업**(대량 삭제·배포·외부 발행): 자동 진행 금지 → **plan-only 로 계획만 출력하고 종료**, 사람이 상호작용 세션에서 재실행하도록 안내.
 > 이 폴백은 Phase 1.5·경로전환(5.x)·경고모드(6.2) 등 **모든 `AskUserQuestion` 게이트에 공통 적용**. 상호작용 세션(`LENS_NONINTERACTIVE` 미설정)에선 기존대로 승인 필수.
 
-**AskUserQuestion** (header: "Lens Multi v3.21.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.21.1 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.21.0 — 실행 계획
+Lens Multi v3.21.1 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -333,7 +333,7 @@ N+2. 서브태스크 #2: [설명] — execution level (status: pending)
 
 #### 3.1 Monitor Agent 배포 (백그라운드)
 
-haiku 모델로 Monitor Agent를 별도로 시작합니다:
+haiku 모델로 Monitor Agent를 **Task 도구로 별도 spawn**합니다 (Worker 들과 독립):
 
 ```
 당신은 Monitor Agent입니다. 병렬 실행 중인 모든 Worker의 진행 상황을 추적합니다.
@@ -356,7 +356,9 @@ Monitor는 **백그라운드에서 실행**되며, 다른 Agent와 독립적입�
 
 #### 3.2 모든 Worker 동시 배포
 
-**같은 메시지에서 모든 Worker를 시작합니다.** Worker 간 대기 없음.
+**구현 메커니즘 (필수 · v3.21.1):** Worker = **Task 도구 서브에이전트**다. 각 서브태스크마다 **Task 도구를 1회씩 호출**해 Worker 를 spawn 한다. N개면 **하나의 어시스턴트 턴 안에서 Task 도구를 N번 병렬 호출**한다(순차 await 금지 — 한 Worker 끝나고 다음을 부르지 말 것). Worker 프롬프트를 텍스트로 나열만 하고 멈추거나, Leader 가 혼자 순차 처리하는 것은 **금지** — 그건 `/cc` 가 아니라 `/c` 다. 각 Task 호출의 `prompt` 인자에 아래 Worker 템플릿을 치환해 넣는다. 스킬 할당은 `subagent_type` 이 아니라 **프롬프트 첫 줄 지시(템플릿 1.4)로 강제**한다 (Worker 가 Skill 도구로 직접 invoke).
+
+**같은 메시지에서 모든 Worker를 시작합니다 (= Task 도구 N회 병렬 호출).** Worker 간 대기 없음.
 
 각 Worker에 할당:
 - 고유 Worker ID (#1, #2, #N)
@@ -478,7 +480,7 @@ Monitor가 모든 Worker 완료를 보고할 때까지 대기합니다.
 
 Supervisor 모델 = `opus` 고정 (품질 우선 — 토큰 비용 비고려). Worker 가 전부 opus 이므로 Supervisor 도 동급 깊이여야 "주니어가 시니어 코드 리뷰"하는 역전이 없다.
 
-모든 Worker가 완료되면, **별도의 Supervisor Agent** (opus)를 시작합니다:
+모든 Worker가 완료되면, **별도의 Supervisor Agent** (opus)를 **Task 도구로 spawn**합니다:
 
 ```
 당신은 Supervisor Agent입니다. 모든 Worker의 출력 품질과 완성도를 검토합니다.
@@ -503,9 +505,9 @@ Supervisor 모델 = `opus` 고정 (품질 우선 — 토큰 비용 비고려). W
 
 ## 스킬 호출 감사
 
-각 Worker 결과에서 첫 줄 `Skill invoked: /{skill_name}` 라인 존재 여부 확인:
+각 Worker 결과에서 첫 줄 `Skill invoked: {skill_name}` 라인 존재 여부 확인 (스킬명은 **슬래시 없이** — Worker 출력 형식과 byte 단위로 동일해야 함):
 
-- 스킬 할당됐는데 라인 누락 → 해당 서브태스크 **점수 0점**, `fix_instructions`에 "할당된 `/{skill_name}` 스킬을 첫 액션으로 호출 후 재작업" 명시
+- 스킬 할당됐는데 라인 누락 → 해당 서브태스크 **점수 0점**, `fix_instructions`에 "할당된 `{skill_name}` 스킬을 첫 액션으로 호출 후 재작업" 명시
 - 스킬 미할당(`general`) 서브태스크 → 이 검증 제외
 - 스킬 할당 + 라인 존재 → 통과, 다른 품질 검증으로 진행
 
@@ -607,7 +609,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.21.0 — 반복 {N}/5
+Lens Multi v3.21.1 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -752,7 +754,7 @@ Lens Multi v3.21.0 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.21.0 — 최종 결과                       ║
+║   Lens Multi v3.21.1 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -907,7 +909,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.21.0 — 최종 결과
+Lens Multi v3.21.1 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 
@@ -929,7 +931,7 @@ QA 검증: 모든 페이지 렌더링 OK, 라우팅 작동, 테스트 5/5 통과
 - **Goal 절대 우위 (v3.4+)** — SUCCESS_CRITERIA 가 단 하나라도 미달인 상태에서 done 보고 금지. 미달 시 Plan B 전환 / 재시도 / 사용자 개입 중 하나 선택. `/cc` 는 Goal 자체를 수정할 권한 없음 — 약하다고 판단되면 사용자에게 "Goal 재정의 — /cp Modify 권장" 회신
 - **핸드오프 페이로드 검증** — `[HANDOFF FROM /cp]` 페이로드 수신 시 plan 문서를 Read 로 직접 읽어 일치 확인, 불일치 시 plan 문서가 SoT
 - **User approval 없는 실행 금지** — 항상 Phase 1.5 에서 AskUserQuestion 사용
-- **Worker 실행 순서는 동시** — Phase 3 에서 순차 대기 없음
+- **Worker = Task 도구 서브에이전트, 동시 spawn** — Phase 3 에서 각 Worker 를 **Task 도구로 spawn 하되 하나의 턴에서 N번 병렬 호출**(순차 await 없음). Worker 를 텍스트로 나열만 하고 멈추면 그건 `/cc` 가 아니다 (병렬 미실행 = 회귀).
 - **Monitor 필수** — 모든 실행에 포함, 백그라운드에서 5분마다 보고
 - **Passed 작업 재수행 금지** — 재반복 시, 통과한 작업은 유지
 - **Supervisor & QA 분리** — Workers 와 별도 Agent 로 실행
