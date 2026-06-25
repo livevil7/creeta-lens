@@ -4,9 +4,10 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.20.0**
-- Updated: 2026-06-18
+- Current: **v3.21.0**
+- Updated: 2026-06-25
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.21.0 feat: **계획서 과잉요약 차단 + 필수 섹션 확장** — 계획 md 가 `/cc` 실행 TodoWrite 보다 짧게 요약되던 근본 원인(brevity 조항 vs 누락금지 모순)을 **원칙 0 "간결=군더더기 제거이지 누락이 아니다"**(최상위 override, 충돌 시 완전성 승, **계획 md ≥ 실행 Todo**)로 차단. `/cpp` "항목당 한 줄"→"필요한 만큼"(천장 오해 제거), spine 6→8섹션. 신규 필수: **🧰 실행 전략&자원**(난이도·권장 모델·병렬 에이전트수[ultracode]·활용 설치 스킬 자동감지·기존 자원), **💡 시사점/⚠️ 주의점/🔀 Side Effect**, **✅ 검증 전략**(Playwright/데이터/staging·범위·보고 명시), **❓ Why=6하원칙**. 양쪽 게이트 강제(`/cp` Phase 5.0 내용완전성·`/cpp` S6/S7). 상세: `CHANGELOG.md`.
 - v3.18.0 feat: **`/cpp` 대형 기획안 재포지셔닝** — Codex 협의·HTML 슬라이드 등 모든 글자수/분량 캡 해제, 큰 작업이면 항목 전량 수록. `/cp`=간결(캡 유지). 분량캡의 원래 목적(코딩 주저리 차단)을 **"항목당 사용자 언어 한 줄+전량+체크리스트"**로 대체. 신규 **task-deep HTML 양식**(슬라이드 무제한, Plan N장), `/cp html` 이 `planner: cpp` 감지해 task-deep 위임(6장 회귀 차단). 상세: `CHANGELOG.md`.
 - v3.17.0 feat: 계획 스킬(`/cp`·`/cpp`)을 **What / Why / How / Review** 4대 골격으로 통일 + **❓ Why(왜) 신규 필수 섹션**(문제·동기·안 하면 생기는 비용 — 비면 게이트 reject, Fast 도 한 줄 필수). `/cp` 문서 템플릿 What→Why→How→Review 재배치(Plan A/B 는 How 하위로, 내용 보존)·Goal 게이트 4→5조건, `/cpp` spine 5→6섹션·S0/S7 Why, `/cc` 핸드오프에 `[WHY]` 블록. 더불어 **`/cc`↔`/ccp` 경계 재조준** — `/cc`=개발(빌드), `/ccp`=개발됐거나 가동 중인 것 전체 리뷰→QA→수정(핵심 페어 `/cc`→`/ccp`, 메커니즘 불변). 상세: `CHANGELOG.md`.
 - v3.16.0 feat: 신규 skill **`/ccp`** (Lens Power Verify) — 적대적 검증·수복 엔진. 이미 만들어진 것(출처 불문 — 다른 세션·수동·PR·방금 빌드)을 받아 **실제 실행(Playwright/앱/curl)으로 작동 증명** → **4 렌즈 적대적 다중검증**(기능·엣지·회귀·UX, UI면 +접근성/반응형, API면 +보안/권한) → **만장일치 게이트**(blocking refute 1+면 fail) → 최소 수복(실패 축만, pass 축 freeze) → 증거 리포트(verified true/false). 경계(Codex 합의): `/cc`=만들면서 검증, `/ccp`=이미 만들어진 것 독립 감사. **안전장치**(Codex): read-only 우선·파괴적(배포·DB·결제·대량삭제) 승인 게이트·5회+예산 cap·동일실패 2회 전략전환·정직한 종료(verified=false). 더불어 **5분 진행보고 공통 규칙** — `/cc`(2→5분)·`/cp`·`/cpp`·`/ccp` 모두 장시간 작업 시 5분 주기 진행보고. 상세: `CHANGELOG.md` + `docs/tasks/2026-06-11-ccp-power-verify.md`.
@@ -27,8 +28,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 |-------|-------------|----------|
 | `/c` | Single skill navigator | Scan → Recommend → Execute → Discover |
 | `/cc` | 개발(빌드) — 병렬 멀티에이전트 엔진 | Scan → Multi-Match → Parallel Execute → Synthesize |
-| `/cp` | Plan-first (fast/standard) | 골격 **What→Why→How→Review**. Fast = 4주제 각 한 줄 + checklist + board; Standard = Codex + Plan A/B + pre-mortem + HTML. Deep → /cpp |
-| `/cpp` | Power Plan (deep, **대형**) | **분량 캡 없음**(항목 전량+체크리스트, task-deep HTML 무제한). What+Why+장면 → Clarify-to-zero → fan-out 조사(6축) → domain deep-spec(How) → **Codex 협의(필수)** → build-ready tasks → EARS(Review) → approve |
+| `/cp` | Plan-first (fast/standard) | 골격 **What→Why(6하원칙)→🧰실행전략→How→💡시사점/주의점/SideEffect→✅Review(검증수단)**. 원칙 0: 글길이 줄이기≠목표, 계획 md≥실행 Todo. Standard = Codex + Plan A/B + pre-mortem + HTML. Deep → /cpp |
+| `/cpp` | Power Plan (deep, **대형**) | **분량 캡 없음**(항목 전량+체크리스트, 계획 md≥실행 Todo). spine 8: What+장면 → Why(6하) → 🧰실행전략(난이도·모델·병렬·스킬·자원) → Clarify-to-zero → fan-out(6축) → deep-spec+💡SideEffect → **Codex 협의(필수)** → build-ready tasks → ✅검증수단(Playwright/data/staging)+EARS → approve |
 | `/ccp` | Power Verify (개발 후 전체 리뷰·QA·수정) | `/cc`가 만든/가동 중인 것 → 실제 실행 베이스라인 → 4렌즈 적대적 검증 → 만장일치 게이트 → 최소 수복(안전장치) → 증거 리포트(verified true/false) |
 | `/cps` | Repo orientation doc | Scan docs → Assemble 4 sections → Diff gate → Write → Conditional CLAUDE.md pointer |
 | `/cr` | Self-modernization audit | Load registry → probe/web native capabilities → classify KEEP/THIN/OBSOLETE + upgrade/ergonomics → (deep) conversation mining → report + /cp handoff → stamp |
