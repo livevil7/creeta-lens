@@ -1,3 +1,11 @@
+## [3.21.2] - 2026-06-27
+
+`/cc` 워커가 AI 특유의 코드 과생산을 줄이도록 **Ponytail 결정 사다리**를 Simplicity 규칙에 임베드.
+
+### Added (v3.21.2)
+
+- **`/cc` 워커 디스패치에 Ponytail 7단 사다리 임베드 (Rule 2 Simplicity First 실행 반사)** — 각 병렬 워커가 코드 작성 전 위에서부터 첫 작동 칸에서 멈추도록 강제: ①YAGNI(필요한가) →②기존 코드베이스 재사용 →③표준 라이브러리 →④네이티브 플랫폼 기능(`<input type="date">`·CSS·DB 제약) →⑤이미 깔린 의존성 →⑥한 줄 →⑦최소 구현. 입력검증·에러핸들링·보안·접근성·명시 요청 기능은 예외(절대 안 줄임). "문제를 먼저 이해한 뒤 climb"(증상 패치보다 근본 수정). 출처 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT) — 실측 벤치 코드 -54%/토큰 -22%/비용 -20%/시간 -27%, 보안 100% 유지. `skills/cc/SKILL.md`. SoT 동기화: `livevil-setting/docs/rules/coding-principles.md` Rule 2.
+
 ## [3.21.1] - 2026-06-25
 
 `/cc` 가 **병렬 에이전트를 안 띄우고 스킬을 안 쓰는** 회귀 수정. 13에이전트 조사 + 적대적 검증으로 근본원인 3건 확정.

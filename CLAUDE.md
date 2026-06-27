@@ -4,8 +4,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.21.1**
-- Updated: 2026-06-25
+- Current: **v3.21.2**
+- Updated: 2026-06-27
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.21.1 fix: **`/cc` 병렬 미실행 + 스킬 미활용 회귀 수정** (13에이전트 조사+적대적 검증). ① Worker 가 **Task 도구에 바인딩 안 됨** — 어느 버전에도 "Task 도구로 spawn" 지시가 없어(멘션 0건) Leader 가 혼자 순차 처리/텍스트 나열로 빠짐 → Phase 3.2 에 "Task 도구 N회 병렬 호출(순차 await 금지)" 구체 directive 복원. ② **Supervisor 스킬 감사 슬래시 불일치**(v3.20.0 도입) — Worker `Skill invoked: ui-ux-pro-max`(슬래시 없음) vs 감사 `/{skill_name}`(슬래시) → 정상 호출도 0점→재할당 루프. 매칭 문자열 통일. ③ Phase 1.3 가 주입된 스킬 인벤토리 표를 SoT 로 참조하도록 명시. 상세: `CHANGELOG.md`.
 - v3.21.0 feat: **계획서 과잉요약 차단 + 필수 섹션 확장** — 계획 md 가 `/cc` 실행 TodoWrite 보다 짧게 요약되던 근본 원인(brevity 조항 vs 누락금지 모순)을 **원칙 0 "간결=군더더기 제거이지 누락이 아니다"**(최상위 override, 충돌 시 완전성 승, **계획 md ≥ 실행 Todo**)로 차단. `/cpp` "항목당 한 줄"→"필요한 만큼"(천장 오해 제거), spine 6→8섹션. 신규 필수: **🧰 실행 전략&자원**(난이도·권장 모델·병렬 에이전트수[ultracode]·활용 설치 스킬 자동감지·기존 자원), **💡 시사점/⚠️ 주의점/🔀 Side Effect**, **✅ 검증 전략**(Playwright/데이터/staging·범위·보고 명시), **❓ Why=6하원칙**. 양쪽 게이트 강제(`/cp` Phase 5.0 내용완전성·`/cpp` S6/S7). 상세: `CHANGELOG.md`.
