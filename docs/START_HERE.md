@@ -11,6 +11,7 @@ This is the first document to read for `creeta-lens`.
 - `/cp` — plan-first execution + documentation lifecycle (PLAN / DONE / ORGANIZE / CONVERT)
 - `/cps` — generates `docs/START_HERE.md`, a repo orientation + question-routing entry point
 - `/cs` — multi-repo git synchronizer
+- `/ci` — per-user plugin install synchronizer (manifest ↔ installed; installs missing, removes only excluded, reports foreign)
 - `/lens-upgrade` — one-stop safe plugin upgrade
 
 The plugin is distributed through a Claude Code marketplace and auto-discovers skills from `skills/*/SKILL.md` (`plugin.json` → `"skills": "./skills/"`).
@@ -30,11 +31,13 @@ Read these before making claims about how Lens behaves:
 3. `docs/rules/release-guide.md` - SemVer rules + exact release procedure (why editing the cache is not a release).
 4. `docs/rules/codex-integration.md` - how `/cp` and `/cc` use Codex CLI for heterogeneous-model dual verification.
 5. `docs/rules/document-conventions.md` and `docs/rules/documentation-guide.md` - doc writing standards Lens itself follows.
-6. `CHANGELOG.md` - version history (newest at top).
+6. `docs/rules/live-research.md` — 라이브리서치 substrate(/cpp·/cr 참조): agent-reach·insane-search 호출법 + 미설치 폴백 규칙.
+7. `CHANGELOG.md` - version history (newest at top).
 
 ## Fast Answer Rules
 
-- If the user asks what a skill does or how it behaves, read `skills/{c|cc|cp|cps|cs|lens-upgrade}/SKILL.md` — the SKILL.md is the executable spec.
+- If the user asks what a skill does or how it behaves, read `skills/{c|cc|cp|cps|cs|ci|lens-upgrade}/SKILL.md` — the SKILL.md is the executable spec.
+- If the user asks how to sync installed plugins to a wanted-list (install missing / remove excluded), use `/ci` — spec in `skills/ci/SKILL.md`, deterministic backend `lib/install-sync.js`.
 - If the user asks how to cut a new version / release, use `docs/rules/release-guide.md` (bump + tag + push), then `docs/rules/publishing-guide.md` for marketplace registration.
 - If the user asks about Codex, pre-mortem, or dual verification, use `docs/rules/codex-integration.md`.
 - If the user asks how Lens-generated docs should be written, use `docs/rules/document-conventions.md` and `docs/rules/documentation-guide.md`.

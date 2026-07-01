@@ -43,7 +43,7 @@ fi
 
 TODAY=$(date +%Y-%m-%d)
 
-echo "=== Updating 13 files ==="
+echo "=== Updating 14 files ==="
 
 # Regex patterns match ANY v MAJOR.MINOR(.PATCH)? — the patch segment is
 # optional so 2-part banners (e.g. "Lens v3.1", "Lens Multi v3.4") are caught
@@ -90,16 +90,20 @@ echo "[9/13] skills/ccp/SKILL.md"
 # 8. skills/cs/SKILL.md (banner + "currently X.Y.Z" prose)
 sed "${SEDI[@]}" -E "s/Lens Sync v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Sync v$NEW_VERSION/g" skills/cs/SKILL.md
 sed "${SEDI[@]}" -E "s/currently [0-9]+\.[0-9]+\.[0-9]+/currently $NEW_VERSION/g" skills/cs/SKILL.md
-echo "[10/13] skills/cs/SKILL.md"
+echo "[10/14] skills/cs/SKILL.md"
+
+# 8b. skills/ci/SKILL.md (Creeta Install banner in the table row)
+sed "${SEDI[@]}" -E "s/Creeta Install v[0-9]+\.[0-9]+(\.[0-9]+)?/Creeta Install v$NEW_VERSION/g" skills/ci/SKILL.md
+echo "[11/14] skills/ci/SKILL.md"
 
 # 9. CLAUDE.md (Current version + Updated date)
 sed "${SEDI[@]}" -E "s/Current: \*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
 sed "${SEDI[@]}" -E "s/Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Updated: $TODAY/" CLAUDE.md
-echo "[11/13] CLAUDE.md"
+echo "[12/14] CLAUDE.md"
 
 # 10. README.md (title)
 sed "${SEDI[@]}" -E "s/^# Lens v[0-9]+\.[0-9]+\.[0-9]+/# Lens v$NEW_VERSION/" README.md
-echo "[12/13] README.md"
+echo "[13/14] README.md"
 
 # 10. CHANGELOG.md - prepend new section header (user fills in details).
 # Uses awk because git-bash sed can choke on multi-line substitutions.
@@ -116,7 +120,7 @@ NR==1 {
 }
 { print }
 ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
-echo "[13/13] CHANGELOG.md (template added - fill in details)"
+echo "[14/14] CHANGELOG.md (template added - fill in details)"
 
 echo ""
 echo "=== Verification ==="
@@ -133,11 +137,12 @@ COUNT=$(grep -rl "v$NEW_VERSION\|\"$NEW_VERSION\"" \
   skills/cpp/SKILL.md \
   skills/ccp/SKILL.md \
   skills/cs/SKILL.md \
+  skills/ci/SKILL.md \
   CLAUDE.md \
   README.md \
   CHANGELOG.md 2>/dev/null | wc -l)
 
-echo "Files with v$NEW_VERSION: $COUNT/13"
+echo "Files with v$NEW_VERSION: $COUNT/14"
 
 # Check stale version remnants — any v[0-9].[0-9].[0-9] that is NOT the new
 # version, across version-bearing files (excludes CHANGELOG and docs/history

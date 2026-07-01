@@ -186,6 +186,26 @@ Per-machine safe: items not installed on this box never appear in the list, so d
 
 Auto-upgrade path: `claude update`, `claude plugin update <name>@<marketplace>`, npm-global codex (`npm install -g @openai/codex@latest`), winget-sourced gh on Windows, brew-sourced gh on macOS, and lens itself delegated to `/lens-upgrade`. When the install source can't be identified (e.g. apt/dnf/pacman, VSCode-bundled codex), the command is printed and the user runs it.
 
+### `/ci` — Sync installed plugins to your manifest
+
+```
+/ci                     # sync this machine to your wanted-list
+/ci add <spec> [what]   # add a plugin to the manifest
+/ci remove <spec>       # queue a plugin for removal (moves it to excluded)
+/ci edit                # print the manifest path + open it for hand-editing
+```
+
+`/ci` (Creeta Install) keeps *this* machine aligned to a **per-user manifest** of plugins you want (`~/.claude/lens/manifest.json`). It diffs the manifest against what's actually installed and sorts every plugin into four buckets: **install** (wanted but missing), **remove** (only what the manifest *explicitly excludes*), **foreign** (installed but not in your manifest — reported, never touched), and **ok** (already matching).
+
+| You type | What happens |
+| --- | --- |
+| `/ci` (empty manifest) | Creates the template, lists your installed plugins as "foreign", points you to `/ci add` |
+| `/ci` (with a manifest) | Shows the 4-bucket preview → asks Approve / Install-only / Cancel → installs missing, then removes excluded (backup + per-item confirm) |
+| `/ci add watch@claude-video` | Adds the plugin to your manifest (run `/ci` to actually install it) |
+| `/ci remove gstack@old` | Moves it into `excluded` so the next `/ci` removes it |
+
+**Safety**: removal targets are **only** plugins the manifest explicitly excludes; manifest-absent ("foreign") plugins are never auto-removed. Every uninstall is preceded by a per-item confirmation and a backup to `~/.claude/lens/removed-backup-<timestamp>/`. Lens itself is hard-guarded — `/ci` can never uninstall it. Complements `/cu` (which *updates* what's installed) — `/ci` decides *which plugins exist*.
+
 ### `/cr` — Self-modernization audit
 
 ```

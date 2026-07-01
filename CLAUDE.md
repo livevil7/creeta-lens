@@ -34,11 +34,13 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 | `/ccp` | Power Verify (개발 후 전체 리뷰·QA·수정) | `/cc`가 만든/가동 중인 것 → 실제 실행 베이스라인 → 4렌즈 적대적 검증 → 만장일치 게이트 → 최소 수복(안전장치) → 증거 리포트(verified true/false) |
 | `/cps` | Repo orientation doc | Scan docs → Assemble 4 sections → Diff gate → Write → Conditional CLAUDE.md pointer |
 | `/cr` | Self-modernization audit | Load registry → probe/web native capabilities → classify KEEP/THIN/OBSOLETE + upgrade/ergonomics → (deep) conversation mining → report + /cp handoff → stamp |
+| `/ci` | Install sync (per-user) | Dry-run diff (manifest ↔ installed) → 4-bucket preview (install/remove/foreign/ok) → approve → install missing (marketplace add + `install --scope user`) → remove **only excluded** (backup + per-item confirm) → foreign report-only → re-diff. Self-protecting: never uninstalls Lens. Backend `lib/install-sync.js` |
 
 - `/c <request>` picks the best one skill and runs it
 - `/cc <request>` runs ALL relevant skills as parallel Task agents, then synthesizes outputs
 - `/cp <request>` generates a work plan document, gets user approval, then executes
 - `/cps` generates/updates `docs/START_HERE.md` — a repo's first-read orientation + question-routing entry point
+- `/ci` syncs installed plugins to a per-user manifest (`~/.claude/lens/manifest.json`): installs missing, removes only explicitly-excluded (backup + per-item confirm), reports foreign read-only
 - Any command with no args shows full skill inventory
 
 ## Hooks (5)
@@ -149,5 +151,6 @@ EN, KO, JA, ZH, ES, FR, DE, IT (8 languages)
 - 먼저 읽기: [docs/START_HERE.md](docs/START_HERE.md) — 레포 진입점 + 질문 라우팅
 - 진행 중인 작업: `docs/tasks/` 확인
 - 프로젝트 규칙: `docs/rules/` 확인
+- 라이브 리서치: [docs/rules/live-research.md](docs/rules/live-research.md) — 라이브리서치 substrate(/cpp·/cr 참조)
 - 작업 히스토리: `docs/history/` 참조
 - 변경 이력: [CHANGELOG.md](CHANGELOG.md)
