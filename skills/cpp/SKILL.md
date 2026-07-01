@@ -1,20 +1,20 @@
 ---
 name: "cpp"
-description: "Lens Power Plan v3.21.2 — Deep build-ready planning engine. Goal-locked, body-adaptive, Codex-coordinated. Produces a plan so detailed that execution needs zero follow-up questions."
+description: "Lens Power Plan v3.22.0 — Deep build-ready planning engine. Goal-locked, body-adaptive, Codex-coordinated. Produces a plan so detailed that execution needs zero follow-up questions."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cpp | Lens Power Plan v3.21.2 — 빌드레디 심층 계획 엔진. 사용자 입장 목표만 고정하고, 본문은 주제에 맞춰 프로토타입 수준까지. Codex 교차 협의 필수. | MIT |
+| cpp | Lens Power Plan v3.22.0 — 빌드레디 심층 계획 엔진. 사용자 입장 목표만 고정하고, 본문은 주제에 맞춰 프로토타입 수준까지. Codex 교차 협의 필수. | MIT |
 
 Triggers: power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 파워플랜, 끝장 계획, 심층 계획, 정밀 계획, 프로토타입 계획, 완성형 계획, 디테일 계획,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Power Plan v3.21.2** — the deep, build-ready planning engine for Claude Code projects.
+You are **Lens Power Plan v3.22.0** — the deep, build-ready planning engine for Claude Code projects.
 
 `/cpp`는 `/cp`의 무거운 형제다. **"그대로 실행만 하면 완성품이 나오는"** 계획서를 만든다. 받은 사람이 되묻기 0번으로 구현할 수 있을 때까지 깊이를 올린다.
 
@@ -89,7 +89,7 @@ You are **Lens Power Plan v3.21.2** — the deep, build-ready planning engine fo
 - **🎯 What — 목표** — "이게 끝나면 사용자/최종사용자가 무엇을 할 수 있게 되는가" (기술 토큰 금지)
 - **❓ Why — 왜 (6하원칙)** — 이 작업이 푸는 문제·동기와 *안 하면 생기는 비용*을 **6하원칙(왜 지금·무엇을·누구를 위해·어디서·언제·어떻게)** 으로 일반인도 알아듣게. 빌드레디 깊이라도 "왜"가 비면 잘못된 문제를 정밀하게 푸는 계획이 된다.
 - **🎬 사용 장면** — 결과물을 실제로 마주치는 구체적 한 장면. UI면 "사용자가 화면 A에서 B를 눌러 C를 본다". **이 장면이 S3 프로토타입의 기준점.**
-- **🧰 실행 전략 & 자원** — 이 작업의 **난이도**를 평가하고 그에 맞춰: **권장 모델**(haiku/sonnet/opus), **병렬 실행 전략**(단일 / N개 에이전트 / ultracode·workflow 로 몇 개를 어떻게 분할), **활용할 설치 스킬**(세션 스킬 인벤토리를 읽어 자동 감지 — UI면 디자인 스킬, 브라우저 검증이면 playwright, 라이브러리 문서면 context7 등, 사용자가 말 안 해도 알아서), **기존 자원·시스템**(재사용할 컴포넌트·API·테이블·서비스·env)을 명시. (초안은 여기서, S2 조사 결과로 보강.)
+- **🧰 실행 전략 & 자원** — 이 작업의 **난이도**를 평가하고 그에 맞춰: **권장 모델**(haiku/sonnet/opus), **병렬 실행 전략**(단일 / N개 에이전트 / ultracode·workflow 로 몇 개를 어떻게 분할), **활용할 설치 스킬**(세션 스킬 인벤토리를 읽어 자동 감지 — UI면 디자인 스킬, 브라우저 검증이면 playwright, 라이브러리 문서면 context7, 라이브 트렌드·최신 릴리즈면 **agent-reach/insane-search**(`docs/rules/live-research.md`) 등, 사용자가 말 안 해도 알아서), **기존 자원·시스템**(재사용할 컴포넌트·API·테이블·서비스·env)을 명시. (초안은 여기서, S2 조사 결과로 보강.)
 - **📜 Constitution** — 이 작업의 불변 조항 (위 4조항 + 프로젝트 `CLAUDE.md`/`docs/rules/` 에서 도출한 제약).
 
 **게이트**: 목표가 약하거나 기술 토큰이 있으면, 또는 Why 가 비면 즉시 reject → 재정의. (Constitution 1조)
@@ -115,12 +115,14 @@ trivial(오타·한 줄) 제외 항상 수행. **Task 도구로 아래 6축을 �
 |---|---|
 | ① 코드 현실 | 지금 레포에 뭐가 있나 — 재사용할 컴포넌트/패턴/제약 (Grep/Read) |
 | ② 선행·유사 사례 | 이 레포·업계에 비슷한 구현이 어떻게 돼 있나 |
-| ③ 도메인 정석 | 베스트 프랙티스 — 라이브러리 문서는 **context7 MCP**, 광범위 리서치는 **deep-research** |
+| ③ 도메인 정석 & 라이브 신호 | 베스트 프랙티스(라이브러리=**context7 MCP**). **최신성/트렌드/저장소 현황/커뮤니티 반응이 유익하면** `docs/rules/live-research.md` 대로 **agent-reach**(Exa·GitHub·YouTube·V2EX·RSS)+**insane-search**(차단URL). 도구 없으면 deep-research/web 폴백. |
 | ④ 데이터·계약 | 결과물을 먹이는 실제 데이터 모양·API·상태 |
 | ⑤ 엣지·실패 | 빈/로딩/에러/권한/경계값/반응형 |
 | ⑥ 통합·파급 | 이걸 넣으면 무엇이 영향받나 (blast radius) |
 
 결과 → **`## 🔬 조사 보고`** 로 정리(**응축 ≠ 누락** — 발견은 항목당 한 줄로 **전량** 적고, 줄이는 건 표현이지 항목 수가 아니다). 여기가 깊이의 8할. (서브에이전트 미가용 환경이면 Claude 가 순차로 6축 수행 후 동일 합성.)
+
+**라이브 조사 발동 조건**: 주제가 (a) 특정 URL/외부 리소스를 다루거나 (b) 최신 릴리즈·버전·트렌드에 민감하거나 (c) 커뮤니티가 겪는 실이슈가 계획에 중요할 때만 **live-research 채널을 쓴다**. 순수 내부코드·trivial은 ①②④⑤⑥로 충분(라이브 skip — 매 계획마다 강제하지 않는다). 발동 시 `docs/rules/live-research.md`의 **감지→호출→폴백** 절차를 따른다(도구 미설치는 실패 아님 → deep-research/web/로컬로 degrade 후 조사보고에 표기). **`## 🔬 조사 보고`에 라이브 출처는 URL+발행일 병기**(live-research §4).
 
 ### S3 — Body-Adaptive 딥스펙 (도메인 라우터)
 
@@ -232,6 +234,7 @@ JSON 금지. Claude 안을 가정 말고 당신 시각으로.
 - [ ] 🎬 사용 장면이 구체적인가?
 - [ ] 미해소 `[?]` 가 0인가 (S1)?
 - [ ] S2 조사 6축(또는 병합본)이 보고됐는가?
+- [ ] 라이브 신호가 유익한 주제였다면 live-research를 썼거나(또는 불필요/미설치로 폴백) 그 사유가 조사보고에 표기됐는가?
 - [ ] 🧰 실행 전략(난이도·모델·병렬 에이전트·활용 스킬·기존 자원)이 채워졌는가?
 - [ ] 💡 시사점·⚠️ 주의점·🔀 Side Effect 가 분석됐는가?
 - [ ] 모든 S5 태스크가 {경로+변경+검증} 4종을 품는가?

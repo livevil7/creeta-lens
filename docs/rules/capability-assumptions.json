@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Lens 기능이 가정하는 네이티브 공백 레지스트리. /cr 가 이 가정을 라이브 probe/web 으로 대조해 노후도(KEEP/THIN/OBSOLETE)를 판정한다. SoT=실제 SKILL.md/훅/lib. 행=네이티브 능력 단위(닫히면 affects_lens 의 Lens 기능이 THIN/OBSOLETE).",
+  "description": "Lens 기능이 가정하는 네이티브 공백 레지스트리. /crv 가 이 가정을 라이브 probe/web 으로 대조해 노후도(KEEP/THIN/OBSOLETE)를 판정한다. SoT=실제 SKILL.md/훅/lib. 행=네이티브 능력 단위(닫히면 affects_lens 의 Lens 기능이 THIN/OBSOLETE).",
   "method": "signal_method: probe=로컬 환경/CLI 점검(권장·무네트워크), web=공식 체인지로그, both. false_obsolete_risk=이 가정을 죽은 것으로 오판할 위험.",
   "last_full_audit": "2026-06-05",
   "audit_report": "docs/history/2026-06-05-lens-modernization-audit.md",
@@ -120,7 +120,8 @@
       "affects_lens": [
         "scripts/user-prompt-handler.js",
         "lib/keyword-matcher.js",
-        "lib/plugin-registry.js"
+        "lib/plugin-registry.js",
+        "skills/crv/SKILL.md"
       ],
       "purpose": "hooks-discovery 키워드 자동제안 + /c 추천을 네이티브 Skills auto-discovery(의미기반 self-invoke) + Skill tool + /slash가 대체",
       "assumed_native_gap": "네이티브가 요청에 맞는 스킬을 자동 발화/추천 못 함",

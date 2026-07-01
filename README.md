@@ -1,4 +1,4 @@
-# Lens v3.21.2
+# Lens v3.22.0
 
 **Never wonder which plugin to use again.**
 
@@ -206,19 +206,27 @@ Auto-upgrade path: `claude update`, `claude plugin update <name>@<marketplace>`,
 
 **Safety**: removal targets are **only** plugins the manifest explicitly excludes; manifest-absent ("foreign") plugins are never auto-removed. Every uninstall is preceded by a per-item confirmation and a backup to `~/.claude/lens/removed-backup-<timestamp>/`. Lens itself is hard-guarded — `/ci` can never uninstall it. Complements `/cu` (which *updates* what's installed) — `/ci` decides *which plugins exist*.
 
-### `/cr` — Self-modernization audit
+### `/cr` — Creeta Research (live deep research)
 
 ```
-/cr            # quick: supply-side audit (native capability drift)
-/cr deep       # + demand-side conversation mining → net-new feature proposals
+/cr <topic>    # multi-angle live research on any topic → cited report in the conversation
 ```
 
-`/cr` re-evaluates **every Lens feature** as Claude Code + Codex evolve. It diffs a registry of "assumed native gaps" (`docs/rules/capability-assumptions.json`) against live reality — mostly by **probing the running environment** (`claude --help`, the session's tool surface, `codex --help`), falling back to official changelogs — and classifies each feature **KEEP / THIN / OBSOLETE**, with concrete upgrade vectors and ergonomics improvements. In `deep` mode it also mines your own session transcripts for recurring pains and proposes net-new features. Output is a dated report (md + HTML + board); high-confidence upgrades are handed to `/cp` as task docs. OBSOLETE never auto-deletes anything — it only proposes. A SessionStart nudge reminds you when the audit goes stale (Lens repo only; `capabilityAuditIntervalDays`, default 30).
+`/cr` researches **any topic live from many angles** — semantic web search (Exa), GitHub repos/issues, YouTube, community reactions (V2EX/Reddit via agent-reach), RSS — cross-checks agreement vs conflict, and **reports back in the conversation with cited sources (URL + date)**. It **saves no files**, never puts your local/private code or secrets into external queries, and has **no scope guard** (runs in any repo). If the live-research tools aren't installed it falls back to `deep-research`/`WebSearch`. For plain general web research, `deep-research` may be a better fit.
+
+### `/crv` — Self-modernization audit
+
+```
+/crv            # quick: supply-side audit (native capability drift)
+/crv deep       # + demand-side conversation mining → net-new feature proposals
+```
+
+`/crv` re-evaluates **every Lens feature** as Claude Code + Codex evolve. It diffs a registry of "assumed native gaps" (`docs/rules/capability-assumptions.json`) against live reality — mostly by **probing the running environment** (`claude --help`, the session's tool surface, `codex --help`), falling back to official changelogs — and classifies each feature **KEEP / THIN / OBSOLETE**, with concrete upgrade vectors and ergonomics improvements. In `deep` mode it also mines your own session transcripts for recurring pains and proposes net-new features. Output is a dated report (md + HTML + board); high-confidence upgrades are handed to `/cp` as task docs. OBSOLETE never auto-deletes anything — it only proposes. A SessionStart nudge reminds you when the audit goes stale (Lens repo only; `capabilityAuditIntervalDays`, default 30).
 
 | You type | What happens |
 | --- | --- |
-| `/cr` (in the Lens repo) | Probes native capabilities, classifies all features, writes the audit report, hands upgrades to `/cp`, resets the staleness timer |
-| `/cr` (elsewhere) | Stops — `/cr` only runs inside the Lens source repo |
+| `/crv` (in the Lens repo) | Probes native capabilities, classifies all features, writes the audit report, hands upgrades to `/cp`, resets the staleness timer |
+| `/crv` (elsewhere) | Stops — `/crv` only runs inside the Lens source repo |
 
 **When to use which:**
 

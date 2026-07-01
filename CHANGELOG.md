@@ -1,11 +1,32 @@
+## [3.22.0] - 2026-07-01
+
+### Added (v3.22.0)
+
+### Changed (v3.22.0)
+
+### Fixed (v3.22.0)
+
+## [3.22.0] - 2026-07-01
+
+라이브 리서치 기반 확장 — `/ci`(설치목록 동기화)·`/cr`(creeta research) 신설, `/cpp` 라이브화, 기존 Lens Review → `/crv` 개명. agent-reach + insane-search 를 Lens 조사에 편입.
+
+### Added (v3.22.0)
+
+- **신규 skill `/ci` (Creeta Install) — per-user 플러그인 설치목록 동기화** — `~/.claude/lens/manifest.json`(사용자별 "원하는 플러그인 목록")과 이 머신의 실제 설치현황을 대조해 4분류(설치할 것/제거할 것/목록밖 그대로둠/이미맞음) 프리뷰 → 승인 → 설치(marketplace add + `install --scope user`, fail-soft) / 제거(**manifest.excluded 명시 항목만**, 백업 `~/.claude/lens/removed-backup-<ts>/` + 항목별 재확인 후 uninstall) 동기화. **안전모델**: manifest 미등재 "foreign" 플러그인은 절대 자동제거 안 함(보고만), `lens@CreetaCorp`는 하드가드로 제거후보 원천배제(self-uninstall 차단). 목록관리 `/ci add`·`/ci remove`·`/ci edit`. 결정론 백엔드 `lib/install-sync.js`(무의존, `claude plugin list --json` 1차 + `installed_plugins.json` 폴백, cu.py 패턴 재사용) + 단위테스트 `lib/install-sync.test.js`(foreign 불가침·lens 자기보호·excluded∩installed). `skills/ci/SKILL.md`.
+- **신규 skill `/cr` (Creeta Research) — 라이브 다각도 딥리서치** — agent-reach(Exa·GitHub·YouTube·V2EX·RSS 무키)+insane-search(차단 URL 우회)로 임의 주제를 다각도 병렬 조사 → 교차·상충 정리 → **대화로 인용 보고**(파일 저장 안 함). 안전: 로컬/비공개 코드·시크릿 외부쿼리 금지, 출처 URL+발행일 의무, 도구 미설치 시 deep-research/web 폴백, 스코프가드 없음(아무 레포서나). 기존 `deep-research` 와 차별=무키 라이브채널+WAF우회. `docs/rules/live-research.md` 소비. `skills/cr/SKILL.md`.
+- **`docs/rules/live-research.md` 신설 — /cpp·/cr 공유 라이브리서치 규칙** — Lens 스킬(`/cpp` S2, `/cr`)이 "현재 라이브 정보"(최신 릴리즈·트렌드·이슈·커뮤니티 반응)를 가져오는 표준 경로를 단일 SoT 문서로 정의. agent-reach(무키 라이브 채널)·insane-search(WAF 우회 fetch) 감지·호출법 + 미설치 시 폴백 규칙(deep-research→WebSearch/WebFetch) + 신선도 규율(출처 URL·발행일 병기) + insane-search 안전 한계(페이월·robots·비공개 금지, terminal 실패 인정). `CLAUDE.md`·`docs/START_HERE.md` 에 참조 등록. `docs/rules/live-research.md`.
+
+### Changed (v3.22.0)
+
+- **`/cpp` S2 전방위 조사에 라이브 리서치 조건부 주입** — 축③(도메인 정석)에 agent-reach+insane-search 추가. 주제가 최신성/트렌드/저장소현황/커뮤니티반응에 민감할 때만 발동(강제 아님), 미설치 graceful degrade. S0 실행전략·S7 self-check 정합. S4 Codex 하드게이트 무변경. `skills/cpp/SKILL.md`.
+- **기존 `/cr` (Lens Review) → `/crv` 개명** — creeta research 가 `/cr` 을 쓰도록 자가 현대화 감사를 `/crv` 로 이전. `skills/cr`→`skills/crv`, `lib/capability-audit.js`(nudge 3문자열·주석), `hooks/session-start.js`, `docs/rules/capability-assumptions.json`(affects_lens 에 crv 등록), `docs/rules/codex-integration.md`, `CLAUDE.md`·`README.md`. 기능·알림·stamp·scope guard 무손실.
+
 ## [3.21.2] - 2026-06-27
 
 `/cc` 워커가 AI 특유의 코드 과생산을 줄이도록 **Ponytail 결정 사다리**를 Simplicity 규칙에 임베드.
 
 ### Added (v3.21.2)
 
-- **신규 skill `/ci` (Creeta Install) — per-user 플러그인 설치목록 동기화** — `~/.claude/lens/manifest.json`(사용자별 "원하는 플러그인 목록")과 이 머신의 실제 설치현황을 대조해 4분류(설치할 것/제거할 것/목록밖 그대로둠/이미맞음) 프리뷰 → 승인 → 설치(marketplace add + `install --scope user`, fail-soft) / 제거(**manifest.excluded 명시 항목만**, 백업 `~/.claude/lens/removed-backup-<ts>/` + 항목별 재확인 후 uninstall) 동기화. **안전모델**: manifest 미등재 "foreign" 플러그인은 절대 자동제거 안 함(보고만), `lens@CreetaCorp`는 하드가드로 제거후보 원천배제(self-uninstall 차단). 목록관리 `/ci add`·`/ci remove`·`/ci edit`. 결정론 백엔드 `lib/install-sync.js`(무의존, `claude plugin list --json` 1차 + `installed_plugins.json` 폴백, cu.py 패턴 재사용) + 단위테스트 `lib/install-sync.test.js`(foreign 불가침·lens 자기보호·excluded∩installed). `skills/ci/SKILL.md`.
-- **`docs/rules/live-research.md` 신설 — /cpp·/cr 공유 라이브리서치 규칙** — Lens 스킬(`/cpp` S2, `/cr`)이 "현재 라이브 정보"(최신 릴리즈·트렌드·이슈·커뮤니티 반응)를 가져오는 표준 경로를 단일 SoT 문서로 정의. agent-reach(무키 라이브 채널)·insane-search(WAF 우회 fetch) 감지·호출법 + 미설치 시 폴백 규칙(deep-research→WebSearch/WebFetch) + 신선도 규율(출처 URL·발행일 병기) + insane-search 안전 한계(페이월·robots·비공개 금지, terminal 실패 인정). `CLAUDE.md`·`docs/START_HERE.md` 에 참조 등록. `docs/rules/live-research.md`.
 - **`/cc` 워커 디스패치에 Ponytail 7단 사다리 임베드 (Rule 2 Simplicity First 실행 반사)** — 각 병렬 워커가 코드 작성 전 위에서부터 첫 작동 칸에서 멈추도록 강제: ①YAGNI(필요한가) →②기존 코드베이스 재사용 →③표준 라이브러리 →④네이티브 플랫폼 기능(`<input type="date">`·CSS·DB 제약) →⑤이미 깔린 의존성 →⑥한 줄 →⑦최소 구현. 입력검증·에러핸들링·보안·접근성·명시 요청 기능은 예외(절대 안 줄임). "문제를 먼저 이해한 뒤 climb"(증상 패치보다 근본 수정). 출처 [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT) — 실측 벤치 코드 -54%/토큰 -22%/비용 -20%/시간 -27%, 보안 100% 유지. `skills/cc/SKILL.md`. SoT 동기화: `livevil-setting/docs/rules/coding-principles.md` Rule 2.
 
 ## [3.21.1] - 2026-06-25
