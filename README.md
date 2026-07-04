@@ -1,4 +1,4 @@
-# Lens v3.22.0
+# Lens v3.23.0
 
 **Never wonder which plugin to use again.**
 
@@ -122,6 +122,7 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 | `/cp fix this typo` | Fast tier — concise Goal + checklist + approve (skips Codex/pre-mortem) |
 | `/cp build auth with JWT` | Standard tier — full plan, saves to `docs/2026-02-28-jwt-auth.md`, asks for approval |
 | `/cp refactor the API layer` | Creates a step-by-step plan, saves to `docs/`, waits for your go-ahead |
+| `/cp flow` | FLOW mode — maps user-journey stages ↔ engines/modules ↔ dependencies into one interactive flowchart, saved as `docs/rules/flow.md` + `flow.html` (the project's big-picture Rule) |
 | `/cp` (no args) | Shows full skill inventory (same as `/c`) |
 
 ### `/cpp` — Power Plan (deep, build-ready)

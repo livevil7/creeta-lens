@@ -73,7 +73,7 @@ function main() {
 
     // 6. Output response
     const response = {
-      systemMessage: `Lens v3.22.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready`,
+      systemMessage: `Lens v3.23.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready`,
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         skillCount: skills.length,
@@ -92,7 +92,7 @@ function main() {
   } catch (err) {
     // Fail gracefully - don't break the session
     const fallback = {
-      systemMessage: 'Lens v3.22.0 activated (scan skipped)',
+      systemMessage: 'Lens v3.23.0 activated (scan skipped)',
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         error: err.message,
@@ -113,7 +113,7 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planS
   let ctx = '';
 
   // Header
-  ctx += `# Lens v3.22.0 - Session Startup\n\n`;
+  ctx += `# Lens v3.23.0 - Session Startup\n\n`;
 
   // /crv capability-audit nudge (Lens repo only; muted single line)
   if (auditNudge) {
@@ -178,7 +178,7 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planS
 }
 
 function buildFallbackContext() {
-  return `# Lens v3.22.0 - Session Startup
+  return `# Lens v3.23.0 - Session Startup
 
 Skill scan was skipped (no plugins cache found or scan error).
 Use \`/c <request>\` to manually scan and get recommendations.

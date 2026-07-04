@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lens 3.23.0 통합 업그레이드 — /cp flow + 하네스 규칙 이식 · 보고서</title>
+<meta name="lens:source" content="docs/tasks/2026-07-04-cp-flow-mode.md">
+<meta name="lens:source-hash" content="0e1a855db88c">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">06</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 06 · COVER</div>
+  <div class="meta">
+    <span>2026-07-04</span>
+    <span class="dot">·</span>
+    <span class="badge task">Task</span>
+    <span class="dot">·</span>
+    <span>lens 3.23.0</span>
+  </div>
+
+  <h1 class="h-title">Lens 3.23.0 통합 업그레이드 — <code>/cp flow</code> 신설 + Fable 하네스 규칙 이식</h1>
+  <p class="lede">
+    어떤 프로젝트든 <code>/cp flow</code> 한 번으로 이용자 단계·화면·엔진·종속 관계를
+    한 장의 인터랙티브 플로우차트(Rule)로 그리고, 공개된 Fable 5 하네스 규칙을
+    여섯 스킬에 역할별로 쪼개 이식한다.
+  </p>
+
+  <div class="hero">
+    <div class="num">2<span class="unit">workstreams → 1 release</span></div>
+    <div class="caption">
+      <strong>A</strong> — flow 차트 생성 모드 (템플릿 2 + FLOW 모드 + CONVERT 가드).
+      <strong>B</strong> — 하네스 규칙 이식 (rules SoT 1 + SKILL.md 6).
+      board-builder 수정 <strong>0</strong>.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / tasks</span>
+    <span>2026-07-04-cp-flow-mode</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 06 · AT A GLANCE</div>
+  <h2 class="title">계획 규모</h2>
+  <p class="sub">조사(병렬 에이전트 2 + Codex 듀얼트랙)는 완료 — 남은 것은 적용과 릴리즈.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">workstreams</div>
+      <div class="v">2</div>
+      <div class="desc">A: /cp flow 모드 신설 · B: 하네스 규칙 이식.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">tasks</div>
+      <div class="v accent">9</div>
+      <div class="desc">A(T1–T3) + B(T4–T6) + 공통 마무리(T7–T9).</div>
+    </div>
+    <div class="kpi">
+      <div class="l">rule sources</div>
+      <div class="v">3</div>
+      <div class="desc">Claude Code 2.1.172 프롬프트 + claude.ai Fable + fable-prompts 방법론.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">target skills</div>
+      <div class="v">6</div>
+      <div class="desc"><code>/c</code> <code>/cc</code> <code>/ccp</code> <code>/cp</code> <code>/cpp</code> <code>/cr</code> — 역할별 발췌 인라인, 스킬당 ~40줄 상한.</div>
+    </div>
+    <div class="kpi">
+      <div class="v">8</div>
+      <div class="l">verifications</div>
+      <div class="desc">auto 6 + manual 2. dogfood는 livevil-boost 실행.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">pre-mortem risks</div>
+      <div class="v warn">6</div>
+      <div class="desc">Blocker 0. 핵심: 규칙 희석·stale 감지 한계.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Goal -->
+<section class="slide" id="goal">
+  <div class="page-no">03 / 06 · GOAL</div>
+  <h2 class="title">목표</h2>
+  <p class="sub">Done = 3.23.0 설치 후 ① 임의 프로젝트에서 /cp flow 산출물이 브라우저에서 한눈에 보이고 ② 여섯 스킬에 역할별 하네스 규칙이 들어가 있다.</p>
+
+  <div class="goal-list" style="margin-top:24px">
+    <div class="goal"><div class="box"></div><div class="t"><strong>[A] 한 장의 전체 그림</strong> — 어떤 프로젝트든 <code>/cp flow</code>로 이용자 단계별 화면 → 받치는 엔진/모듈 → 종속·재사용 관계를 한 그림으로 본다.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>[A] 그림 = Rule</strong> — 산출물이 <code>docs/rules/</code>에 SoT(md)+뷰(html)로 저장되어 사람·Claude가 전체 그림을 먼저 보고 시작한다.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>[A] board 통합</strong> — board 카드로 열람, md 변경 시 stale 표시 (한계: 코드↔md 불일치는 미감지 — 명시).</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>[B] 워커 규율 상향</strong> — Lens가 배포하는 워커·감독·QA·리서치가 Fable 세대 하네스 수준의 작업 규율(정직 보고·끝까지 실행·검증 패턴)을 따른다.</div></div>
+  </div>
+</section>
+
+<!-- 4. Plan -->
+<section class="slide" id="plan">
+  <div class="page-no">04 / 06 · PLAN</div>
+  <h2 class="title">9개 태스크 — Plan A</h2>
+  <p class="sub">A는 md=SoT·CONVERT 패턴 재사용으로 신규 코드 0. B는 additive-only — 하네스가 이미 강제하는 규칙은 복붙하지 않고, 하네스가 못 미치는 지점에만 넣는다.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">A</div>
+      <h3>T1–T2 · FLOW 모드</h3>
+      <div class="what"><code>flow.template.md</code> + <code>flow-viewer.example.html</code>(livevil-boost 일반화) 추가. cp/SKILL.md에 F1 스캔 → F2 2층 추출(단계×엔진) → F3 md → F4 html → F5 board. 근거 없는 노드 <strong>(추정)</strong> 표기 의무.</div>
+    </div>
+    <div class="step">
+      <div class="n">A</div>
+      <h3>T3 · CONVERT 가드</h3>
+      <div class="what">Codex가 발견한 함정 차단 — <code>/cp html</code>이 <code>doc_kind: flow</code> md를 task 6-slide 덱으로 덮지 않고 flow 뷰어로 재생성.</div>
+    </div>
+    <div class="step">
+      <div class="n">B</div>
+      <h3>T4 · 규칙 SoT</h3>
+      <div class="what"><code>docs/rules/harness-rules.md</code> — 인벤토리 재서술(원문 복붙 금지), 스킬 매핑 표, 기준 버전(2.1.172·비공식) 명시, additive-only 판정 기준.</div>
+    </div>
+    <div class="step">
+      <div class="n">B</div>
+      <h3>T5 · 스킬별 발췌 인라인</h3>
+      <div class="what">워커 프롬프트(자율 실행·충실 보고·완료 엄격) / Monitor("침묵은 성공 아님") / /cc(pipeline·스카우팅·스케일링) / /ccp(adversarial 강화·완결성 비평가·self-check) / /cp·/cpp(elicitation gate) / /cr(Unrecognized Entity·effort scaling). 스킬당 ~40줄.</div>
+    </div>
+    <div class="step">
+      <div class="n">B</div>
+      <h3>T6 · 충돌 심사</h3>
+      <div class="what">모델 할당 테이블 vs 상속 기본, 승인 게이트 vs 되묻기 차단, 5분 보고 vs 알림 절제 — 해소 근거를 harness-rules.md에 기록.</div>
+    </div>
+    <div class="step">
+      <div class="n">공통</div>
+      <h3>T7–T9 · 문서·릴리즈·dogfood</h3>
+      <div class="what">CHANGELOG·README·START_HERE → <code>bump-version.sh 3.23.0</code> + tag push → livevil-boost에서 /cp flow 실행 + /c 스모크로 워커 보고 형식 확인.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Risks -->
+<section class="slide" id="risks">
+  <div class="page-no">05 / 06 · RISKS</div>
+  <h2 class="title">사전 리스크</h2>
+  <p class="sub">Claude(Fable 세션) pre-mortem + Codex 듀얼트랙 합성. Blocker 0.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">A · 품질 편차</div>
+      <h3>이용자 단계 추출 실패</h3>
+      <p>화면 없는 CLI·설정 레포에서 단계가 억지로 생성될 수 있음. 단계 2개 미만이면 <strong>B-2 단계 인터뷰</strong>로 전환 — 잘못된 추론이 Rule로 굳는 최악 실패를 차단.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">A · 렌더</div>
+      <h3>Mermaid 노드 폭발</h3>
+      <p>대형 레포에서 노드 50+ 시 렌더 붕괴·가독성 상실 → <strong>B-1 계층 분할</strong>(메인 단계 층 + 단계별 드릴다운).</p>
+    </div>
+    <div class="next warn">
+      <div class="l">B · 희석</div>
+      <h3>규칙 과다 = 역효과</h3>
+      <p>워커 프롬프트에 규칙이 쌓이면 중요 신호가 묻힘. 40줄 상한 + 기존 Karpathy 규칙과 중복 병합 + 위반 관찰 시 <strong>B-3 포인터화</strong>.</p>
+    </div>
+    <div class="next">
+      <div class="l">A · 한계 명시</div>
+      <h3>stale 감지의 실효 범위</h3>
+      <p>board 해시는 md↔html 불일치만 감지 — 코드가 바뀌어도 md가 안 바뀌면 낡음 표시가 안 뜸. frontmatter <code>updated</code> + 재실행 권고로 한계를 명시하고 과장하지 않음.</p>
+    </div>
+    <div class="next">
+      <div class="l">B · 출처</div>
+      <h3>비공식 추출본 드리프트</h3>
+      <p>정확성·최신성 보증 불가, Claude Code 버전업마다 어긋남. 원칙 재서술(복붙 금지) + 기준 버전 명시 + <code>/crv</code> 주기 재대조 채널화.</p>
+    </div>
+    <div class="next">
+      <div class="l">A · Codex 발견</div>
+      <h3>CONVERT 덮어쓰기 사고</h3>
+      <p>가드 없으면 <code>/cp html</code>이 flow 뷰어를 task 덱으로 덮음 → T3 <code>doc_kind: flow</code> 분기로 차단 (검증 8로 확인).</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Resume -->
+<section class="slide" id="resume">
+  <div class="page-no">06 / 06 · RESUME</div>
+  <h2 class="title">재개 포인트</h2>
+  <p class="sub">조사 단계는 완료(인벤토리 확보). 다음 세션은 여기부터.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">A와 B는 서로 독립 — 순서는 A(T1–T3) 먼저, B(T4–T6), 마무리(T7–T9). 릴리즈는 tag push까지가 완료.</div>
+    <ol>
+      <li class="todo">
+        <h4>T1 — 템플릿 2개</h4>
+        <div class="det"><code>templates/flow.template.md</code> + <code>templates/flow-viewer.example.html</code> (livevil-boost flow.html 일반화).</div>
+      </li>
+      <li class="todo">
+        <h4>T2 — FLOW 모드 신설</h4>
+        <div class="det"><code>skills/cp/SKILL.md</code> 라우팅 표에 <code>/cp flow [scope]</code> 예약어 + F1–F5 절차.</div>
+      </li>
+      <li class="todo">
+        <h4>T4 — harness-rules.md SoT</h4>
+        <div class="det">확보된 인벤토리(scratchpad 사본)를 재서술로 정리 — 세션 넘어가면 이 문서의 인벤토리 요약 + task md 참조.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

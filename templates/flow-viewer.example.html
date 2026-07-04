@@ -1,0 +1,169 @@
+<!--
+  flow-viewer.example.html — /cp flow 모드 HTML 뷰어 양식 reference. 런타임 코드가 읽지 않는다 —
+  Claude 가 Read 후 <!- - {PLACEHOLDER}: 설명 - -> 지점을 프로젝트 값으로 치환·모방해 생성한다.
+  md(flow.md)가 SoT, 이 HTML 은 파생 뷰 — md 갱신 후 재생성한다.
+
+  디자인 SoT: livevil-setting/design/05-dark-developer/design.md (토큰은 아래 :root 에 임베드 —
+  타 머신에 livevil-setting 없어도 동작). 보더는 항상 반투명 white, 순백 #fff 텍스트 금지,
+  radius 4/6/8px, 모션은 transform/opacity 120–200ms만.
+  폰트 편차: design.md 는 Inter 지정이나 한국어 커버리지를 위해 Pretendard Variable(CDN) 유지 + Inter, system-ui fallback.
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- {SOURCE_META}: 생성 시 lens:source 를 SoT md 경로(docs/rules/flow.md)로, lens:source-hash 를 그 md 내용 sha256 앞 12자로 치환. lens:builder 는 고정 -->
+<meta name="lens:source" content="docs/rules/flow.md">
+<meta name="lens:source-hash" content="{md_sha256_12}">
+<meta name="lens:builder" content="lens-cp-flow">
+<!-- {TITLE}: "프로젝트명 — 이용자 플로우 & 엔진 맵" 으로 치환 -->
+<title>{project} — 이용자 플로우 & 엔진 맵</title>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<style>
+  /* 05-dark-developer 토큰 (임베드) */
+  :root{
+    --bg:#0a0a0a; --surface:#111113; --surface2:#18181b;
+    --border:rgba(255,255,255,.08); --border-hover:rgba(255,255,255,.14);
+    --text:#ededed; --muted:#a1a1aa; --faint:#71717a;
+    --accent:#6366f1; --accent2:#818cf8;
+    --green:#3fb950; --amber:#d29922; --red:#f85149;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Pretendard Variable',Pretendard,Inter,system-ui,sans-serif}
+  header{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  header .ttl{display:flex;align-items:center;gap:10px}
+  header .m{width:24px;height:24px;border-radius:6px;background:linear-gradient(160deg,var(--accent),#4338ca);display:grid;place-items:center;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700}
+  header h1{font-size:16px;font-weight:600}
+  header .legend{display:flex;gap:13px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);align-items:center}
+  header .legend .k{display:inline-flex;align-items:center;gap:5px}
+  header .sw{width:14px;height:10px;border-radius:3px;display:inline-block;border:1px solid var(--border)}
+  header a{color:var(--accent2);font-size:13px;text-decoration:none}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 24px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+  .zoomctl{display:flex;gap:6px}
+  .zoomctl button{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 11px;cursor:pointer;font-family:inherit;font-size:12px}
+  .zoomctl button:hover{border-color:var(--border-hover);background:var(--surface2)}
+  #canvas{width:100%;height:calc(100vh - 96px);overflow:auto;background:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,.045) 1px, transparent 0) 0 0/26px 26px}
+  #zoomwrap{width:100%;height:100%}
+  .mermaid{opacity:0;transition:opacity .18s;width:100%;height:100%}
+  .mermaid svg{display:block;width:100%;height:100%}
+  #err{color:var(--red);font-family:'JetBrains Mono',monospace;padding:24px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <!-- {HEADER_TITLE}: 프로젝트명으로 치환 -->
+  <div class="ttl"><span class="m">▶</span><h1>{project} — 이용자 플로우 & 엔진 맵</h1></div>
+  <div class="legend">
+    <!-- {LEGEND_ITEMS}: mermaid classDef 종류와 1:1 로 치환. sw 의 background/border-color 는 classDef fill/stroke 와 일치시킬 것 -->
+    <span class="k"><span class="sw" style="background:#1e1b4b;border-color:#6366f1"></span> {핵심 화면}</span>
+    <span class="k"><span class="sw" style="background:#0b2818;border-color:#3fb950"></span> {받치는 엔진}</span>
+    <span class="k">— 이용자 진행 · ┄ 엔진 받침/종속</span>
+    <!-- {CLICK_HINT}: 노드 클릭 시 열리는 것(목업/코드/문서)으로 치환. click 링크가 없으면 이 span 삭제 -->
+    <span class="k" style="color:var(--accent2)">노드 클릭 = {열리는 것}</span>
+    <!-- {SOURCE_LINK}: SoT md 의 이 HTML 기준 상대 경로로 치환 -->
+    <a href="{flow_md_relpath}">flow md (SoT) →</a>
+  </div>
+</header>
+<div class="bar">
+  <!-- {STAGE_SUMMARY}: ①→②→… 단계 요약 한 줄로 치환. 조작 힌트는 유지 -->
+  <span>①{단계} → ②{단계} → ③{단계}. <b style="color:var(--accent2)">Space</b>+드래그 = 이동 · <b style="color:var(--accent2)">Ctrl+휠</b> = 확대/축소</span>
+  <span class="zoomctl"><button id="zout">− 축소</button><button id="zreset">맞춤</button><button id="zin">확대 +</button></span>
+</div>
+<!-- {MERMAID_SOURCE}: 아래 pre.mermaid 내용을 SoT md ③ 플로우차트의 mermaid 소스로 통째 치환 (subgraph·classDef·점선 문법 유지) -->
+<div id="canvas"><div id="zoomwrap"><pre class="mermaid">
+flowchart TB
+  classDef hub fill:#312e81,stroke:#818cf8,stroke-width:2.5px,color:#e0e7ff;
+  classDef star fill:#1e1b4b,stroke:#6366f1,stroke-width:2px,color:#c7d2fe;
+  classDef sys fill:#0b2818,stroke:#3fb950,stroke-width:1.5px,color:#c9f7d4;
+
+  entry([{진입점}]) --> s1["① {단계 이름}<br/>{화면 한 줄}"]:::hub
+
+  subgraph P2["② {단계 이름}"]
+    s2a["{화면}<br/>{구성 요약}"]:::star --> s2b["{후속 화면}"]
+  end
+  s1 --> s2a
+
+  subgraph P3["③ {단계 이름}"]
+    s3["{화면}"]:::star
+  end
+  s2b -->|"{전이 조건}"| s3
+
+  subgraph SYS["받치는 엔진 — 화면 뒤에서 도는 모듈"]
+    m1["{모듈 A}<br/>{코드 경로 요약}"]:::sys
+    m2["{모듈 B} (추정)"]:::sys
+  end
+  s3 ~~~ m1
+
+  s2a -.-> m1
+  s3 -.-> m1
+  s2b -.-> m2
+  m1 -.{피드백 라벨}.-> s1
+
+  %% {CLICK_LINKS}: 노드별로 열 파일(목업·코드·문서) 상대경로로 치환. 대상 없는 노드는 click 줄 삭제
+  click s1 "{path/to/screen1.html}" _blank
+  click s2a "{path/to/screen2.html}" _blank
+</pre></div></div>
+<div id="err"></div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: false, securityLevel: 'loose', theme: 'base',
+    /* themeVariables = 05-dark-developer 토큰 */
+    themeVariables: {
+      darkMode: true, background: '#0a0a0a',
+      primaryColor: '#18181b', primaryBorderColor: 'rgba(255,255,255,0.14)', primaryTextColor: '#ededed',
+      lineColor: '#a1a1aa', fontFamily: "'Pretendard Variable', Pretendard, Inter, system-ui, sans-serif", fontSize: '15px',
+      clusterBkg: 'rgba(255,255,255,0.02)', clusterBorder: 'rgba(255,255,255,0.08)', titleColor: '#a1a1aa',
+      edgeLabelBackground: '#111113', tertiaryColor: '#18181b'
+    },
+    flowchart: { curve: 'basis', nodeSpacing: 38, rankSpacing: 64, padding: 14, useMaxWidth: false, htmlLabels: true }
+  });
+  try {
+    await mermaid.run({ querySelector: '.mermaid' });
+    const el = document.querySelector('.mermaid');
+    const svg = el.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      svg.removeAttribute('width'); svg.removeAttribute('height');
+      svg.style.maxWidth = 'none';
+    }
+    el.style.opacity = '1';
+    let scale = 1;
+    const canvas = document.getElementById('canvas');
+    function apply(){ if(svg){ svg.style.width = (scale*100)+'%'; svg.style.height = (scale*100)+'%'; } }
+    apply();
+    document.getElementById('zin').onclick = () => { scale = Math.min(5, scale * 1.3); apply(); };
+    document.getElementById('zout').onclick = () => { scale = Math.max(0.5, scale / 1.3); apply(); };
+    document.getElementById('zreset').onclick = () => { scale = 1; apply(); };
+    canvas.addEventListener('wheel', (e) => { if (e.ctrlKey) { e.preventDefault(); scale = Math.max(0.5, Math.min(5, scale * (e.deltaY < 0 ? 1.12 : 0.89))); apply(); } }, { passive: false });
+
+    let space = false, drag = false, sx = 0, sy = 0, sl = 0, st = 0;
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && e.target.tagName !== 'BUTTON') {
+        if (!space) { space = true; canvas.style.cursor = 'grab'; }
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', (e) => { if (e.code === 'Space') { space = false; drag = false; canvas.style.cursor = ''; } });
+    canvas.addEventListener('mousedown', (e) => {
+      if (space || e.button === 1) {
+        drag = true; canvas.style.cursor = 'grabbing';
+        sx = e.clientX; sy = e.clientY; sl = canvas.scrollLeft; st = canvas.scrollTop; e.preventDefault();
+      }
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (drag) { canvas.scrollLeft = sl - (e.clientX - sx); canvas.scrollTop = st - (e.clientY - sy); }
+    });
+    window.addEventListener('mouseup', () => { if (drag) { drag = false; canvas.style.cursor = space ? 'grab' : ''; } });
+    canvas.addEventListener('click', (e) => { if (space || drag) { e.preventDefault(); e.stopPropagation(); } }, true);
+    ['zin','zout','zreset'].forEach(id => document.getElementById(id).addEventListener('click', (e) => e.currentTarget.blur()));
+  } catch (e) {
+    document.getElementById('err').style.display = 'block';
+    document.getElementById('err').textContent = 'diagram error: ' + e.message;
+  }
+</script>
+</body>
+</html>

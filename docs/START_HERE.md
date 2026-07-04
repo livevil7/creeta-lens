@@ -8,7 +8,7 @@ This is the first document to read for `creeta-lens`.
 
 - `/c` — single skill navigator (scan → recommend → execute)
 - `/cc` — parallel multi-agent execution (Leader → Workers → Supervisor → QA)
-- `/cp` — plan-first execution + documentation lifecycle (PLAN / DONE / ORGANIZE / CONVERT)
+- `/cp` — plan-first execution + documentation lifecycle (PLAN / DONE / ORGANIZE / CONVERT / FLOW — `/cp flow` 는 프로젝트 전체 그림(단계↔엔진↔종속) 플로우차트를 `docs/rules/flow.md`+`flow.html` Rule 로 생성)
 - `/cps` — generates `docs/START_HERE.md`, a repo orientation + question-routing entry point
 - `/cs` — multi-repo git synchronizer
 - `/ci` — per-user plugin install synchronizer (manifest ↔ installed; installs missing, removes only excluded, reports foreign)

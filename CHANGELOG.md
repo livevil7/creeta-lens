@@ -1,3 +1,21 @@
+## [3.23.0] - 2026-07-04
+
+`/cp flow` 신설(프로젝트 플로우차트 = Rule) + Fable 하네스 규칙 이식(6개 스킬 역할별 인라인). 계획: `docs/tasks/2026-07-04-cp-flow-mode.md`.
+
+### Added (v3.23.0)
+
+- **`/cp flow [scope]` — FLOW 모드 신설**: 어떤 프로젝트든 "이용자 관점 단계별 화면/구성 ↔ 받치는 엔진/모듈 ↔ 종속·재사용 관계"를 한 장의 인터랙티브 플로우차트로 그려 `docs/rules/flow.md`(SoT) + `flow.html`(뷰)로 저장 — 프로젝트 전체 그림의 Rule. F1 실파일 근거 스캔(근거 없는 노드 `(추정)` 표기 의무) → F2 2층 추출·관계 매핑(단계<2 시 인터뷰 fallback) → F3 md(기존 파일 diff 승인) → F4 HTML(노드 50+ 시 복수 블록 분할 fallback) → F5 board 재빌드. `flow` 는 라우팅 예약어(뒤에 자연어가 붙으면 PLAN 모드). `skills/cp/SKILL.md`.
+- **flow 템플릿 쌍**: `templates/flow.template.md`(단계 정의 표 + 모듈 인벤토리 표(재사용 가시화) + mermaid 원본 + 근거 규칙) + `templates/flow-viewer.example.html`(livevil-boost flow.html 일반화 — zoom/pan/클릭/Mermaid 11 ESM 계승, **05-dark-developer 디자인 토큰 임베드**(livevil-setting/design SoT — 색·헤어라인 보더·radius·모션, 폰트만 한국어 커버리지로 Pretendard 유지 편차 명기), `lens:source*` 메타로 board stale 감지 호환).
+- **`docs/rules/harness-rules.md` 신설 — Fable 하네스 규칙 SoT**: 공개 추출본(asgeirtj/system_prompts_leaks, Claude Code 2.1.172 Fable — 비공식·재서술) 기반 규칙 인벤토리 A~G(자율 실행·정직 보고·오케스트레이션·QA 패턴·계획·리서치·공통 보고) + **additive-only 판정 기준**(하네스가 이미 강제하면 재복붙 금지 — 워커 프롬프트/Lens 특화 지점/3중 반복만 예외) + 스킬 매핑 표 + 충돌 심사 3건(모델 할당·승인 게이트·5분 보고 — 전부 Lens 설계 유지). `/crv` 재대조 채널 명시.
+- **6개 스킬 하네스 규칙 인라인 (역할별 분할)**: `/c`·`/cc` 워커 디스패치 프롬프트에 "작업 규율"(끝까지 실행·결과 충실 보고·완료 마킹 엄격·상태 변경 전 증거 검사) + Monitor 프롬프트에 "침묵은 성공이 아니다"(모든 종결 상태 매치) + `/cc` Leader 오케스트레이션 규율(릴레이 의무·중복 금지·SendMessage 재사용·하이브리드 스카우팅·규모 스케일링·pipeline 기본) / `/ccp` QA 적용분(refuted 기본값·완결성 비평가·침묵 캡 금지·self-check) / `/cp`·`/cpp` 계획 적용분(elicitation gate·승인 전용 게이트·충분하면 행동) / `/cr` 리서치 적용분(Unrecognized Entity Rule·effort scaling·snippet 불신·출처 위계·"없음" 과신 금지). 스킬당 ~40줄 이내, 삭제 0줄(순수 삽입).
+
+### Changed (v3.23.0)
+
+- **CONVERT 모드 가드**: `/cp html <md>` 양식 판별이 frontmatter `doc_kind: flow` 를 최우선 확인(`planner: cpp` 보다 먼저) — flow 뷰어가 task 6-slide 덱으로 덮이는 사고 차단.
+- **모델 할당 절 보강** (`/c`·`/cc`): "불확실하면 세션 모델을 상속한다 — 세션이 opus 이상 티어(예: Fable)면 상속이 곧 최고 품질" (harness-rules §4.1 해소 반영).
+
+### Fixed (v3.23.0)
+
 ## [3.22.0] - 2026-07-01
 
 ### Added (v3.22.0)
