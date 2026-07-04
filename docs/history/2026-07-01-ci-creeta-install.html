@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>/ci — Creeta Install 설치목록 동기화 · 보고서</title>
+<meta name="lens:source" content="docs/history/2026-07-01-ci-creeta-install.md">
+<meta name="lens:source-hash" content="3b637bfd5181">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">07</b></div>
+
+<main class="deck">
+
+<!-- ── 1. Cover ───────────────────────────────────── -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 07 · COVER</div>
+  <div class="meta">
+    <span>2026-07-01</span>
+    <span class="dot">·</span>
+    <span class="badge">Done</span>
+    <span class="dot">·</span>
+    <span>creeta-lens · v3.22.0</span>
+  </div>
+
+  <h1 class="h-title">/ci — Creeta Install: per-user 설치목록 동기화 스킬</h1>
+  <p class="lede">
+    사용자가 "내가 쓰는 플러그인 목록"을 manifest 한 파일에 적어두면, <code>/ci</code> 한 번으로
+    이 머신이 그 목록에 맞춰진다 — 없으면 설치, <strong>빼라고 명시한 것만</strong> 백업 후 제거.
+  </p>
+
+  <div class="hero">
+    <div class="num">4<span class="unit">분류</span></div>
+    <div class="caption">
+      설치할 것 / 제거할 것 / 목록밖 그대로둠 / 이미 맞음 — diff 프리뷰 후 승인.
+      <strong>v3.22.0으로 출시</strong> (tag v3.22.0, commit fe20cb2).
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-07-01-ci-creeta-install</span>
+  </div>
+</section>
+
+<!-- ── 2. At a glance ─────────────────────────────── -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 07 · AT A GLANCE</div>
+  <h2 class="title">숫자로 본 /ci</h2>
+  <p class="sub">신규 스킬 1 + 결정론 백엔드 1 + 단위테스트 1. 파괴적 연산은 전부 게이트 뒤에.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">diff 분류</div>
+      <div class="v">4<span class="unit">구획</span></div>
+      <div class="desc">toInstall / toRemove / <strong>foreign(보고만)</strong> / ok.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">신규 산출물</div>
+      <div class="v">3<span class="unit">개</span></div>
+      <div class="desc"><code>skills/ci/SKILL.md</code> + <code>lib/install-sync.js</code> + <code>lib/install-sync.test.js</code>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">제거 조건</div>
+      <div class="v accent">excluded<span class="unit">only</span></div>
+      <div class="desc">manifest.excluded 명시 항목만. <strong>백업 + 항목별 재확인</strong> 후 uninstall.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">자동 제거되는 foreign</div>
+      <div class="v good">0</div>
+      <div class="desc">목록에 없는 플러그인은 <strong>절대 자동 삭제 안 함</strong> — 보고만.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">목록 관리 UX</div>
+      <div class="v">3<span class="unit">서브커맨드</span></div>
+      <div class="desc"><code>/ci add</code> · <code>/ci remove</code> · <code>/ci edit</code>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">EARS 검증 항목</div>
+      <div class="v">6<span class="unit">건</span></div>
+      <div class="desc">빈 틀 생성 · foreign 불가침 · 자기보호 · dry-run 무변경 · 백업 · 세션 노출.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 3. How it works ─────────────────────────────── -->
+<section class="slide" id="how">
+  <div class="page-no">03 / 07 · PIPELINE</div>
+  <h2 class="title">동기화 흐름</h2>
+  <p class="sub">결정론 백엔드가 diff를 만들고, 사람이 승인하고, 파괴적 연산은 백업 뒤에서만.</p>
+
+  <div class="pipe" style="margin-top:24px">
+    <div class="step">
+      <div class="n">1</div>
+      <h3>수집 · Diff</h3>
+      <p class="what"><code>~/.claude/lens/manifest.json</code>(없으면 빈 틀 생성) ↔ 설치현황. <strong>list --json 1차 + installed_plugins.json 폴백</strong>.</p>
+      <div class="files"><span class="nm">lib/install-sync.js</span></div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <h3>프리뷰 · 승인</h3>
+      <p class="what">4구획 표를 dry-run으로 출력 → 사용자 승인(설치+제거 / 설치만 / 취소).</p>
+      <div class="files"><span class="nm">--dry-run --json</span></div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <h3>설치</h3>
+      <p class="what">marketplace add → <code>install --scope user</code>. 항목별 <strong>fail-soft</strong>(하나 실패해도 계속).</p>
+      <div class="files"><span class="nm">skills/ci/SKILL.md</span></div>
+    </div>
+    <div class="step">
+      <div class="n">4</div>
+      <h3>제거 (게이트)</h3>
+      <p class="what">excluded 항목만 — <strong>installPath 백업</strong>(<code>removed-backup-&lt;ts&gt;/</code>) + 항목별 재확인 후 uninstall. foreign은 안내만.</p>
+      <div class="files"><span class="nm">최종 재-diff로 "일치" 보고</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 4. Key decisions ────────────────────────────── -->
+<section class="slide" id="decisions">
+  <div class="page-no">04 / 07 · KEY DECISIONS</div>
+  <h2 class="title">왜 이렇게 설계했나</h2>
+  <p class="sub">파괴적 연산 안전이 최우선. Codex 교차 협의가 안전모델과 참조 패턴을 교정.</p>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <div class="n">01</div>
+      <div>
+        <h3>managed / excluded / foreign 3분리</h3>
+        <p>제거는 <code>manifest.excluded</code> 명시 항목만. 목록에 없는 foreign은 <strong>절대 자동 삭제 없이 보고만</strong>. 모든 uninstall은 백업 + 항목별 승인 뒤. (Codex 핵심 교정)</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">02</div>
+      <div>
+        <h3>Lens 자기보호 하드가드</h3>
+        <p><code>lens@CreetaCorp</code>는 제거 후보에서 원천 배제 — <strong>self-uninstall 재앙</strong>을 Constitution 레벨에서 차단.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">03</div>
+      <div>
+        <h3>cu.py 패턴 재사용</h3>
+        <p>초안의 모델 install-skills.ps1은 이 레포에 없음(Codex 지적으로 확인) → 레포 내 <code>scripts/cu.py</code>의 installed_plugins.json 직접 읽기 + scope 보정 패턴으로 교체.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">04</div>
+      <div>
+        <h3>설치현황 이중 수집</h3>
+        <p><code>claude plugin list --json</code> 1차 + <code>installed_plugins.json</code> 폴백 — CLI 스키마가 버전 따라 변할 수 있어 <strong>폴백 필수</strong>.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">05</div>
+      <div>
+        <h3>범용 설계 (내 전용 아님)</h3>
+        <p>livevil 개인 특화 로직 금지. manifest는 <strong>사용자가 채우는 빈 틀</strong>로 시작 — Lens를 쓰는 누구나 자기 목록을 갖는다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 5. Validation ─────────────────────────────── -->
+<section class="slide" id="validate">
+  <div class="page-no">05 / 07 · VALIDATION</div>
+  <h2 class="title">어떻게 믿을 수 있나</h2>
+  <p class="sub">사후 아카이브 — 당시 개별 검증 로그는 없다. 대신 릴리즈 산출물과 현재 상태로 확인.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">EARS 6건 중 auto 항목은 단위테스트가 커버하도록 설계.</div>
+    <ol>
+      <li>
+        <h4>단위테스트 설계 (EARS auto)</h4>
+        <div class="det"><code>lib/install-sync.test.js</code> — foreign 불가침(toRemove 절대 미포함) · lens 자기보호 · excluded∩installed 케이스. 레포에 실존.</div>
+      </li>
+      <li>
+        <h4>검증 로그 부재 (정직 명시)</h4>
+        <div class="det">이 문서는 사후 아카이브 — 당시 dry-run·백업 확인 로그는 <strong>남아 있지 않다</strong>.</div>
+      </li>
+      <li>
+        <h4>v3.22.0 릴리즈·설치로 최종 확인</h4>
+        <div class="det">산출물 3종이 레포에 실존하고, <code>/ci</code>가 세션 스킬 목록에 정상 노출 (2026-07-04 확인). tag <code>v3.22.0</code> · commit <code>fe20cb2</code>.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ── 6. Files ────────────────────────────────────── -->
+<section class="slide" id="files">
+  <div class="page-no">06 / 07 · ARTIFACTS</div>
+  <h2 class="title">변경 파일</h2>
+  <p class="sub">신규 3 + 릴리즈 배선 5. 기존 스킬·lib는 무수정(Surgical).</p>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <div class="gh"><h3>Skill</h3><span class="cnt">1</span></div>
+      <ul>
+        <li><span>skills/ci/SKILL.md</span></li>
+      </ul>
+      <p class="note">동기화 오케스트레이션 + <code>/ci add·remove·edit</code> 분기.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Lib</h3><span class="cnt">2</span></div>
+      <ul>
+        <li><span>lib/install-sync.js</span></li>
+        <li><span>lib/install-sync.test.js</span></li>
+      </ul>
+      <p class="note">무의존 결정론 백엔드 + 단위테스트.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>릴리즈 배선</h3><span class="cnt">5</span></div>
+      <ul>
+        <li><span>scripts/bump-version.sh</span></li>
+        <li><span>docs/START_HERE.md</span></li>
+        <li><span>CLAUDE.md</span></li>
+        <li><span>README.md</span></li>
+        <li><span>CHANGELOG.md</span></li>
+      </ul>
+      <p class="note">버전-bearing 목록 + 사용자 문서 등록.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 7. Next ───────────────────────────────────── -->
+<section class="slide" id="next">
+  <div class="page-no">07 / 07 · WHAT'S NEXT</div>
+  <h2 class="title">남은 일</h2>
+  <p class="sub">스킬은 출시 완료. 개인 목록 이식과 스키마 드리프트 감시가 남았다.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next">
+      <div class="l">Follow-up · A</div>
+      <h3>내 목록 이식</h3>
+      <p>manifest는 빈 틀로 시작 — livevil-setting/skills.json에서 <strong>export해 이식</strong>하는 것은 별도 작업.</p>
+    </div>
+    <div class="next">
+      <div class="l">Watch · B</div>
+      <h3>list --json 스키마 드리프트</h3>
+      <p>Claude Code 버전에 따라 스키마가 변할 수 있음 — <strong><code>installed_plugins.json</code> 폴백</strong>이 방어선.</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">제거는 명시한 것만, 그것도 백업 뒤에서 — foreign은 건드리지 않는다.</div>
+    <div class="right">creeta-lens · v3.22.0<br>2026-07-01</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

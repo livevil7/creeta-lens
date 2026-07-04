@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lens 3.23.x — /cp flow + 하네스 규칙 이식 · 보고서</title>
+<meta name="lens:source" content="docs/history/2026-07-04-cp-flow-mode.md">
+<meta name="lens:source-hash" content="db3730b44bb4">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">07</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 07 · COVER</div>
+  <div class="meta">
+    <span>2026-07-04</span>
+    <span class="dot">·</span>
+    <span class="badge">Done</span>
+    <span class="dot">·</span>
+    <span>lens v3.23.0 → v3.23.1</span>
+  </div>
+
+  <h1 class="h-title">Lens 3.23.x — <code>/cp flow</code> 신설 + Fable 하네스 규칙 이식</h1>
+  <p class="lede">
+    어떤 프로젝트든 한 번의 명령으로 "이용자 화면 ↔ 엔진/모듈 ↔ 종속·재사용"을
+    한 장의 인터랙티브 플로우차트 Rule 로 그리고, 공개된 Fable 5 하네스 규칙을
+    여섯 스킬에 역할별로 이식했다.
+  </p>
+
+  <div class="hero">
+    <div class="num">2<span class="unit">releases in 1 day</span></div>
+    <div class="caption">
+      <strong>v3.23.0</strong>(FLOW 모드 + 규칙 이식) → dogfood 반려 →
+      <strong>v3.23.1</strong>(단계 층 = 화면 단위 강제). QA auto <strong>6/6</strong> pass.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-07-04-cp-flow-mode</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 07 · AT A GLANCE</div>
+  <h2 class="title">숫자로 본 작업</h2>
+  <p class="sub">병렬 워커 5 + dogfood 워커 2 + Supervisor·QA. Plan A 완주, Plan B 미발동.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">releases</div>
+      <div class="v">2</div>
+      <div class="desc"><strong>v3.23.0</strong> 본편 + <strong>v3.23.1</strong> 화면 단위 패치 — tag push·설치 완료.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">skills upgraded</div>
+      <div class="v accent">6</div>
+      <div class="desc"><code>/c</code> <code>/cc</code> <code>/ccp</code> <code>/cp</code> <code>/cpp</code> <code>/cr</code> — 역할별 인라인, 삭제 0줄.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">QA auto checks</div>
+      <div class="v good">6/6</div>
+      <div class="desc">산출물·Playwright 렌더·board·스킬 grep·버전·CONVERT 가드 전부 실행 증거.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">supervisor score</div>
+      <div class="v">92</div>
+      <div class="desc">실파일 재검증 pass. Codex 리뷰는 미완 → 단독 게이트 degrade(정직 기록).</div>
+    </div>
+    <div class="kpi">
+      <div class="l">dogfood nodes</div>
+      <div class="v">24</div>
+      <div class="desc">livevil-boost — 화면 9 + 접점 2 + 엔진 12, <code>(추정)</code> 노드 <strong>0</strong>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">rule inventory</div>
+      <div class="v">7<span class="unit">categories</span></div>
+      <div class="desc">A 자율실행 ~ G 공통보고 — <code>harness-rules.md</code> SoT 105줄.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Problem -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 07 · PROBLEM</div>
+  <h2 class="title">전체 그림이 머릿속에만 있었다</h2>
+  <p class="sub">프로젝트가 커질수록 "어떤 화면을 어떤 엔진이 받치는가"를 매 세션 재파악. 워커 규율도 Karpathy 4규칙에서 멈춰 있었다.</p>
+
+  <div class="compare" style="margin-top:24px">
+    <div class="panel warn">
+      <div class="ph"><span class="tag">Before</span><h3>재파악 비용 반복</h3></div>
+      <p class="note">단계·화면·엔진·종속 관계가 문서화되지 않아 세션·협업자마다 처음부터 파악. understand-anything 은 범위 과다·품질 미달. 워커는 완료 과대보고·중간 멈춤·침묵 모니터 문제 지속.</p>
+    </div>
+    <div class="panel good">
+      <div class="ph"><span class="tag">After</span><h3>한 장의 Rule + 규율 상향</h3></div>
+      <p class="note"><code>/cp flow</code> 한 번으로 화면↔엔진↔종속이 인터랙티브 차트 Rule 로 저장·board 열람. 여섯 스킬의 워커·감독·QA·리서치가 Fable 세대 하네스 규율(정직 보고·끝까지 실행·검증 패턴)을 따름.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. How it works -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 07 · HOW IT WORKS</div>
+  <h2 class="title">FLOW 파이프라인 F1–F5</h2>
+  <p class="sub">md = SoT, HTML = 파생 뷰. 실제 파일 근거만 — 근거 없는 노드는 (추정) 표기 의무.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">F1</div>
+      <h3>스캔</h3>
+      <div class="what">CLAUDE.md·docs/rules·README → 라우트/화면/CLI/잡/외부시스템 수집. 실파일 근거만.</div>
+    </div>
+    <div class="step">
+      <div class="n">F2</div>
+      <h3>2층 추출</h3>
+      <div class="what"><strong>단계 층 = 화면 단위</strong>(v3.23.1 강제 — 스크립트·설정·잡은 엔진 층으로 강등) + SYS 엔진 층. 실선/점선/재사용/피드백 매핑.</div>
+    </div>
+    <div class="step">
+      <div class="n">F3</div>
+      <h3>md SoT</h3>
+      <div class="what"><code>docs/rules/flow.md</code> — 단계 표 + 모듈 인벤토리(재사용 가시화) + mermaid. 기존 파일은 diff 승인 후 덮어씀.</div>
+    </div>
+    <div class="step">
+      <div class="n">F4</div>
+      <h3>HTML 뷰어</h3>
+      <div class="what">05-dark-developer 토큰 임베드, zoom/pan, click 은 HTML 전용(실존 파일만). 노드 50+ 시 계층 분할.</div>
+    </div>
+    <div class="step">
+      <div class="n">F5</div>
+      <h3>board</h3>
+      <div class="what">board 재빌드 — rules 카드로 열람, md↔html 해시 불일치 시 stale 표시.</div>
+    </div>
+    <div class="step">
+      <div class="n">가드</div>
+      <h3>CONVERT 보호</h3>
+      <div class="what"><code>/cp html</code> 이 <code>doc_kind: flow</code> 감지 시 task 덱이 아닌 flow 뷰어로 재생성 (Codex 발견 함정 차단).</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Decisions -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 07 · DECISIONS</div>
+  <h2 class="title">주요 결정</h2>
+  <p class="sub">사용자 반려 1회가 스펙의 핵심 규칙을 만들었다.</p>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <h3>단계 층 노드 = 화면(스크린) 단위</h3>
+      <p>초판 dogfood 가 단계를 스크립트/작업 단위로 묶어 <strong>사용자 반려</strong> → "이용자가 실제로 보는 화면/뷰만 단계 노드" 로 강제, 화면 인벤토리는 라우트/템플릿에서 도출. v3.23.1 로 즉시 패치.</p>
+    </div>
+    <div class="dec">
+      <h3>Additive-only 이식 원칙</h3>
+      <p>하네스가 이미 강제하는 규칙은 재복붙 금지 — 예외는 워커 디스패치 프롬프트·Lens 특화 지점·3중 반복뿐. 스킬당 ~40줄 상한, 삭제 0줄 (fable-prompts 의 Lossless Transformation 교훈).</p>
+    </div>
+    <div class="dec">
+      <h3>비공식 출처는 재서술 + 기준 버전 명시</h3>
+      <p>추출본 원문 복붙 금지(정확성·라이선스 동시 회피), 기준 Claude Code 2.1.172 명시, 버전업 시 <code>/crv</code> 재대조 채널. 충돌 3건(모델 할당·승인 게이트·5분 보고)은 심사 후 전부 Lens 설계 유지.</p>
+    </div>
+    <div class="dec">
+      <h3>디자인 SoT = 05-dark-developer 토큰 임베드</h3>
+      <p>livevil-setting design.md 토큰(색·헤어라인 보더·radius·모션)을 템플릿에 임베드해 타 머신에서도 동작. 폰트만 한국어 커버리지로 Pretendard 유지(편차 명기).</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Validation -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 07 · VALIDATION</div>
+  <h2 class="title">검증</h2>
+  <p class="sub">텍스트 검토가 아니라 실행 증거 — Playwright 실렌더 + grep + 버전 확인.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">Supervisor 92/100(실파일 재검증) → QA auto 6/6 → dogfood 2회(반려→재생성).</div>
+    <ol>
+      <li>
+        <h4>QA auto 6/6 pass</h4>
+        <div class="det">산출물 ls · Playwright 렌더(svg=true, err=none) · board 카드(해시 일치) · 스킬 grep 6/6 · 설치본 버전 · CONVERT 가드(slide 클래스 0).</div>
+      </li>
+      <li>
+        <h4>dogfood — livevil-boost 실전 2회</h4>
+        <div class="det">1차(21노드, 모듈 단위) 사용자 반려 → 스펙 수정 → 2차(24노드 = 화면 9 + 접점 2 + 엔진 12) 렌더 통과. mermaid 점선 라벨 lexical error 실측·가드 반영.</div>
+      </li>
+      <li>
+        <h4>정직 기록 — Codex 리뷰 미완</h4>
+        <div class="det">180초 내 판정 미산출 → 블로킹 없이 Supervisor 단독 게이트로 degrade, 사실대로 기록.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- 7. Files & Next -->
+<section class="slide" id="next">
+  <div class="page-no">07 / 07 · FILES & NEXT</div>
+  <h2 class="title">변경 파일 & 후속</h2>
+  <p class="sub">신규 3 + 스킬 6 + 문서 4 + dogfood 산출물 3 (livevil-boost).</p>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <h3>신규</h3>
+      <p><code>templates/flow.template.md</code> · <code>templates/flow-viewer.example.html</code> · <code>docs/rules/harness-rules.md</code></p>
+    </div>
+    <div class="file-card">
+      <h3>스킬 6종</h3>
+      <p><code>skills/cp</code>(FLOW+가드+8줄) · <code>c</code>+20 · <code>cc</code>+27 · <code>ccp</code>+16 · <code>cpp</code>+12 · <code>cr</code>+14</p>
+    </div>
+    <div class="file-card">
+      <h3>dogfood (livevil-boost)</h3>
+      <p><code>docs/rules/flow.md</code> · <code>flow.html</code> · <code>board_livevil-boost.html</code> — commit <code>1bf78f2</code></p>
+    </div>
+  </div>
+
+  <div class="next-grid" style="margin-top:20px">
+    <div class="next">
+      <div class="l">후속 (보류)</div>
+      <h3>board FLOW badge · loop-until-dry /cc 반영 · CHANGELOG 빈 [3.22.0] 헤더 정리</h3>
+      <p>board stale 은 md↔html 불일치만 감지 — 코드 변경은 <code>/cp flow</code> 재실행으로 갱신. harness-rules.md 는 Claude Code 버전업 시 <code>/crv</code> 재대조.</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">전체 그림을 한 장으로 — 화면이 단계가 되고, 그 그림이 Rule 이 된다.</div>
+    <div class="right">creeta-lens · v3.23.0 → v3.23.1<br>2026-07-04</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

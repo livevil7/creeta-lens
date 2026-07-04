@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>/cr = Creeta Research 신설 + Lens Review → /crv 개명 · 보고서</title>
+<meta name="lens:source" content="docs/history/2026-07-01-cr-research-rename-crv.md">
+<meta name="lens:source-hash" content="672a18428728">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">07</b></div>
+
+<main class="deck">
+
+<!-- ── 1. Cover ───────────────────────────────────── -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 07 · COVER</div>
+  <div class="meta">
+    <span>2026-07-01</span>
+    <span class="dot">·</span>
+    <span class="badge">Done</span>
+    <span class="dot">·</span>
+    <span>creeta-lens · v3.22.0</span>
+  </div>
+
+  <h1 class="h-title">/cr = Creeta Research 신설 + 기존 Lens Review → /crv 개명</h1>
+  <p class="lede">
+    자가 현대화 감사를 <code>/crv</code>로 무손실 이전해 이름을 비우고, 그 자리에
+    라이브 다각도 딥리서치 <strong>Creeta Research</strong>를 신설 — 조사 결과는 파일 없이 대화로 인용 보고.
+  </p>
+
+  <div class="hero">
+    <div class="num">2<span class="unit">skills</span></div>
+    <div class="caption">
+      <strong>/crv</strong>(Review, 기능·알림·stamp·scope guard 무손실 이전) + <strong>/cr</strong>(Research, 신규).
+      <strong>v3.22.0으로 출시</strong> (tag v3.22.0, commit fe20cb2).
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-07-01-cr-research-rename-crv</span>
+  </div>
+</section>
+
+<!-- ── 2. At a glance ─────────────────────────────── -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 07 · AT A GLANCE</div>
+  <h2 class="title">숫자로 본 두 갈래</h2>
+  <p class="sub">개명(A)이 먼저, 신설(B)이 다음. 순서가 곧 안전장치.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">skills</div>
+      <div class="v">2<span class="unit">개</span></div>
+      <div class="desc"><code>/cr</code>(research 신설) + <code>/crv</code>(review 이전).</div>
+    </div>
+    <div class="kpi">
+      <div class="l">nudge 문자열 이전</div>
+      <div class="v">3<span class="unit">곳</span></div>
+      <div class="desc"><code>lib/capability-audit.js</code>의 SessionStart 재감사 안내 문구.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">개명 손실</div>
+      <div class="v good">0</div>
+      <div class="desc">기능·알림·stamp·scope guard <strong>전부 /crv로 이전</strong>. 전수 grep 게이트.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">/cr 산출 파일</div>
+      <div class="v accent">0<span class="unit">개</span></div>
+      <div class="desc">Research는 <strong>대화 보고만</strong> — 파일 저장 안 함 (설계 규칙).</div>
+    </div>
+    <div class="kpi">
+      <div class="l">배선 파일</div>
+      <div class="v">9<span class="unit">그룹</span></div>
+      <div class="desc">skills ×2 · lib · hooks · rules ×2 · CLAUDE/README · 릴리즈 3종.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">EARS 검증 항목</div>
+      <div class="v">7<span class="unit">건</span></div>
+      <div class="desc">잔재 0 · 알림 문구 · 감사 동작 · 인용 보고 · 폴백 · affects_lens · 태그.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 3. Problem ────────────────────────────────── -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 07 · PROBLEM</div>
+  <h2 class="title">/cr 이름이 이미 점유돼 있었다</h2>
+  <p class="sub">
+    Review는 SessionStart nudge·capability-audit에 배선돼 있어 대충 옮기면
+    알림이 죽은 명령을 가리킨다 — 깨끗한 개명이 선행 조건.
+  </p>
+
+  <div class="compare">
+    <div class="panel warn">
+      <div class="ph">
+        <span class="tag">Before</span>
+        <h3>이름 충돌</h3>
+      </div>
+      <p class="note" style="margin-top:12px">
+        <code>/cr</code> = Lens Review(자가 현대화 감사)가 점유. 사용자는 <code>/cr</code>을
+        "creeta research"로 쓰고 싶음. 방치하면 <strong>둘 중 하나가 안 뜨거나</strong>,
+        SessionStart 알림이 <strong>존재하지 않는 명령을 안내</strong>하게 된다.
+      </p>
+    </div>
+
+    <div class="panel good">
+      <div class="ph">
+        <span class="tag">After</span>
+        <h3>역할 분리</h3>
+      </div>
+      <p class="note" style="margin-top:12px">
+        <code>/crv</code> = Lens Review — 알림·stamp·scope guard 그대로, 문구만 /crv.<br>
+        <code>/cr</code> = Creeta Research — 아무 레포에서나(스코프 가드 없음) 라이브 다각도 조사,
+        출처 URL+발행일 인용을 <strong>대화로 보고</strong>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 4. How it works ─────────────────────────────── -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 07 · PIPELINE</div>
+  <h2 class="title">A(개명) → B(신설), 순서가 핵심</h2>
+  <p class="sub">충돌부터 제거하고, 게이트를 통과한 뒤에 신설. substrate 문서가 토대.</p>
+
+  <div class="pipe" style="margin-top:24px">
+    <div class="step">
+      <div class="n">A1</div>
+      <h3>스킬 이동</h3>
+      <p class="what"><code>skills/cr</code> → <code>skills/crv</code> + frontmatter·triggers·본문 식별자 전환. scope guard·stamp 유지.</p>
+      <div class="files"><span class="nm">git mv + SKILL.md</span></div>
+    </div>
+    <div class="step">
+      <div class="n">A2</div>
+      <h3>배선 이전</h3>
+      <p class="what">capability-audit <strong>nudge 3문자열</strong>·주석, session-start 주석, capability-assumptions <strong>affects_lens에 crv 등록</strong>, 문서들.</p>
+      <div class="files"><span class="nm">lib · hooks · rules · docs</span></div>
+    </div>
+    <div class="step">
+      <div class="n">A6</div>
+      <h3>전수 grep 게이트</h3>
+      <p class="what">역사문서 제외 레포 전체에서 <strong>/cr(review) 잔재 0</strong> 확인 후에만 B 진행 — 개명 무손실 판정.</p>
+      <div class="files"><span class="nm">grep -rn "/cr\b"</span></div>
+    </div>
+    <div class="step">
+      <div class="n">B</div>
+      <h3>/cr 신설</h3>
+      <p class="what">다각도 병렬 수집(웹검색·GitHub·YouTube·커뮤니티·RSS) → 교차·상충 정리 → 대화 보고. <code>live-research.md</code> 소비.</p>
+      <div class="files"><span class="nm">skills/cr/SKILL.md (new)</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 5. Key decisions ────────────────────────────── -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 07 · KEY DECISIONS</div>
+  <h2 class="title">왜 이렇게 설계했나</h2>
+  <p class="sub">Codex 교차 협의가 blast radius를 넓히고 신규 스킬의 안전 규칙을 박았다.</p>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <div class="n">01</div>
+      <div>
+        <h3>A 먼저 → B 순서</h3>
+        <p><code>/cr</code> 이름 충돌을 먼저 제거해야 신규 스킬이 안전하게 자리 잡음. 순서에 <strong>Codex 이견 없음</strong>.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">02</div>
+      <div>
+        <h3>개명은 무손실 — blast radius 확장</h3>
+        <p>Codex가 초안보다 범위를 넓게 교정: nudge 3문자열 + <strong>affects_lens에 crv 신규 등록</strong>(기존엔 skills/cr 미참조라 자가감사 대상 누락 위험)까지.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">03</div>
+      <div>
+        <h3>신규 /cr 안전 4규칙 (Codex)</h3>
+        <p>(a) <strong>파일 저장 안 함</strong> (b) 출처 URL+발행일 의무 (c) 로컬/비공개 코드·시크릿 <strong>외부 쿼리 유출 금지</strong> (d) 스코프 가드 없음(Review와 반대).</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">04</div>
+      <div>
+        <h3>deep-research와 차별</h3>
+        <p>creeta research = <strong>무키 라이브채널 + WAF 차단우회</strong> 특화. 범용 웹리서치만이면 deep-research 폴백/안내으로 중복 회피.</p>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="n">05</div>
+      <div>
+        <h3>substrate 소비 + 역사문서 불변</h3>
+        <p>호출 명령 복붙 금지 — <code>docs/rules/live-research.md</code>(SoT) 참조. 과거 기록(<code>docs/history/2026-06-05-*audit*</code>)의 /cr 표기는 개명 제외.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 6. Validation ─────────────────────────────── -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 07 · VALIDATION</div>
+  <h2 class="title">어떻게 믿을 수 있나</h2>
+  <p class="sub">사후 아카이브 — 당시 grep·실행 로그는 없다. 릴리즈 산출물과 현재 세션으로 확인.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">EARS 7건: 개명 무손실은 grep 게이트, 신규 /cr은 실행 관측으로 설계.</div>
+    <ol>
+      <li>
+        <h4>검증 설계</h4>
+        <div class="det">개명 잔재 0(전수 grep) · SessionStart 알림 /crv 문구 · /crv 감사 파이프라인(stamp 갱신) · /cr 인용 보고+파일 0 · 미설치 폴백 · affects_lens 등록 · 태그+세션 노출.</div>
+      </li>
+      <li>
+        <h4>검증 로그 부재 (정직 명시)</h4>
+        <div class="det">이 문서는 사후 아카이브 — 당시 개별 grep·실행 로그는 <strong>남아 있지 않다</strong>.</div>
+      </li>
+      <li>
+        <h4>v3.22.0 릴리즈·설치로 최종 확인</h4>
+        <div class="det"><code>skills/cr/</code>·<code>skills/crv/</code>가 레포에 실존하고, <strong>/cr(research)·/crv(review) 둘 다</strong> 세션 스킬 목록에 정상 노출 (2026-07-04 확인). tag <code>v3.22.0</code> · commit <code>fe20cb2</code>.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ── 7. Files ────────────────────────────────────── -->
+<section class="slide" id="files">
+  <div class="page-no">07 / 07 · ARTIFACTS</div>
+  <h2 class="title">변경 파일</h2>
+  <p class="sub">개명 배선 6그룹 + 신설 1 + 릴리즈 배선. CHANGELOG 명시 기준.</p>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <div class="gh"><h3>Skills</h3><span class="cnt">2</span></div>
+      <ul>
+        <li><span>skills/cr → skills/crv</span><span class="meta">이동</span></li>
+        <li><span>skills/cr/SKILL.md</span><span class="meta">신규</span></li>
+      </ul>
+      <p class="note">Review 이전 + Research 신설.</p>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Code · Rules</h3><span class="cnt">4</span></div>
+      <ul>
+        <li><span>lib/capability-audit.js</span><span class="meta">nudge ×3</span></li>
+        <li><span>hooks/session-start.js</span></li>
+        <li><span>docs/rules/capability-assumptions.json</span><span class="meta">affects_lens</span></li>
+        <li><span>docs/rules/codex-integration.md</span></li>
+      </ul>
+    </div>
+    <div class="file-card">
+      <div class="gh"><h3>Docs · 릴리즈</h3><span class="cnt">5</span></div>
+      <ul>
+        <li><span>CLAUDE.md</span></li>
+        <li><span>README.md</span></li>
+        <li><span>docs/START_HERE.md</span></li>
+        <li><span>scripts/bump-version.sh</span></li>
+        <li><span>CHANGELOG.md</span></li>
+      </ul>
+      <p class="note">스킬 표·사용법·버전-bearing 목록.</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">이름을 비우는 일이 먼저다 — 무손실 개명 없이는 신설도 없다.</div>
+    <div class="right">creeta-lens · v3.22.0<br>2026-07-01</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>
