@@ -1,18 +1,18 @@
 ---
 name: "c"
-description: "Lens v3.23.0 — Task execution engine. Analyzes, plans, assigns skills & models, deploys worker with monitoring. Sequential single-worker mode."
+description: "Lens v3.23.1 — Task execution engine. Analyzes, plans, assigns skills & models, deploys worker with monitoring. Sequential single-worker mode."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| c | Lens v3.23.0 — Sequential task execution engine. Leader analyzes & plans, assigns skills/models, deploys single Worker with real-time monitoring, Supervisor reviews, QA verifies. Works on ANY task. | MIT |
+| c | Lens v3.23.1 — Sequential task execution engine. Leader analyzes & plans, assigns skills/models, deploys single Worker with real-time monitoring, Supervisor reviews, QA verifies. Works on ANY task. | MIT |
 
 Triggers: /c, execute, run, do this, 실행, 하기, 작업 실행, 처리해줘, やってくれ, 做, ejecutar, 
 excute, exécuter, eseguire, eseguire
 
-You are **Lens v3.23.0**, a sequential task execution engine for Claude Code.
+You are **Lens v3.23.1**, a sequential task execution engine for Claude Code.
 
 `/c` analyzes any user request, decomposes it into a task list, assigns the best skill and model for each task, gets your approval, then executes tasks one-by-one with real-time progress monitoring. Unlike `/cc` (parallel), `/c` runs tasks sequentially.
 
@@ -178,7 +178,7 @@ Document the plan internally. You will present this to the user for approval in 
 Use AskUserQuestion (header: "Lens") to present the task table and get approval:
 
 ```
-Lens v3.23.0 — 실행 계획
+Lens v3.23.1 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {user's original request}
@@ -257,7 +257,7 @@ For each task:
 Worker prompt template:
 
 ```
-You are Worker Agent for Lens v3.23.0.
+You are Worker Agent for Lens v3.23.1.
 
 ## Your Task
 {specific task description from Phase 1 plan}
@@ -384,7 +384,7 @@ Worker 할당 테이블을 스캔하여 `opus` worker 존재 여부 확인:
 Spawn a **Supervisor agent** (model selected by 4.0 above):
 
 ```
-You are the Supervisor agent for Lens v3.23.0. Review all Worker outputs.
+You are the Supervisor agent for Lens v3.23.1. Review all Worker outputs.
 
 ## 당신의 모델
 당신의 모델은 {assigned_model}입니다. (opus/sonnet)
@@ -448,7 +448,7 @@ opus인 경우: 깊은 추론과 구조적 통찰에 집중. 단순 코드 스�
 → Re-dispatch ONLY failed tasks:
 
 ```
-Lens v3.23.0 — 반복 작업 {N}/5
+Lens v3.23.1 — 반복 작업 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 점수: {overall_score}/100
 
@@ -488,7 +488,7 @@ Skip for simple requests.
 Spawn a **QA Verification agent** (haiku model) that ACTUALLY tests results:
 
 ```
-You are the QA Verification agent for Lens v3.23.0. ACTUALLY VERIFY the work.
+You are the QA Verification agent for Lens v3.23.1. ACTUALLY VERIFY the work.
 Do not just review text — prove it works with real tests.
 
 ## Original Request
@@ -550,7 +550,7 @@ Do not just review text — prove it works with real tests.
 
 ```
 ╔════════════════════════════════════════════════════════╗
-║     Lens v3.23.0 — Final Results (Sequential)            ║
+║     Lens v3.23.1 — Final Results (Sequential)            ║
 ║     Model Iterations: {N}/5  |  Quality Score: {S}/100 ║
 ╚════════════════════════════════════════════════════════╝
 

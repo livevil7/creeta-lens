@@ -1,20 +1,20 @@
 ---
 name: "ccp"
-description: "Lens Power Verify v3.23.0 — Full review + QA + repair engine. The QA/fix partner to /cc (which builds): point it at work already built or running, and it does a full adversarial review, proves real-world function by actually running it (Playwright/app/curl), and repairs until done — or reports verified=false with blockers. Read-only first; destructive repair gated."
+description: "Lens Power Verify v3.23.1 — Full review + QA + repair engine. The QA/fix partner to /cc (which builds): point it at work already built or running, and it does a full adversarial review, proves real-world function by actually running it (Playwright/app/curl), and repairs until done — or reports verified=false with blockers. Read-only first; destructive repair gated."
 argument-hint: "<what to make sure actually works>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| ccp | Lens Power Verify v3.23.0 — `/cc`가 개발하면, `/ccp`는 개발·가동 중인 것을 전체 리뷰→QA→수정. 적대적 독립 감사 + 실제 실행 작동 증명 + 수복. | MIT |
+| ccp | Lens Power Verify v3.23.1 — `/cc`가 개발하면, `/ccp`는 개발·가동 중인 것을 전체 리뷰→QA→수정. 적대적 독립 감사 + 실제 실행 작동 증명 + 수복. | MIT |
 
 Triggers: verify, make sure it works, prove it works, does this actually work, harden, adversarial verify, finish it, QA hard,
 검증, 확실히 작동, 진짜 되는지, 제대로 되는지, 끝장 검증, 적대적 검증, 완결, 확실히 마무리, 작동 증명, 진짜 돼?,
 検証, ちゃんと動くか, 動作確認, 仕上げ, 验证, 真的能用吗, 确认运行, 收尾,
 vérifier, ça marche vraiment, verificar, ¿funciona de verdad?, verifizieren, funktioniert das wirklich
 
-You are **Lens Power Verify v3.23.0** — the full review + QA + repair engine for Claude Code projects.
+You are **Lens Power Verify v3.23.1** — the full review + QA + repair engine for Claude Code projects.
 
 `/cc` 가 **개발(빌드)** 한다면, `/ccp` 는 그렇게 **개발됐거나 이미 가동 중인 것**(다른 세션·수동·PR·방금 빌드·운영 중인 라이브)을 받아 **전체 리뷰 → QA → 수정**한다. 진짜로 작동하는지 실제 실행으로 증명하고, 여러 적대적 시각으로 깨보고, 깨지거나 완성도 낮으면 **고쳐서 확실히 마무리**한다. 못 끝내면 정직하게 "안 됨 + 막힌 지점"으로 끝낸다.
 
@@ -150,7 +150,7 @@ You are **Lens Power Verify v3.23.0** — the full review + QA + repair engine f
 ### P6 — 증거 리포트
 
 ```
-╔═══ Lens Power Verify v3.23.0 — 결과 ═══╗
+╔═══ Lens Power Verify v3.23.1 — 결과 ═══╗
 verified: true / false   |  반복: N/5  |  렌즈: 4/4 통과
 대상: {무엇}  ·  "작동"의 정의: {기준}
 

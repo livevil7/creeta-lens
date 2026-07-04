@@ -4,7 +4,7 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.23.0**
+- Current: **v3.23.1**
 - Updated: 2026-07-04
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.23.0 feat: **`/cp flow` 신설 + Fable 하네스 규칙 이식**. ① FLOW 모드 — 프로젝트의 "이용자 단계별 화면 ↔ 엔진/모듈 ↔ 종속·재사용"을 한 장의 인터랙티브 플로우차트로 그려 `docs/rules/flow.md`(SoT)+`flow.html`(뷰, **05-dark-developer 토큰**) = 전체 그림 Rule. 템플릿 쌍(`templates/flow.template.md`+`flow-viewer.example.html`, livevil-boost 일반화) + CONVERT `doc_kind: flow` 가드(flow 뷰어가 task 덱으로 덮이는 사고 차단). ② 하네스 규칙 — 공개 추출본(Claude Code 2.1.172 Fable, 비공식·재서술) 기반 `docs/rules/harness-rules.md` SoT + 6개 스킬 역할별 인라인(워커 "작업 규율"·Monitor "침묵은 성공이 아니다"·/cc 오케스트레이션 규율·/ccp QA 패턴·/cp·/cpp elicitation gate·/cr 리서치 규율). **additive-only 원칙**(하네스가 이미 강제하면 재복붙 금지). 상세: `CHANGELOG.md`.

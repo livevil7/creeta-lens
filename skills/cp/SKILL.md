@@ -1,20 +1,20 @@
 ---
 name: "cp"
-description: "Lens Plan v3.23.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
+description: "Lens Plan v3.23.1 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.23.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
+| cp | Lens Plan v3.23.1 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.23.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.23.1**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -685,15 +685,16 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
 
 ### F1: 스캔
 
-- CLAUDE.md · `docs/rules/` · README 를 먼저 Read → 엔트리포인트(라우트/페이지/화면/CLI/대시보드)·백그라운드 잡·외부 시스템을 Read/Glob/Grep 으로 수집.
+- CLAUDE.md · `docs/rules/` · README 를 먼저 Read → 엔트리포인트(라우트/페이지/화면/CLI/대시보드)·백그라운드 잡·외부 시스템을 Read/Glob/Grep 으로 수집. (프로젝트가 단수 `docs/rule/` 를 쓰면 그쪽도 스캔하되, 산출물은 board-builder 가 스캔하는 `docs/rules/` 에 두고 그 사실을 보고에 명시.)
 - **실제 파일만 근거로 삼는다.** 근거 파일이 없는 노드는 `(추정)` 표기 의무 — 잘못된 추론이 Rule 로 굳는 것을 방지.
 
 ### F2: 2층 추출 + 관계 매핑
 
-- **(a) 이용자 관점 단계**: 화면/명령의 사용 순서를 ①~⑦ 시나리오로 배열. 핵심 화면(★)·키 개입 지점 구분.
+- **(a) 이용자 관점 단계 — 노드는 화면(스크린) 단위 (핵심 규칙)**: 각 단계 subgraph 안의 노드는 **이용자가 실제로 보는 화면/뷰**(웹 페이지·대시보드 뷰·보드·콘솔 화면·모달)다. 라벨은 "화면 이름 + 그 화면에서 하는 일 한 줄"(예: "채널 발굴 보드 — 키워드→후보 listup"). **스크립트·설정 파일·백그라운드 잡·CLI 명령·배포 절차는 화면이 아니다 → 전부 (b) 엔진 층으로.** 화면 인벤토리는 라우트/템플릿/페이지 파일에서 도출하고, 사용 순서를 ①~⑦ 시나리오로 배열하며 핵심 화면(★)·키 개입 지점을 구분한다. UI 없는 구간(순수 배치 등)은 이용자 개입 접점만 단계로 남기고 나머지는 엔진 층으로 강등.
 - **(b) 엔진/모듈 층**: 각 화면을 받치는 서비스·잡·저장소·외부시스템을 SYS subgraph 로.
-- **관계 표기**: 진행=실선, 받침/종속=점선, 재사용=한 모듈←여러 단계 점선, 피드백 루프는 별도 표기.
-- **Fallback**: 이용자 단계가 2개 미만으로 추출되면 AskUserQuestion 으로 주요 단계 3~7개를 인터뷰한 뒤 모듈 매핑만 자동 수행.
+- **관계 표기**: 진행=실선, 받침/종속=점선, 재사용=한 모듈←여러 단계 점선, 피드백 루프는 별도 표기. 점선 라벨은 `-.->|"라벨"|` 형식만 사용 — `-.라벨.->` 은 라벨 안 `.`·`-` 문자(파일명 등)에서 mermaid lexical error.
+- **근거 범위**: 코드가 레포 밖인 인프라(터널·외부 서버 등)는 레포 내 rule/문서를 근거로 인정(경로 명기). 문서조차 없으면 `(추정)`.
+- **Fallback**: 이용자 단계(화면)가 2개 미만으로 추출되면 AskUserQuestion 으로 주요 단계 3~7개를 인터뷰한 뒤 모듈 매핑만 자동 수행.
 
 ### F3: md SoT 작성
 
@@ -709,7 +710,7 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
   <meta name="lens:source-hash" content="{md sha256 앞 12자}">
   <meta name="lens:builder" content="lens-cp-flow">
   ```
-- 노드 click 링크는 **실존 확인된 파일만** 연결.
+- 노드 click 링크는 **실존 확인된 파일만** 연결 — 화면 노드는 가능하면 그 화면 실물(목업 html·라우트 템플릿·페이지 파일)로. **click 줄은 HTML 전용** (md 의 mermaid 는 구조만 — SoT 에 click 줄을 넣지 않는다).
 - **Fallback**: 노드 50+ 또는 렌더 위험 시 mermaid 를 복수 블록(메인 단계층 + 단계별 드릴다운)으로 분할해 뷰어에 섹션 렌더.
 
 ### F5: board + 보고
