@@ -1,3 +1,27 @@
+## [3.24.0] - 2026-07-15
+
+### Added (v3.24.0)
+
+### Changed (v3.24.0)
+
+### Fixed (v3.24.0)
+
+## [3.24.0] - 2026-07-15
+
+모델 정책 전환 — 고정 모델명 폐지, "난이도 사다리 + 그 시점의 최고 모델 자동 추종". 계획: `docs/tasks/2026-07-15-dynamic-top-model-policy.md`.
+
+### Changed (v3.24.0)
+
+- **난이도 사다리 (Claude 축)**: 모델 배정 원칙을 "품질 우선 — 전 역할 `opus` 고정"(v3.11)에서 **업무 난이도 기반 배분**으로 전환 (사용자 지시 — 최고 모델 무차별 배정 금지). Easy=경량 티어(현재 haiku) / Medium=중간 티어(현재 sonnet) / Hard=**최상위 티어(TOP)**. 각 칸은 이름이 아니라 **상대 위치** — 모델 세대가 바뀌면 자동 상승. `/c`(기존 티어제)와 `/cc`(기존 전부-opus)가 동일 사다리로 통일, `/ccp` substantive 역할은 성격상 Hard→TOP, Supervisor/QA는 최고 사용 Worker 티어와 동급(역전 방지), Monitor=haiku 유지.
+- **TOP 판정 절차**: 세션 모델이 Task tool enum 최상위와 같거나 상위(예: Fable)면 **모델 지정 생략(상속)**, 미만이면 enum 최상위 명시(현재 fable, 없으면 opus). 미래 새 모델명의 우열 판별 불확실 시 상속이 안전 기본값. `harness-rules.md` §4.1 재심사·개정.
+- **codex 모델 resolver (OpenAI 축)**: `-m gpt-5.5` 하드코딩 폐지 → 매 호출 직전 `~/.codex/models_cache.json` 순위표에서 1등(visibility=list + supported_in_api + priority 최소, 2026-07 현재 `gpt-5.6-sol`)을 node 한 줄로 동적 선택. **`MODEL_ARG` 배열 분기**로 resolver 실패 시 빈 `-m ""` 전달 원천 차단 + ⚠️ 강등 플래그 의무(조용한 강등 금지). 3단 fallback: resolver 실패→`-m` 생략+플래그 / 400→`-m` 생략 재시도 / tier 거부→tier 생략. 실측: 성공·실패 경로 + gpt-5.6-sol EXIT 0 + Mac Mini(순위표 부재) 플래그 경로 정상. 깊이 분기(소규모 xhigh/대규모 high)·timeout 180s는 불변 — gpt-5.6-sol도 xhigh/high 동일 지원 실측.
+- **`/cp` Pre-mortem 명칭·규칙**: "Opus Pre-mortem" → "Claude Pre-mortem (TOP)" — 세션이 enum 최상위 이상이면 내부 수행, 미만이면 TOP agent spawn.
+- **capability-assumptions.json 감시 확장**: Task enum 사실 갱신([sonnet,opus,haiku,fable]) + 모델 드리프트 감지 채널 신설(순위표 스키마·1등 slug 변동, 문서 예시 표기 낡음 → /crv 개정 제안).
+
+### Process (v3.24.0)
+
+- 듀얼트랙: Codex(gpt-5.6-sol) 독립 조사 합의 3·분기 4 전부 해소. Pre-mortem: ultracode 4-skeptic 27건 → 12건 채택 반영(blocker 2건 — resolver 빈 값 강등 — 설계로 사전 해소). Supervisor(fable) 82점 pass. Codex 리뷰는 대형 diff로 180s 초과 → §7 degrade(Supervisor 단독 게이트) — timeout 가드 라이브 실증.
+
 ## [3.23.1] - 2026-07-04
 
 FLOW 모드 스펙 강화 — dogfood(livevil-boost) 사용자 피드백 반영.

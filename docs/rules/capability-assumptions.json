@@ -12,7 +12,7 @@
         "skills/c/SKILL.md",
         "skills/cc/SKILL.md"
       ],
-      "purpose": "/c·/cc의 worker dispatch + 모델 티어 배정(haiku/sonnet/opus)을 네이티브 Task model enum + model: frontmatter + CLAUDE_CODE_SUBAGENT_MODEL이 대체",
+      "purpose": "/c·/cc의 worker dispatch + 난이도 사다리 모델 배정(경량=haiku/중간=sonnet/최상위=TOP, v3.24+)을 네이티브 Task model enum + model: frontmatter + CLAUDE_CODE_SUBAGENT_MODEL이 대체",
       "assumed_native_gap": "네이티브가 작업별 모델 티어로 서브에이전트를 dispatch하지 못함",
       "gap_closed_signal": "claude agents --help / --agents JSON에 model 필드, Task tool model enum 존재 — 이미 닫힘(v2.1.x GA). 추가로 enum이 non-Anthropic까지 열리면 codex 통합 KEEP 근거 약화",
       "signal_method": "probe",
@@ -20,8 +20,8 @@
       "official_sources": [
         "https://code.claude.com/docs/en/release-notes"
       ],
-      "false_obsolete_risk": "Task model enum이 [sonnet,opus,haiku]로 닫혀 있어 cross-vendor(codex) dispatch는 여전히 비네이티브 — /c·/cc 모델배정만 대체, codex 통합은 무관",
-      "last_reviewed": "2026-06-06"
+      "false_obsolete_risk": "Task model enum은 [sonnet,opus,haiku,fable](2026-07 확인)로 계속 자라며 순위 메타데이터가 없다 — 스킬의 '현재 fable' 예시 표기가 enum 최상위와 어긋나면 /crv가 개정 제안(v3.24 TOP 규칙). cross-vendor(codex) dispatch는 여전히 비네이티브 — /c·/cc 모델배정만 대체, codex 통합은 무관",
+      "last_reviewed": "2026-07-15"
     },
     {
       "id": "native-dynamic-workflows",
@@ -186,8 +186,8 @@
       "official_sources": [
         "https://github.com/openai/codex/releases"
       ],
-      "false_obsolete_risk": "배관(review/schema/ephemeral)만 닫힘 — cross-vendor 이종검증 개념층은 codex가 OpenAI 계열인 한 KEEP. gpt-5.5/service_tier=priority는 서버측 검증이라 폐기 시 런타임 깨짐 감지 필요",
-      "last_reviewed": "2026-06-06"
+      "false_obsolete_risk": "배관(review/schema/ephemeral)만 닫힘 — cross-vendor 이종검증 개념층은 codex가 OpenAI 계열인 한 KEEP. 모델은 v3.24+부터 models_cache.json resolver 동적 선택이라 이름 폐기 리스크는 해소, service_tier는 서버측 검증이라 폐기 시 런타임 깨짐 감지 필요",
+      "last_reviewed": "2026-07-15"
     },
     {
       "id": "codex-model-tier-drift",
@@ -195,16 +195,16 @@
       "affects_lens": [
         "docs/rules/codex-integration.md"
       ],
-      "purpose": "codex-integration.md 호출 파라미터(gpt-5.5, service_tier=fast, depth=xhigh/high 입력규모 분기, timeout 180s)가 codex 바이너리 변경에 깨지지 않는지 — /cp·/cc·/cpp 모든 codex 호출의 SoT",
-      "assumed_native_gap": "n/a (Lens 자체 하드코딩 가정의 유효성)",
-      "gap_closed_signal": "gpt-5.5가 서버에서 폐기되면 -m gpt-5.5가 런타임 400. service_tier=priority가 정식 fast 별칭에서 제거되면 파싱 실패. codex --version/config-reference 변경으로 감지",
+      "purpose": "codex-integration.md 호출 파라미터(models_cache.json resolver 동적 모델 v3.24+, service_tier=fast, depth=xhigh/high 입력규모 분기, timeout 180s)가 codex 바이너리 변경에 깨지지 않는지 — /cp·/cc·/cpp 모든 codex 호출의 SoT",
+      "assumed_native_gap": "n/a (Lens 자체 호출 규약 가정의 유효성)",
+      "gap_closed_signal": "~/.codex/models_cache.json 스키마 변경(models/visibility/priority/slug 필드 리네임)·부재 시 resolver가 빈 값 → ⚠️ fallback 플래그 발생 빈도로 감지. 문서 예시 '현재 1등' 표기가 priority-1 slug와 어긋나면 개정 제안. service_tier=priority가 정식 fast 별칭에서 제거되면 파싱 실패. codex --version/config-reference 변경으로 감지",
       "signal_method": "both",
       "probe_hint": "codex --version · codex exec review --help · codex -c service_tier=fast 실측(EXIT 0?)",
       "official_sources": [
         "https://github.com/openai/codex/releases"
       ],
-      "false_obsolete_risk": "현재 전부 실측 통과(EXIT 0) — 조기 제거 금지. 단 모델명/service_tier 서버측 검증이라 미래 깨짐 대비 fallback만 보강. timeout 180s 는 coreutils(클라이언트측)이라 서버 드리프트 무관",
-      "last_reviewed": "2026-06-15"
+      "false_obsolete_risk": "현재 전부 실측 통과(EXIT 0, gpt-5.6-sol 2026-07-15) — 조기 제거 금지. 모델은 resolver 3단 fallback(실패→-m 생략+플래그 / 400→-m 생략 재시도)이 방어, service_tier는 서버측 검증이라 미래 깨짐 대비 fallback 유지. timeout 180s 는 coreutils(클라이언트측)이라 서버 드리프트 무관",
+      "last_reviewed": "2026-07-15"
     }
   ]
 }

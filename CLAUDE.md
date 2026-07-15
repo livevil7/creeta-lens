@@ -4,9 +4,10 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 ## Version
 
-- Current: **v3.23.1**
-- Updated: 2026-07-04
+- Current: **v3.24.0**
+- Updated: 2026-07-15
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.24.0 feat: **모델 정책 전환 — 고정 모델명 폐지, 난이도 사다리 + 최신 최고 모델 자동 추종** (사용자 지시: 무차별 최고 모델 배정 금지). ① Claude 축 — Easy=경량(현재 haiku)/Medium=중간(현재 sonnet)/Hard=**TOP**(세션이 enum 최상위 이상이면 상속, 미만이면 enum 최상위 명시 — 현재 fable). 칸=상대 위치라 모델 세대와 함께 자동 상승. `/c`·`/cc` 사다리 통일(`/cc` v3.11 "전부 opus" 폐기), `/ccp`=Hard 성격→TOP, Supervisor/QA=최고 Worker 티어 동급, Monitor=haiku. ② codex 축 — `-m gpt-5.5` 폐지 → **resolver**(`~/.codex/models_cache.json` priority-1 동적 선택, 현재 gpt-5.6-sol) + `MODEL_ARG` 배열 분기(빈 `-m ""` 차단) + ⚠️ 강등 플래그 의무. ③ capability-assumptions에 모델 드리프트 감시 채널. 상세: `CHANGELOG.md` + `docs/rules/codex-integration.md` §4·§6 + `docs/rules/harness-rules.md` §4.1.
 - v3.23.0 feat: **`/cp flow` 신설 + Fable 하네스 규칙 이식**. ① FLOW 모드 — 프로젝트의 "이용자 단계별 화면 ↔ 엔진/모듈 ↔ 종속·재사용"을 한 장의 인터랙티브 플로우차트로 그려 `docs/rules/flow.md`(SoT)+`flow.html`(뷰, **05-dark-developer 토큰**) = 전체 그림 Rule. 템플릿 쌍(`templates/flow.template.md`+`flow-viewer.example.html`, livevil-boost 일반화) + CONVERT `doc_kind: flow` 가드(flow 뷰어가 task 덱으로 덮이는 사고 차단). ② 하네스 규칙 — 공개 추출본(Claude Code 2.1.172 Fable, 비공식·재서술) 기반 `docs/rules/harness-rules.md` SoT + 6개 스킬 역할별 인라인(워커 "작업 규율"·Monitor "침묵은 성공이 아니다"·/cc 오케스트레이션 규율·/ccp QA 패턴·/cp·/cpp elicitation gate·/cr 리서치 규율). **additive-only 원칙**(하네스가 이미 강제하면 재복붙 금지). 상세: `CHANGELOG.md`.
 - v3.21.1 fix: **`/cc` 병렬 미실행 + 스킬 미활용 회귀 수정** (13에이전트 조사+적대적 검증). ① Worker 가 **Task 도구에 바인딩 안 됨** — 어느 버전에도 "Task 도구로 spawn" 지시가 없어(멘션 0건) Leader 가 혼자 순차 처리/텍스트 나열로 빠짐 → Phase 3.2 에 "Task 도구 N회 병렬 호출(순차 await 금지)" 구체 directive 복원. ② **Supervisor 스킬 감사 슬래시 불일치**(v3.20.0 도입) — Worker `Skill invoked: ui-ux-pro-max`(슬래시 없음) vs 감사 `/{skill_name}`(슬래시) → 정상 호출도 0점→재할당 루프. 매칭 문자열 통일. ③ Phase 1.3 가 주입된 스킬 인벤토리 표를 SoT 로 참조하도록 명시. 상세: `CHANGELOG.md`.
 - v3.21.0 feat: **계획서 과잉요약 차단 + 필수 섹션 확장** — 계획 md 가 `/cc` 실행 TodoWrite 보다 짧게 요약되던 근본 원인(brevity 조항 vs 누락금지 모순)을 **원칙 0 "간결=군더더기 제거이지 누락이 아니다"**(최상위 override, 충돌 시 완전성 승, **계획 md ≥ 실행 Todo**)로 차단. `/cpp` "항목당 한 줄"→"필요한 만큼"(천장 오해 제거), spine 6→8섹션. 신규 필수: **🧰 실행 전략&자원**(난이도·권장 모델·병렬 에이전트수[ultracode]·활용 설치 스킬 자동감지·기존 자원), **💡 시사점/⚠️ 주의점/🔀 Side Effect**, **✅ 검증 전략**(Playwright/데이터/staging·범위·보고 명시), **❓ Why=6하원칙**. 양쪽 게이트 강제(`/cp` Phase 5.0 내용완전성·`/cpp` S6/S7). 상세: `CHANGELOG.md`.

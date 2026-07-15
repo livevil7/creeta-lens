@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.23.1 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
+description: "Lens Multi v3.24.0 — Parallel task execution engine. Same as /c but deploys multiple workers simultaneously. Includes monitoring, model assignment, and quality review."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.23.1 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.24.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Monitor tracks progress, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.23.1**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.24.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, a Monitor agent tracks progress in real-time, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -122,14 +122,14 @@ Leader · Worker(병렬) · Supervisor · QA — 모든 phase가 이 4규칙을 
   ┌──────────────────────────┐  │
   │   Supervisor Agent       │──┘
   │  (Quality review + score)│
-  │    opus model            │
+  │  top worker-tier model   │
   └────────┬─────────────────┘
            │ (pass)
            ▼
   ┌──────────────────────────┐
   │  QA Verification Agent   │──→ fail → back to Leader
   │ (Actually test results)  │
-  │     opus model           │
+  │  top worker-tier model   │
   │ Playwright/Bash/Read/curl│
   └────────┬─────────────────┘
            │ (verified)
@@ -151,20 +151,20 @@ Leader · Worker(병렬) · Supervisor · QA — 모든 phase가 이 4규칙을 
 
 ---
 
-## 모델 할당 테이블
+## 모델 할당 테이블 (난이도 사다리 — v3.24+)
 
-> **품질 우선 (토큰 비용 비고려)**: substantive 역할(Worker 전 난이도·Supervisor·QA)은 항상 `opus`. Monitor 만 예외(`haiku`) — 대시보드 상태 폴링뿐이라 opus 로 올려도 품질 이득이 0.
-> **불확실하면 세션 모델을 상속한다** — 세션 모델이 opus 이상 티어(예: Fable)면 모델 지정을 생략(상속)하는 것이 곧 최고 품질이다. (근거: docs/rules/harness-rules.md §4.1)
+> **난이도 기반 배분 (v3.24, 사용자 지시)**: 최고 모델 무차별 배정 금지 — Worker 모델은 **업무 난이도**로 정한다. 사다리의 각 칸은 이름이 아니라 **상대 위치**라서 모델 세대가 바뀌면 자동으로 올라간다: Easy=**경량 티어**(현재 haiku) / Medium=**중간 티어**(현재 sonnet) / Hard=**최상위 티어(TOP)**. (구 v3.11 "품질 우선 — 전 역할 opus 고정" 철학은 폐기.)
+> **TOP 판정 절차**: 세션 모델이 Task tool enum 최상위와 같거나 상위(예: Fable)면 **모델 지정을 생략(상속)** — 그게 곧 최고 품질. 미만이면 enum 최상위를 명시(현재 fable, 없으면 opus). 미래 새 모델명의 우열 판별이 불확실하면 상속이 안전 기본값. (근거: docs/rules/harness-rules.md §4.1 v3.24 개정)
 
 | 역할 | 모델 | 이유 |
 |------|------|------|
 | Leader | 현재 모델 | 분석 및 계획 정확도 |
-| Worker (Easy) | opus | 품질 우선 — 단순 작업도 최고 모델 |
-| Worker (Medium) | opus | 코드/분석 작업 |
-| Worker (Hard) | opus | 복잡한 아키텍처 |
-| Monitor | haiku | 상태 확인만 — opus 품질 이득 0인 유일 예외 |
-| Supervisor | opus | 품질 검토 — Worker 산출물과 동급 깊이 |
-| QA | opus | 실제 검증 — 깊은 분석 필요 |
+| Worker (Easy) | 경량 티어 (현재 haiku) | 파일 읽기·검색·단순 수정 — 상위 모델 품질 이득 미미 |
+| Worker (Medium) | 중간 티어 (현재 sonnet) | 코드/분석 작업 |
+| Worker (Hard) | TOP (현재 fable) | 복잡한 아키텍처·설계·보안 |
+| Monitor | haiku | 상태 확인만 — 상위 모델 품질 이득 0 |
+| Supervisor | 최고 사용 Worker 티어와 동급 | 품질 검토 — TOP worker 가 있으면 TOP ("주니어가 시니어 리뷰" 역전 방지) |
+| QA | 최고 사용 Worker 티어와 동급 | 실제 검증 — 검증 대상과 동급 깊이 |
 
 ---
 
@@ -253,12 +253,12 @@ original_request: {원본 요청}
 
 - **미설치 시 graceful degrade**: `ui-ux-pro-max` 가 이 머신의 Skill 인벤토리에 없으면 하드 실패하지 말고, 해당 Worker 에 "ui-ux-pro-max 부재 — 네이티브 UI/UX 베스트프랙티스(접근성·반응형·일관된 스페이싱/타이포·대비)로 진행" 을 명시하고 general-purpose 로 진행한다. 이 경우 Supervisor 의 스킬 호출 감사(Phase 4)는 해당 서브태스크에 적용하지 않는다. (설치가 필요하면 최종 보고에서 사용자에게 안내 — `/cc` 실행 도중 자동 설치는 하지 않는다.)
 
-#### 1.4 모델 할당
+#### 1.4 모델 할당 (난이도 사다리 — v3.24+)
 
-모든 Worker는 `opus`로 할당합니다 (품질 우선 — 토큰 비용 비고려). 난이도 라벨(Easy/Medium/Hard)은 진행 표시·우선순위 참고용으로만 유지하며, 모델은 난이도와 무관하게 항상 opus:
-- **Easy** (단순 작업): opus
-- **Medium** (코드/분석): opus
-- **Hard** (복잡한 아키텍처): opus
+Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모델 무차별 배정 금지 — 사용자 지시). 난이도 라벨(Easy/Medium/Hard)이 곧 배정 기준:
+- **Easy** (파일 읽기·검색·자료 수집·단순 수정): 경량 티어 (현재 haiku)
+- **Medium** (코드 작성·분석·디버깅·콘텐츠): 중간 티어 (현재 sonnet)
+- **Hard** (복잡한 아키텍처·설계·보안·심층 검토): **TOP** — 세션 모델이 enum 최상위 이상이면 지정 생략(상속), 미만이면 enum 최상위 명시 (현재 fable, 없으면 opus)
 
 #### 1.5 승인 요청 (필수 — 단, 헤드리스 예외)
 
@@ -269,10 +269,10 @@ original_request: {원본 요청}
 > - **파괴적/되돌리기 어려운 작업**(대량 삭제·배포·외부 발행): 자동 진행 금지 → **plan-only 로 계획만 출력하고 종료**, 사람이 상호작용 세션에서 재실행하도록 안내.
 > 이 폴백은 Phase 1.5·경로전환(5.x)·경고모드(6.2) 등 **모든 `AskUserQuestion` 게이트에 공통 적용**. 상호작용 세션(`LENS_NONINTERACTIVE` 미설정)에선 기존대로 승인 필수.
 
-**AskUserQuestion** (header: "Lens Multi v3.23.1 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.24.0 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.23.1 — 실행 계획
+Lens Multi v3.24.0 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -282,9 +282,9 @@ Lens Multi v3.23.1 — 실행 계획
 ┌───┬──────────────────────┬────────────┬────────┬─────────┐
 │ # │ 서브태스크            │ 할당 스킬   │ 모델   │ 난이도   │
 ├───┼──────────────────────┼────────────┼────────┼─────────┤
-│ 1 │ [설명]               │ /skill     │ opus   │ Medium  │
-│ 2 │ [설명]               │ general    │ opus   │ Easy    │
-│ 3 │ [설명]               │ /review    │ opus   │ Medium  │
+│ 1 │ [설명]               │ /skill     │ sonnet │ Medium  │
+│ 2 │ [설명]               │ general    │ haiku  │ Easy    │
+│ 3 │ [설명]               │ /review    │ fable  │ Hard    │
 └───┴──────────────────────┴────────────┴────────┴─────────┘
 
 품질 검증: Supervisor 리뷰 + QA 검증
@@ -382,7 +382,7 @@ Monitor는 **백그라운드에서 실행**되며, 다른 Agent와 독립적입�
 각 Worker에 할당:
 - 고유 Worker ID (#1, #2, #N)
 - 해당 서브태스크 설명
-- 할당된 모델 (opus — Monitor만 haiku)
+- 할당된 모델 (난이도 사다리 배정 — 1.4. Monitor는 haiku)
 - 할당된 skill 정보 (있으면)
 - 모든 도구 접근 권한
 
@@ -510,15 +510,15 @@ Monitor가 모든 Worker 완료를 보고할 때까지 대기합니다.
 
 #### 4.0 Supervisor 모델
 
-Supervisor 모델 = `opus` 고정 (품질 우선 — 토큰 비용 비고려). Worker 가 전부 opus 이므로 Supervisor 도 동급 깊이여야 "주니어가 시니어 코드 리뷰"하는 역전이 없다.
+Supervisor 모델 = **최고 사용 Worker 티어와 동급** (v3.24 난이도 사다리). TOP worker 가 하나라도 있으면 Supervisor 도 TOP — 동급 깊이여야 "주니어가 시니어 코드 리뷰"하는 역전이 없다. (TOP 판정 절차는 모델 할당 테이블 참조 — 세션 ≥ enum 최상위면 지정 생략.)
 
-모든 Worker가 완료되면, **별도의 Supervisor Agent** (opus)를 **Task 도구로 spawn**합니다:
+모든 Worker가 완료되면, **별도의 Supervisor Agent** (위 규칙으로 정한 모델)를 **Task 도구로 spawn**합니다:
 
 ```
 당신은 Supervisor Agent입니다. 모든 Worker의 출력 품질과 완성도를 검토합니다.
 
 ## 당신의 모델
-당신의 모델은 opus입니다. 깊은 추론과 구조적 통찰에 집중하세요 — 단순 코드 스타일 체크 외에도 아키텍처 의사결정의 trade-off까지 검토.
+당신은 Worker 최고 티어와 동급 모델입니다. 깊은 추론과 구조적 통찰에 집중하세요 — 단순 코드 스타일 체크 외에도 아키텍처 의사결정의 trade-off까지 검토.
 
 ## 원본 요청
 {사용자 원본 요청}
@@ -585,8 +585,11 @@ Supervisor 모델 = `opus` 고정 (품질 우선 — 토큰 비용 비고려). W
 SCHEMA=$(mktemp /tmp/codex_schema_XXXXXX.json)
 printf '%s' '{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","fail"]},"high_findings":{"type":"array","items":{"type":"string"}}},"required":["verdict","high_findings"]}' > "$SCHEMA"
 RES=$(mktemp /tmp/codex_review_XXXXXX.json)
+# 모델 resolver (codex-integration.md §4 ①) — 순위표 1등 동적 선택, 이름 하드코딩 금지
+CODEX_MODEL=$(node -e "const p=require('path'),os=require('os');const d=require(p.join(os.homedir(),'.codex','models_cache.json'));const m=d.models.filter(x=>x.visibility==='list'&&x.supported_in_api!==false).sort((a,b)=>(a.priority??99)-(b.priority??99))[0];if(!m||!m.slug)process.exit(1);console.log(m.slug)" 2>/dev/null) || CODEX_MODEL=""
+MODEL_ARG=(); if [ -n "$CODEX_MODEL" ]; then MODEL_ARG=(-m "$CODEX_MODEL"); else echo "⚠️ 모델 resolver 실패 — codex config 기본 모델로 진행"; fi
 timeout 180 "$CODEX_BIN" exec review --uncommitted \
-  -m gpt-5.5 -c model_reasoning_effort=high -c service_tier=fast \
+  "${MODEL_ARG[@]}" -c model_reasoning_effort=high -c service_tier=fast \
   --output-schema "$SCHEMA" --ephemeral --json > "$RES" 2>/dev/null
 # 결과: $RES 의 최종 메시지에 {"verdict","high_findings"} JSON
 # 깊이=high (전체 diff=대규모 → xhigh 폭증 회피) · 180초 초과(exit 124)면 degrade. 상세: codex-integration.md §4·§7.
@@ -596,7 +599,7 @@ timeout 180 "$CODEX_BIN" exec review --uncommitted \
 
 3. **판정** — `$RES` 의 구조화 출력에서 `verdict == "fail"` **또는** `high_findings` 비어있지 않으면 **FAIL**. (awk PASS/FAIL 휴리스틱·`[high]` 텍스트 파싱 불필요 — 스키마가 강제.)
 
-4. **Fallback (구버전 codex)** — `codex exec review` 미지원이면 §4 자유형 호출(`timeout 180 ... -m gpt-5.5 -c model_reasoning_effort=high -c service_tier=fast -o "$OUT"`)로 변경 diff + 아래 프롬프트, 마지막 줄 `PASS`/`FAIL` + `[high]` 파싱으로 graceful degrade (180초 초과 시 §7 부분 수집/degrade):
+4. **Fallback (구버전 codex)** — `codex exec review` 미지원이면 §4 자유형 호출(`timeout 180 ... "${MODEL_ARG[@]}" -c model_reasoning_effort=high -c service_tier=fast -o "$OUT"`)로 변경 diff + 아래 프롬프트, 마지막 줄 `PASS`/`FAIL` + `[high]` 파싱으로 graceful degrade (180초 초과 시 §7 부분 수집/degrade):
 
 ```text
 다음 코드 변경을 리뷰하세요. 순수 텍스트, 한국어. 각 지적은 [심각도 high/med/low] + 파일:라인 + 무엇이 + 왜. 마지막 줄에 PASS 또는 FAIL 한 단어만.
@@ -641,7 +644,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.23.1 — 반복 {N}/5
+Lens Multi v3.24.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -687,7 +690,7 @@ Lens Multi v3.23.1 — 반복 {N}/5
 
 ### Phase 6: QA Verification (필수 — 절대 생략, SUCCESS_CRITERIA 직접 검증)
 
-모든 Worker와 Supervisor가 완료되면, **별도의 QA Agent** (opus 모델)가 **실제로 검증**합니다.
+모든 Worker와 Supervisor가 완료되면, **별도의 QA Agent** (최고 사용 Worker 티어와 동급 모델)가 **실제로 검증**합니다.
 
 **v3.4+ 변경점**: QA 의 **첫 책임은 SUCCESS_CRITERIA 각 항목을 실제 검증** 하는 것. 서브태스크 산출물 검증은 그 보조.
 
@@ -786,7 +789,7 @@ Lens Multi v3.23.1 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.23.1 — 최종 결과                       ║
+║   Lens Multi v3.24.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -913,12 +916,12 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 **사용자 요청**: "React 웹사이트 만들어 줄래? 랜딩, 블로그, 대시보드 페이지. 완전히 작동하는 것."
 
-### Phase 1: 분해
-1. React 프로젝트 초기화 + 라우터 설정 (Worker #1, opus)
-2. 랜딩 페이지 컴포넌트 + 스타일링 (Worker #2, opus)
-3. 블로그 페이지 + Mock API (Worker #3, opus)
-4. 대시보드 페이지 + 데이터 시각화 (Worker #4, opus)
-5. E2E 테스트 작성 (Worker #5, opus) — 할당 skill: `/qa`
+### Phase 1: 분해 (난이도 사다리 배정)
+1. React 프로젝트 초기화 + 라우터 설정 (Worker #1, Easy → haiku)
+2. 랜딩 페이지 컴포넌트 + 스타일링 (Worker #2, Medium → sonnet)
+3. 블로그 페이지 + Mock API (Worker #3, Medium → sonnet)
+4. 대시보드 페이지 + 데이터 시각화 (Worker #4, Hard → TOP=fable)
+5. E2E 테스트 작성 (Worker #5, Medium → sonnet) — 할당 skill: `/qa`
 
 ### Phase 2: TodoWrite
 5개 항목, 모두 `pending`
@@ -941,7 +944,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.23.1 — 최종 결과
+Lens Multi v3.24.0 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 

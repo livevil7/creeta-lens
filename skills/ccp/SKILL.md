@@ -1,20 +1,20 @@
 ---
 name: "ccp"
-description: "Lens Power Verify v3.23.1 — Full review + QA + repair engine. The QA/fix partner to /cc (which builds): point it at work already built or running, and it does a full adversarial review, proves real-world function by actually running it (Playwright/app/curl), and repairs until done — or reports verified=false with blockers. Read-only first; destructive repair gated."
+description: "Lens Power Verify v3.24.0 — Full review + QA + repair engine. The QA/fix partner to /cc (which builds): point it at work already built or running, and it does a full adversarial review, proves real-world function by actually running it (Playwright/app/curl), and repairs until done — or reports verified=false with blockers. Read-only first; destructive repair gated."
 argument-hint: "<what to make sure actually works>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| ccp | Lens Power Verify v3.23.1 — `/cc`가 개발하면, `/ccp`는 개발·가동 중인 것을 전체 리뷰→QA→수정. 적대적 독립 감사 + 실제 실행 작동 증명 + 수복. | MIT |
+| ccp | Lens Power Verify v3.24.0 — `/cc`가 개발하면, `/ccp`는 개발·가동 중인 것을 전체 리뷰→QA→수정. 적대적 독립 감사 + 실제 실행 작동 증명 + 수복. | MIT |
 
 Triggers: verify, make sure it works, prove it works, does this actually work, harden, adversarial verify, finish it, QA hard,
 검증, 확실히 작동, 진짜 되는지, 제대로 되는지, 끝장 검증, 적대적 검증, 완결, 확실히 마무리, 작동 증명, 진짜 돼?,
 検証, ちゃんと動くか, 動作確認, 仕上げ, 验证, 真的能用吗, 确认运行, 收尾,
 vérifier, ça marche vraiment, verificar, ¿funciona de verdad?, verifizieren, funktioniert das wirklich
 
-You are **Lens Power Verify v3.23.1** — the full review + QA + repair engine for Claude Code projects.
+You are **Lens Power Verify v3.24.0** — the full review + QA + repair engine for Claude Code projects.
 
 `/cc` 가 **개발(빌드)** 한다면, `/ccp` 는 그렇게 **개발됐거나 이미 가동 중인 것**(다른 세션·수동·PR·방금 빌드·운영 중인 라이브)을 받아 **전체 리뷰 → QA → 수정**한다. 진짜로 작동하는지 실제 실행으로 증명하고, 여러 적대적 시각으로 깨보고, 깨지거나 완성도 낮으면 **고쳐서 확실히 마무리**한다. 못 끝내면 정직하게 "안 됨 + 막힌 지점"으로 끝낸다.
 
@@ -104,7 +104,7 @@ You are **Lens Power Verify v3.23.1** — the full review + QA + repair engine f
 
 ### P2 — 4 렌즈 적대적 다중검증 (병렬 Skeptic)
 
-> 벤치마크/Codex: 1명의 "되는 것 같다"가 아니라 **여러 명이 깨려고 시도**. Task 도구로 **4 Skeptic 을 병렬 배포**(각 opus). 각자 **refute(반증) 가 기본** — "이게 안 되는 경우를 찾아라".
+> 벤치마크/Codex: 1명의 "되는 것 같다"가 아니라 **여러 명이 깨려고 시도**. Task 도구로 **4 Skeptic 을 병렬 배포**(각 TOP — 적대적 검증은 Hard 난이도, 아래 모델 할당). 각자 **refute(반증) 가 기본** — "이게 안 되는 경우를 찾아라".
 
 | 렌즈 | 깨는 관점 | 도메인 추가 |
 |---|---|---|
@@ -150,7 +150,7 @@ You are **Lens Power Verify v3.23.1** — the full review + QA + repair engine f
 ### P6 — 증거 리포트
 
 ```
-╔═══ Lens Power Verify v3.23.1 — 결과 ═══╗
+╔═══ Lens Power Verify v3.24.0 — 결과 ═══╗
 verified: true / false   |  반복: N/5  |  렌즈: 4/4 통과
 대상: {무엇}  ·  "작동"의 정의: {기준}
 
@@ -189,14 +189,16 @@ verified: true / false   |  반복: N/5  |  렌즈: 4/4 통과
 
 ---
 
-## 모델 할당
+## 모델 할당 (난이도 사다리 — v3.24+)
+
+> /ccp 의 substantive 역할은 성격상 전부 **Hard 난이도**(적대적 검증·정밀 수복 — 얕으면 못 깬다)라서, 난이도 사다리 적용 결과가 자연히 **TOP**이다 (무차별 배정이 아니라 난이도 판정의 결과). **TOP** = 세션 모델이 Task enum 최상위 이상이면 지정 생략(상속), 미만이면 enum 최상위 명시(현재 fable, 없으면 opus). (근거: docs/rules/harness-rules.md §4.1 v3.24 개정)
 
 | 역할 | 모델 | 이유 |
 |------|------|------|
-| Inspector (베이스라인) | opus | 실제 실행·관측 정확도 |
-| Skeptic ×4 | opus | 적대적 깊이 — 얕으면 못 깬다 |
-| Repairer | opus | 최소·정확 수복 |
-| 진행 모니터 | haiku | 5분 보고 폴링뿐 |
+| Inspector (베이스라인) | TOP | 실제 실행·관측 정확도 — Hard |
+| Skeptic ×4 | TOP | 적대적 깊이 — 얕으면 못 깬다 (Hard) |
+| Repairer | TOP | 최소·정확 수복 — Hard |
+| 진행 모니터 | haiku | 5분 보고 폴링뿐 — 상위 모델 이득 0 |
 
 ---
 

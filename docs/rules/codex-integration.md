@@ -6,13 +6,13 @@ Lens v3.1에서 OpenAI Codex CLI를 활용한 pre-mortem 이종 모델 검증의
 
 ### Codex CLI란
 
-- OpenAI가 제공하는 codex 전용 CLI 도구 (이 확장 빌드가 노출하는 모델: `gpt-5.5`)
+- OpenAI가 제공하는 codex 전용 CLI 도구 (모델은 머신의 모델 순위표에서 최상위를 자동 선택 — §4 resolver. 2026-07 현재 1등: `gpt-5.6-sol`)
 - 로컬 셸에서 비대화형 호출 가능 (`codex exec`)
 - ChatGPT Plus/Pro/Max 구독으로 인증 (별도 API 키 불필요)
 
 ### Lens가 Codex를 사용하는 이유
 
-- **이종 모델 병렬 검증**: Claude Opus와 다른 아키텍처/학습 데이터의 모델로 교차 검증
+- **이종 모델 병렬 검증**: Claude 계열과 다른 아키텍처/학습 데이터의 모델로 교차 검증
 - **블라인드 스팟 해소**: 단일 모델 편향(유사한 추론 경로, 동일한 놓침)을 상쇄
 - **비용 효율**: Plus/Pro/Max 구독 내에서 추가 과금 없이 활용
 
@@ -72,10 +72,15 @@ codex login status
 ## 4. 표준 호출 패턴
 
 ```bash
+# ① 모델 resolver (v3.24+) — 순위표 1등을 매 호출 직전 동적 선택. 이름을 문서에 못박지 않는다.
+CODEX_MODEL=$(node -e "const p=require('path'),os=require('os');const d=require(p.join(os.homedir(),'.codex','models_cache.json'));const m=d.models.filter(x=>x.visibility==='list'&&x.supported_in_api!==false).sort((a,b)=>(a.priority??99)-(b.priority??99))[0];if(!m||!m.slug)process.exit(1);console.log(m.slug)" 2>/dev/null) || CODEX_MODEL=""
+MODEL_ARG=(); if [ -n "$CODEX_MODEL" ]; then MODEL_ARG=(-m "$CODEX_MODEL"); else echo "⚠️ 모델 resolver 실패 — codex config 기본 모델로 진행"; fi
+
+# ② 표준 호출
 OUT=$(mktemp /tmp/codex_XXXXXX.txt)   # 고유 파일명 — 병렬 호출 충돌 방지
 DEPTH=xhigh                            # 소규모; 대규모 리뷰·협의는 high (§"깊이 분기")
 timeout 180 codex exec --skip-git-repo-check \
-  -m gpt-5.5 \
+  "${MODEL_ARG[@]}" \
   -c model_reasoning_effort="$DEPTH" \
   -c service_tier=fast \
   -o "$OUT" \
@@ -88,7 +93,7 @@ RC=$?                                  # 124 = 180초 초과 (§7)
 
 - `exec` — 비대화형 1회 응답 모드. TUI를 띄우지 않고 결과 출력
 - `--skip-git-repo-check` — 현재 디렉토리가 git repo가 아니어도 실행 허용. Pre-mortem은 repo와 무관하므로 필수
-- `-m gpt-5.5` — 모델 명시 고정. config 기본값에 의존하지 않고 항상 동일 모델 사용 (이 codex 확장 빌드가 노출하는 모델)
+- `"${MODEL_ARG[@]}"` — **순위표 1등 동적 지정 (v3.24+)**: `~/.codex/models_cache.json`(codex 가 자동 갱신하는 모델 순위표)에서 `visibility=list` + `supported_in_api` 중 `priority` 최소(=1등, 2026-07 현재 `gpt-5.6-sol`) slug 를 매 호출 직전 선택. 특정 모델명을 문서에 못박지 않고, 사용자가 데스크톱 앱에서 바꾼 config 기본값에도 의존하지 않는다. resolver 실패(순위표 부재·스키마 변경·빈 목록) 시 배열이 비어 `-m` 자체가 생략되고(빈 `-m ""` 전달 원천 차단) ⚠️ 플래그를 stdout 에 남긴다 — **이 플래그는 호출한 스킬의 결과 보고 상단에 복사 의무** (조용한 강등 금지)
 - `timeout 180` — **상한 가드(v3.19+)**: codex 가 180초 안에 못 끝내면 강제 종료(exit 124). 무한 동기 대기를 차단한다. 초과 시 §7 — `-o` 부분 본문이 있으면 "미완" 표기로 수거, 없으면 degrade. (coreutils `timeout` — git-bash/mac/linux 공통)
 - `-c model_reasoning_effort="$DEPTH"` — **깊이 다이얼**: 입력 규모로 분기(§"깊이 분기"). 소규모(pre-mortem 200단어·빠른 조사)=`xhigh`, 대규모(전체 diff 리뷰·딥스펙 전량 협의)=`high`. 토큰 비용 비고려 방침은 유지하되, 대규모 xhigh 의 시간 비선형 폭증만 회피.
 - `-c service_tier=fast` — **속도 다이얼**: API 부하 시 큐 우선권. *별개 다이얼*이라 깊이와 동시 적용 가능. (현행 codex 0.137+ 정식 키는 `fast`; 과거 `priority` 는 동일 동작의 **레거시 별칭**으로 아직 매핑되나 미래 제거 대비 `fast` 로 통일. 라이브 실측 EXIT 0)
@@ -98,7 +103,7 @@ RC=$?                                  # 124 = 180초 초과 (§7)
 
 깊이와 속도는 **독립 다이얼**이다. `reasoning_effort` 는 추론 토큰량(품질·깊이), `service_tier` 는 큐 우선권(지연)을 조절한다 — 한쪽이 다른 쪽을 깎지 않는다.
 
-**xhigh 는 입력이 작을 때만 빠르다.** 실측(gpt-5.5): 소규모에서 `low` 는 `xhigh` 보다 토큰 ~6배 + 속도 이득 0 → 소규모는 xhigh 가 오히려 싸고 빠르다. **그러나 입력이 크면(전체 diff 리뷰·딥스펙 전량 협의) xhigh 의 추론 시간은 비선형으로 폭증**한다. `service_tier=fast` 는 raw 속도가 아니라 **혼잡 시 큐 우선권**이라 compute-bound 인 이 폭증을 깎지 못한다. 따라서 깊이를 입력 규모로 분기한다:
+**xhigh 는 입력이 작을 때만 빠르다.** 실측(gpt-5.5; 2026-07-15 gpt-5.6-sol 도 xhigh/high 단계 동일 지원 확인 — 깊이 분기 규칙은 모델 세대 무관 유지): 소규모에서 `low` 는 `xhigh` 보다 토큰 ~6배 + 속도 이득 0 → 소규모는 xhigh 가 오히려 싸고 빠르다. **그러나 입력이 크면(전체 diff 리뷰·딥스펙 전량 협의) xhigh 의 추론 시간은 비선형으로 폭증**한다. `service_tier=fast` 는 raw 속도가 아니라 **혼잡 시 큐 우선권**이라 compute-bound 인 이 폭증을 깎지 못한다. 따라서 깊이를 입력 규모로 분기한다:
 
 | 호출 지점 | 입력 규모 | DEPTH |
 |---|---|---|
@@ -111,11 +116,12 @@ RC=$?                                  # 124 = 180초 초과 (§7)
 
 ### 모델·티어 드리프트 대비 (버전 무관 fallback)
 
-`-m gpt-5.5` 와 `service_tier` 는 **서버측 검증**이라, OpenAI 가 모델을 폐기/리네임하면 호출이 런타임 400(`invalid_request_error`)으로 죽는다. 머신 하드코딩 금지 원칙에 따라:
+동적 지정 모델과 `service_tier` 는 **서버측 검증**이라, OpenAI 가 모델을 폐기/리네임하면 호출이 런타임 400(`invalid_request_error`)으로 죽는다. 머신 하드코딩 금지 원칙에 따라 fallback 은 3단:
 
-- **모델**: `-m gpt-5.5` 호출이 400(invalid model)이면 **`-m` 을 빼고 1회 재시도** (codex config 기본 모델 사용). 특정 모델명에 영구 의존하지 않는다.
+- **resolver 실패** (순위표 부재·스키마 변경·빈 목록): `MODEL_ARG` 가 비어 `-m` 자체가 생략됨(§4 ① — codex config 기본 모델 사용) + ⚠️ 플래그 출력. **플래그는 호출한 스킬의 결과 보고에 복사 의무** — 조용한 강등 금지.
+- **모델 400**: 동적 선택된 모델이 400(invalid model)이면 **`MODEL_ARG` 를 비우고 1회 재시도** (codex config 기본 모델 사용). 특정 모델명에 영구 의존하지 않는다.
 - **티어**: `service_tier=fast` 가 거부되면 `-c service_tier` 자체를 생략하고 재시도 (기본 티어). `fast`/`priority` 둘 다 미지원인 구버전 대비.
-- 이 fallback 은 graceful — 이종검증이 조용히 죽는 대신 기본값으로라도 돈다. 깨짐은 `/crv` 감사가 `codex --version` probe 로 선제 감지.
+- 이 fallback 은 graceful — 이종검증이 조용히 죽는 대신 기본값으로라도 돈다. 깨짐은 `/crv` 감사가 `codex --version` + `models_cache.json` probe(순위표 스키마·1등 slug 변동)로 선제 감지.
 
 > 참고: codex 바이너리 절대경로는 `CODEX_BIN=$(ls $HOME/.vscode/extensions/openai.chatgpt-*/bin/windows-x86_64/codex.exe 2>/dev/null | head -1)` 로 잡고 `"$CODEX_BIN"` 으로 호출 (PATH 부재 시, §2 단계 2).
 
@@ -162,7 +168,7 @@ JSON 형식 사용하지 말고 한국어로 답변.
 - **200단어 제한**: 응답 시간 단축, 핵심 허점에 집중
 - **순수 텍스트**: 파싱 편의성 (JSON/마크다운 파싱 불필요)
 - **3가지 시나리오 강제**: 단일 실패 모드가 아닌 다중 관점 유도
-- **한국어 명시**: gpt-5.5는 영문 응답 기본값이므로 명시적 지시 필요
+- **한국어 명시**: codex 모델은 영문 응답이 기본값이므로 명시적 지시 필요
 
 ## 7. 에러 처리 — 180초 상한 + 부분 수집/degrade (v3.19+)
 
@@ -216,10 +222,11 @@ Pre-mortem 은 repo 무관(`--skip-git-repo-check`)이지만, **조사·코드�
 - **Phase 4.5 코드리뷰 (구조화·git-aware — v3.13+ 권장)**: 자유형 "이 diff 를 리뷰" 프롬프트 + 수동 diff 주입 + 본문 마지막 줄 awk `PASS`/`FAIL` 파싱은 **취약**(diff 잘림·텍스트 휴리스틱). 대신 **`codex exec review`** 가 git 을 직접 읽고 구조화 판정을 낸다 (현행 0.137+ 라이브 실측 확인):
 
   ```bash
+  # 모델 resolver (§4 ①) 를 먼저 실행해 MODEL_ARG 준비 — 이름 하드코딩 금지
   SCHEMA=$(mktemp /tmp/codex_schema_XXXXXX.json)   # {verdict: pass|fail, high_findings:[...]}
   RES=$(mktemp /tmp/codex_review_XXXXXX.json)
   timeout 180 codex exec review --uncommitted \
-    -m gpt-5.5 -c model_reasoning_effort=high -c service_tier=fast \
+    "${MODEL_ARG[@]}" -c model_reasoning_effort=high -c service_tier=fast \
     --output-schema "$SCHEMA" --ephemeral --json > "$RES" 2>/dev/null
   # 판정: $RES 의 verdict==fail 또는 high_findings 비어있지 않음 → FAIL
   # 깊이=high (전체 diff 는 대규모 입력 → xhigh 폭증 회피, §"깊이 분기").

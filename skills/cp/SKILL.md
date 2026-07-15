@@ -1,20 +1,20 @@
 ---
 name: "cp"
-description: "Lens Plan v3.23.1 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
+description: "Lens Plan v3.24.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.23.1 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
+| cp | Lens Plan v3.24.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
 planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
 
-You are **Lens Plan v3.23.1**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.24.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -315,7 +315,7 @@ Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude �
 ## 🧰 실행 전략 & 자원 (난이도·모델·병렬·스킬·기존 자원)
 
 - **난이도**: {trivial / small / medium / large} — {근거}
-- **권장 모델**: {haiku / sonnet / opus} — {난이도 대비 이유}
+- **권장 모델**: {haiku / sonnet / TOP} — {난이도 대비 이유. TOP=Task enum 최상위 티어(세션 모델이 최상위 이상이면 상속), 사다리는 모델 세대와 함께 자동 상승}
 - **병렬 실행**: {단일 / N개 에이전트 / ultracode·workflow} — {몇 개를 어떻게 분할하나}
 - **활용 스킬 (설치된 것 자동 감지)**: {예: UI→디자인 스킬, 브라우저 검증→playwright, 라이브러리 문서→context7 …} — {왜 이 스킬을 쓰나}
 - **기존 자원·시스템**: {재사용할 컴포넌트/API/테이블/서비스/env} — {어떻게 활용하나}
@@ -402,17 +402,17 @@ Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
 
 Phase 3(Pre-mortem)은 이 HTML 생성과 독립 — Pre-mortem 이 실패해도 md+HTML 은 이미 보존됨. (Pre-mortem 결과는 md 에 추가 후 board 를 한 번 더 재빌드하면 HTML 에도 반영하려면 `/cp html` 로 재생성.)
 
-### Phase 3: Pre-mortem (Opus + Codex 병렬)
+### Phase 3: Pre-mortem (Claude TOP + Codex 병렬)
 
 Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적으로 리스크 분석** 을 수행합니다. 결과는 문서의 `## ⚠️ 사전 리스크` 섹션에 출처를 병기해 저장합니다. (**Fast 등급은 Pre-mortem skip** — 속도 등급 섹션 우선.)
 
 **Pre-mortem 의 새 역할 (v3.4+)**: 단순 리스크 나열이 아니라 **"Plan A 약점 → Plan B Trigger 연결"** 을 도출. 발견된 약점이 이미 Plan B Trigger 와 매칭되는지 확인 → 매칭되지 않으면 Phase 2 로 회귀해 Plan B 에 새 Trigger 추가.
 
-**두 모델을 쓰는 이유**: 같은 모델로 자기 검증 시 동일 편향 공유. Opus (세션 컨텍스트 기반) 와 Codex (독립 코드 분석) 의 교차 검증으로 블라인드 스팟 해소.
+**두 모델을 쓰는 이유**: 같은 모델로 자기 검증 시 동일 편향 공유. Claude TOP (세션 컨텍스트 기반) 과 Codex (독립 코드 분석) 의 교차 검증으로 블라인드 스팟 해소. Pre-mortem 은 Hard 난이도 — 난이도 사다리의 최상위 티어(TOP)가 맡는다.
 
-#### 3.1 Opus Pre-mortem
+#### 3.1 Claude Pre-mortem (TOP)
 
-현재 세션 모델이 opus 면 내부 추론으로 직접 수행. 그 외 모델이면 Task tool 로 opus agent 를 spawn 해 다음 프롬프트 전달:
+현재 세션 모델이 Task enum 최상위와 같거나 상위(예: Fable)면 내부 추론으로 직접 수행. 그 외 모델이면 Task tool 로 enum 최상위(현재 fable, 없으면 opus) agent 를 spawn 해 다음 프롬프트 전달:
 
 ```text
 이 작업 계획의 허점을 찾아주세요. 200단어 이내.
@@ -433,13 +433,13 @@ Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적
 
 #### 3.2 Codex Pre-mortem
 
-> **중복 호출 회피 (v3.9+)**: Phase 0.5 에서 Codex 독립 조사가 이미 수행됐다면(=듀얼트랙 활성), Codex 의 리스크 시각은 Phase 2.4 합성에서 이미 통합됐으므로 **이 단계는 skip** (quota 절약). Pre-mortem 은 3.1 Opus 가 통합안에 대해 단독 수행. Phase 0.5 가 skip 된 경우(trivial 아님에도 Codex 부재, 또는 handoff 직접 진입)에만 아래 Codex 호출 수행.
+> **중복 호출 회피 (v3.9+)**: Phase 0.5 에서 Codex 독립 조사가 이미 수행됐다면(=듀얼트랙 활성), Codex 의 리스크 시각은 Phase 2.4 합성에서 이미 통합됐으므로 **이 단계는 skip** (quota 절약). Pre-mortem 은 3.1 Claude TOP 이 통합안에 대해 단독 수행. Phase 0.5 가 skip 된 경우(trivial 아님에도 Codex 부재, 또는 handoff 직접 진입)에만 아래 Codex 호출 수행.
 
 `docs/rules/codex-integration.md` 의 감지 로직으로 Codex CLI 존재 확인:
 
 1. `command -v codex` 또는 VSCode 확장 경로 확인
-2. 존재하면: Bash tool 로 **§4 표준 호출**(`timeout 180 ... -m gpt-5.5 -c model_reasoning_effort=xhigh -c service_tier=fast -o "$OUT"`) 그대로 호출 (pre-mortem=소규모라 깊이는 `xhigh` 유지 + 180초 상한·§7. `fast`=구 `priority` 통일)
-3. 부재하면: skip 하고 "Codex 미설치 — Opus 단독 pre-mortem" 플래그 기록
+2. 존재하면: Bash tool 로 **§4 표준 호출**(resolver 로 `MODEL_ARG` 준비 후 `timeout 180 ... "${MODEL_ARG[@]}" -c model_reasoning_effort=xhigh -c service_tier=fast -o "$OUT"`) 그대로 호출 (pre-mortem=소규모라 깊이는 `xhigh` 유지 + 180초 상한·§7. `fast`=구 `priority` 통일. 모델은 순위표 1등 동적 선택 — codex-integration.md §4 ①)
+3. 부재하면: skip 하고 "Codex 미설치 — Claude TOP 단독 pre-mortem" 플래그 기록
 
 Codex 프롬프트:
 
@@ -457,7 +457,7 @@ Codex 프롬프트:
 JSON 금지, 자유 서술.
 ```
 
-Codex 미응답/실패 (인증 만료 등) 시 기다리지 않고 "Codex 호출 실패: {에러 요약}" 기록하고 Opus 결과만 사용. 상세: `docs/rules/codex-integration.md` §7.
+Codex 미응답/실패 (인증 만료 등) 시 기다리지 않고 "Codex 호출 실패: {에러 요약}" 기록하고 Claude TOP 결과만 사용. 상세: `docs/rules/codex-integration.md` §7.
 
 #### 3.3 결과 통합 + Plan B Trigger 매칭
 
@@ -466,8 +466,8 @@ Codex 미응답/실패 (인증 만료 등) 시 기다리지 않고 "Codex 호출
 ```markdown
 ## ⚠️ 사전 리스크
 
-### Claude Opus 관점 (세션 컨텍스트 기반)
-{Opus pre-mortem 응답 본문}
+### Claude TOP 관점 (세션 컨텍스트 기반)
+{Claude pre-mortem 응답 본문}
 
 ### Codex 관점 (독립 코드 분석)
 {Codex pre-mortem 응답 본문, 또는 "Codex 미설치 — 단일 모델 pre-mortem" 표기}
