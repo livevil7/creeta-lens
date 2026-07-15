@@ -280,4 +280,6 @@ refs: [docs/rules/codex-integration.md, docs/rules/harness-rules.md, docs/rules/
 - **완료**: Goal 정의 → Codex 듀얼트랙 조사·합성 → 계획 작성 → Pre-mortem(4-skeptic 27건 → 12건 채택 반영, blocker 2건 사전 해소) → 강화판 resolver 실측 통과
 - **Modify 이력 (2026-07-15)**: 사용자 정정 — "최고 모델 무차별 배정 금지, 업무 난이도에 맞춰 배분". Claude 축을 "전 역할 TOP" → "난이도 사다리(Easy=경량/Medium=중간/Hard=TOP, 각 칸 자동 상승)"로 재설계. /cc의 v3.11 "전부 opus(품질 우선·비용 비고려)" 철학 공식 폐기, /c와 사다리 통일. codex는 1등 모델 유지 + 난이도는 깊이 다이얼(기존 xhigh/high).
 - **실행 (2026-07-15, /cc)**: [A]~[H] 전 수정 완료 (rules 3종 + 스킬 5종 + cc P4.5 resolver 인라인 — Supervisor 지적 반영). Supervisor(fable) 82점 pass — fable spawn 실측 겸용. Codex 리뷰는 대형 diff로 180s 초과 → §7 degrade(Supervisor 단독 게이트, timeout 가드 라이브 실증). 검증: V1 resolver=gpt-5.6-sol ✓ / V2 §4 E2E EXIT 0+"V324-OK" ✓ / V3 옛 이름 호출형 0건 ✓ / V4 5개 스킬 사다리 반영 ✓ / V5 fable spawn ✓ / V8 Mac Mini 플래그 경로 정상 ✓ / V9 JSON 파싱 ✓. V6(태그)·V7(플러그인) 출시 단계에서.
-- **재개 포인트**: [I] 출시 — bump 14곳 완료, 커밋→태그→push→ref 검증→플러그인 업데이트
+- **[I] 출시 완료 (2026-07-15)**: 커밋 9fd7182 → 태그 v3.24.0 → push → `git show v3.24.0:.claude-plugin/marketplace.json` ref=v3.24.0 확인 (V6 ✓) → 이 컴퓨터 플러그인 3.23.1→3.24.0 업데이트 (V7 ✓).
+- **Goal 달성**: 3/3 ✓ — 검증 9/9 전량 pass.
+- **재개 포인트**: 완료 — /cp done 으로 history 전환 권장. (다른 컴퓨터는 각자 /lens-upgrade·/ci 시 자동 반영)
