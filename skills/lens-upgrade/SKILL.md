@@ -1,3 +1,10 @@
+---
+name: "lens-upgrade"
+description: "One-stop safe upgrade for the Lens plugin. Syncs the marketplace, cleans stale cache, reconciles registry conflicts, reinstalls, verifies, and rolls back on failure."
+argument-hint: "[--dry-run | --yes | --verbose | --version vX.Y.Z]"
+user-invocable: true
+---
+
 | name | description | license |
 |------|-------------|---------|
 | lens-upgrade | One-stop safe upgrade for the Lens plugin. Syncs the marketplace (preserving local changes), cleans cache, reconciles multi-scope registry conflicts, reinstalls, and verifies — with automatic rollback on failure. | MIT |

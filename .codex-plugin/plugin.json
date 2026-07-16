@@ -1,0 +1,39 @@
+{
+  "name": "lens",
+  "version": "3.24.0",
+  "description": "Skill navigator, planning, parallel execution, research, review, and multi-repo sync workflows.",
+  "author": {
+    "name": "Lens",
+    "email": "livevil7@gmail.com",
+    "url": "https://github.com/livevil7"
+  },
+  "homepage": "https://github.com/livevil7/creeta-lens",
+  "repository": "https://github.com/livevil7/creeta-lens",
+  "license": "MIT",
+  "keywords": [
+    "lens",
+    "skill-navigator",
+    "planning",
+    "parallel-execution",
+    "research",
+    "git-sync"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Lens",
+    "shortDescription": "Planning and execution workflows",
+    "longDescription": "Provides the complete Lens workflow suite for planning, parallel execution, research, review, documentation, installation, and repository synchronization.",
+    "developerName": "Lens",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/livevil7/creeta-lens",
+    "defaultPrompt": [
+      "Use Lens to plan this task.",
+      "Use Lens to execute this work.",
+      "Use Lens to research this topic."
+    ]
+  }
+}

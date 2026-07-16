@@ -1,6 +1,9 @@
 .lens-memory.json
 .lens-cache.json
 .lens/
-.agents/
+.agents/*
+!.agents/plugins/
+.agents/plugins/*
+!.agents/plugins/marketplace.json
 __pycache__/
 *.pyc
