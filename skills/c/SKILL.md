@@ -584,6 +584,21 @@ If `docs/tasks/` has an active task document matching this work:
 - Update the **Progress** section
 - Record completion status
 - Note any follow-ups
+- **Deviation log (v3.25)** — record where execution diverged from the plan: `{planned} → {actually did} (reason: …)`. If nothing diverged, write **"편차 없음"** explicitly — silence and "no deviation" must not look the same. Without this the plan→execute→plan loop never closes and the next plan repeats the same mistake.
+
+### 6.2b Plan check before executing an existing plan (v3.25)
+
+> Scope note: `/c` is **not** a `/cp` handoff target — `/cp` hands off only to `/cc`. This check applies in the narrower case where `/c` picks up an existing plan from `docs/tasks/` as its work definition (§ "Read `docs/tasks/` for active work context"). Do not duplicate the full `/cc` entry gate here.
+
+When an active plan document is driving this work, verify it before executing:
+
+```bash
+node -e "const m=require('${CLAUDE_PLUGIN_ROOT}/lib/plan-manager.js');const fs=require('fs');const r=m.validatePlanStructure(fs.readFileSync(process.argv[1],'utf-8'),process.argv[2]);console.log(JSON.stringify(r));process.exit(r.valid?0:1)" {plan_path} {grade}
+```
+
+Also confirm **blocking open questions are zero**. If either check fails, report what is missing and ask whether to proceed anyway — do not silently execute against a plan that has unanswered blocking questions. A user override is fine, but record `⚠️ 게이트 우회됨 ({미달 항목})` in the plan's Progress section.
+
+The check is structural only — it proves sections exist, not that they are any good. Never report a pass as "the plan is good".
 
 ### 6.3 Offer /cp done
 
