@@ -31,7 +31,7 @@ Read these before making claims about how Lens behaves:
 3. `docs/rules/release-guide.md` - SemVer rules + exact release procedure (why editing the cache is not a release).
 4. `docs/rules/codex-integration.md` - how `/cp` and `/cc` use Codex CLI for heterogeneous-model dual verification.
 5. `docs/rules/document-conventions.md` and `docs/rules/documentation-guide.md` - doc writing standards Lens itself follows.
-6. `docs/rules/live-research.md` — 라이브리서치 substrate(/cpp·/cr 참조): agent-reach·insane-search 호출법 + 미설치 폴백 규칙.
+6. `docs/rules/live-research.md` — 라이브리서치 substrate(/cp deep·/cr 참조): agent-reach·insane-search 호출법 + 미설치 폴백 규칙.
 7. `CHANGELOG.md` - version history (newest at top).
 
 ## Fast Answer Rules

@@ -125,21 +125,26 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 | `/cp flow` | FLOW mode — maps user-journey stages ↔ engines/modules ↔ dependencies into one interactive flowchart, saved as `docs/rules/flow.md` + `flow.html` (the project's big-picture Rule) |
 | `/cp` (no args) | Shows full skill inventory (same as `/c`) |
 
-### `/cpp` — Power Plan (deep, build-ready)
+### Grades — `fast` / `standard` / `deep`
 
 ```
-/cpp <what you want to do>
+/cp fast <task>        # explicit grade
+/cp standard <task>
+/cp deep <task>
+/cp <task>             # auto-judged by risk
 ```
 
-`/cpp` (Lens Power Plan) is the **deep lane** — the heavy sibling of `/cp`. It produces a plan so detailed that execution needs **zero follow-up questions**: user-language Goal, fan-out investigation (6 axes, parallel subagents), a domain-adaptive deep spec (UI → ASCII wireframe + element-by-element states/copy/data-binding), a **mandatory Codex cross-coordination gate** (non-negotiable — stops and reports if Codex is missing), and a build-ready task plan (exact path + change + verify + `[P]`/deps). Benchmarked against GitHub Spec Kit, AWS Kiro (EARS), and obra Superpowers. It carries **no length cap** (v3.18) — large work yields a long, fully-itemized checklist, not a compressed summary; the concise, capped lane stays `/cp`.
+**Grade is chosen by risk, not by length.** Sizing a plan by line count makes length a proxy for quality — a hollow document passes just by being long. The question is *how hard is this to undo*.
 
-| You type | What happens |
-| --- | --- |
-| `/cpp build the inspection-approval screen` | Fan-out research → ASCII wireframe + states + copy → Codex coordination → build-ready tasks |
-| `/cpp design the bidding API` | Endpoint contracts + schema + error taxonomy + sequence, verified with Codex |
-| `/cpp fix a typo` | Downgrade guard — suggests `/cp` instead (too heavy for trivial work) |
+| Grade | When | What you get |
+| --- | --- | --- |
+| `fast` | Small scope, few choices, **easily reversible** | Goal + Why + Plan A checklist + Review |
+| `standard` | Multiple components/choices, or user-facing impact | Full flow: Codex dual-track, Plan A/B, pre-mortem, HTML deck |
+| `deep` | **Hard to reverse** — deploy, data, multi-system, high uncertainty | Fan-out research (6 axes) · domain deep-spec (UI → ASCII wireframe + states + copy) · **mandatory Codex gate** (stops and reports if Codex is missing) · build-ready tasks (exact path + change + verify + `[P]`/deps) · zero follow-up questions |
 
-**When to use which**: quick/standard (concise, capped) → `/cp` · deep/large/zero-follow-up (no length cap, full checklist) → `/cpp`.
+**Mismatch guard (both directions).** Even when you name a grade, `/cp` still judges the risk and speaks up if they disagree — but it never overrides you. Aiming **too low** (planning a deploy-critical change as `fast`) gets a strong warning with specific reasons, because that one actually costs you. Aiming **too high** gets a single light note, because over-planning only wastes time. Your override is recorded in the plan either way.
+
+> `/cpp` was folded into `deep` in v3.25 and removed. Its trigger words still route here.
 
 ### `/ccp` — Power Verify (full review + QA + repair)
 

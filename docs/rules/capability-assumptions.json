@@ -195,7 +195,7 @@
       "affects_lens": [
         "docs/rules/codex-integration.md"
       ],
-      "purpose": "codex-integration.md 호출 파라미터(models_cache.json resolver 동적 모델 v3.24+, service_tier=fast, depth=xhigh/high 입력규모 분기, timeout 180s)가 codex 바이너리 변경에 깨지지 않는지 — /cp·/cc·/cpp 모든 codex 호출의 SoT",
+      "purpose": "codex-integration.md 호출 파라미터(models_cache.json resolver 동적 모델 v3.24+, service_tier=fast, depth=xhigh/high 입력규모 분기, timeout 규모분기 180/300/600s v3.25+)가 codex 바이너리 변경에 깨지지 않는지 — /cp·/cc·/cpp 모든 codex 호출의 SoT",
       "assumed_native_gap": "n/a (Lens 자체 호출 규약 가정의 유효성)",
       "gap_closed_signal": "~/.codex/models_cache.json 스키마 변경(models/visibility/priority/slug 필드 리네임)·부재 시 resolver가 빈 값 → ⚠️ fallback 플래그 발생 빈도로 감지. 문서 예시 '현재 1등' 표기가 priority-1 slug와 어긋나면 개정 제안. service_tier=priority가 정식 fast 별칭에서 제거되면 파싱 실패. codex --version/config-reference 변경으로 감지",
       "signal_method": "both",

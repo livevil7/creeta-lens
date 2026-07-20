@@ -31,8 +31,7 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 |-------|-------------|----------|
 | `/c` | Single skill navigator | Scan → Recommend → Execute → Discover |
 | `/cc` | 개발(빌드) — 병렬 멀티에이전트 엔진 | Scan → Multi-Match → Parallel Execute → Synthesize |
-| `/cp` | Plan-first (fast/standard) | 골격 **What→Why(6하원칙)→🧰실행전략→How→💡시사점/주의점/SideEffect→✅Review(검증수단)**. 원칙 0: 글길이 줄이기≠목표, 계획 md≥실행 Todo. Standard = Codex + Plan A/B + pre-mortem + HTML. Deep → /cpp |
-| `/cpp` | Power Plan (deep, **대형**) | **분량 캡 없음**(항목 전량+체크리스트, 계획 md≥실행 Todo). spine 8: What+장면 → Why(6하) → 🧰실행전략(난이도·모델·병렬·스킬·자원) → Clarify-to-zero → fan-out(6축) → deep-spec+💡SideEffect → **Codex 협의(필수)** → build-ready tasks → ✅검증수단(Playwright/data/staging)+EARS → approve |
+| `/cp` | 계획 엔진 — **3등급(fast/standard/deep)** | 등급은 **위험도**로 판정(분량 아님). `/cp fast|standard|deep <요청>` 명시 지정 + **양방향 불일치 가드**(낮춰=강한경고/높여=가벼운안내). 골격 **What→Why(6하원칙)→🧰실행전략→How→💡시사점/주의점/SideEffect→✅Review(검증수단)**. deep = 6축 fan-out + **Codex 하드게이트** + 빌드레디 태스크 + 되묻기 0 (구 `/cpp` 흡수) |
 | `/ccp` | Power Verify (개발 후 전체 리뷰·QA·수정) | `/cc`가 만든/가동 중인 것 → 실제 실행 베이스라인 → 4렌즈 적대적 검증 → 만장일치 게이트 → 최소 수복(안전장치) → 증거 리포트(verified true/false) |
 | `/cps` | Repo orientation doc | Scan docs → Assemble 4 sections → Diff gate → Write → Conditional CLAUDE.md pointer |
 | `/cr` | Creeta Research (라이브 딥리서치) | Refine topic → Read live-research substrate → multi-angle parallel gather (Exa·GitHub·YouTube·community·RSS) → cross-check conflicts → report to conversation (no file saved) |

@@ -33,7 +33,6 @@
 | 5 | `skills/c/SKILL.md` | `Lens vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
 | 6 | `skills/cc/SKILL.md` | `Lens Multi vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
 | 7 | `skills/cp/SKILL.md` | `Lens Plan vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 8 | `skills/cpp/SKILL.md` | `Lens Power Plan vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
 | 9 | `skills/ccp/SKILL.md` | `Lens Power Verify vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
 | 10 | `skills/cs/SKILL.md` | `Lens Sync vX.Y.Z` + `currently X.Y.Z` | YAML + Markdown |
 | 11 | `CLAUDE.md` | `Current: **vX.Y.Z**` + `Updated: YYYY-MM-DD` + Recent Changes | Markdown |

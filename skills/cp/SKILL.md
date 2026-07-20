@@ -1,18 +1,22 @@
 ---
 name: "cp"
-description: "Lens Plan v3.24.0 — Fast/standard planning + documentation lifecycle. Quick fixes and standard work plans; for deep build-ready plans (prototype-level, fan-out research, Codex-required) use /cpp. Auto-detects: plan, complete & record history, organize docs."
-argument-hint: "[task description]"
+description: "Lens Plan v3.25.0 — Planning engine with three grades (fast/standard/deep) + documentation lifecycle. Grade is chosen by risk, not length: fast=easily reversible, standard=multi-component or user-facing, deep=hard to reverse (deploy/data/multi-system) with build-ready specs and required Codex review. Specify explicitly as `/cp fast|standard|deep <task>` or let it auto-judge. Auto-detects: plan, complete & record history, organize docs."
+argument-hint: "[fast|standard|deep] [task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.24.0 — Fast & standard planning + doc lifecycle. Quick fixes / standard plans (deep build-ready plans → /cpp). | MIT |
+| cp | Lens Plan v3.25.0 — 계획 엔진 · 3등급(fast/standard/deep). 등급은 분량이 아니라 **위험도**로 정한다. deep = 빌드레디·되묻기 0 (구 `/cpp` 흡수). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
 企画, 企画書, 計画書, 要件定義, 仕様書, 规划, 需求文档, 规格书,
-planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation
+planificar, especificacion, planifier, cahier des charges, Pflichtenheft, Spezifikation,
+power plan, deep plan, build-ready plan, definitive plan, prototype plan,
+파워플랜, 끝장 계획, 심층 계획, 정밀 계획, 프로토타입 계획, 완성형 계획, 디테일 계획,
+パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
+plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
 You are **Lens Plan v3.24.0**, the documentation management engine for Claude Code projects.
 
@@ -20,9 +24,9 @@ You are **Lens Plan v3.24.0**, the documentation management engine for Claude Co
 
 ---
 
-## 속도 등급 — 빠른 /cp vs 깊은 /cpp (v3.15+)
+## 속도 등급 — fast / standard / deep (v3.25+)
 
-`/cp` 는 **빠른 수정·표준 계획**의 도구입니다. 끝장 심층 계획(프로토타입까지 그리고, 전방위 fan-out 조사, 빌드레디 태스크, Codex 필수 협의)은 형제 스킬 **`/cpp` (Lens Power Plan)** 를 씁니다. 둘은 용도가 다른 한 쌍입니다.
+`/cp` 는 **하나의 스킬 · 세 등급**입니다. 빠른 수정부터 끝장 심층 계획(프로토타입·전방위 fan-out 조사·빌드레디 태스크·Codex 필수 협의)까지 등급으로 커버합니다. (구 `/cpp` 는 v3.25 에서 **deep 등급으로 흡수·폐지**.)
 
 **등급 기준은 분량이 아니라 위험도다 (v3.25).** 줄 수·페이지 수로 등급을 정하면 길이가 품질의 대리값이 되어, 내용 없는 문서가 길이만으로 통과한다. 기준은 **되돌리기 얼마나 어려운가**다.
 
@@ -32,7 +36,7 @@ You are **Lens Plan v3.24.0**, the documentation management engine for Claude Co
 | **Standard** | 여러 구성요소·선택지 또는 **사용자 영향**이 있음 | 전체 흐름 (Goal→Codex→Plan A/B→합성→문서→HTML+board→Pre-mortem→승인) | — |
 | **Deep** | **되돌리기 어렵거나** 배포·데이터·다중 시스템·중대한 불확실성 | Standard + 전방위 fan-out 조사 · Codex 협의(하드게이트) · 빌드레디 태스크 · 되묻기 0 | — |
 
-> ⚠️ **이관 진행 중 (v3.25)**: Deep 등급의 파이프라인 본문(S0~S8 · Codex 하드게이트 · 6축 fan-out · 빌드레디 태스크)은 **아직 `skills/cpp/SKILL.md` 에 있다.** 이관이 끝날 때까지 `/cp deep` 은 **`lens:cpp` 를 Skill 도구로 호출**해 그 파이프라인을 실행한다. **Standard 로 조용히 강등하지 않는다** — 조용한 강등은 이 개편이 없애려는 실패 모드 그 자체다. 이관 완료 후 이 문단과 `/cpp` 스킬은 함께 제거된다.
+> **Deep 파이프라인 본문은 아래 "Deep 등급 파이프라인 (S0~S8)" 절에 있다.** Standard 로 조용히 강등하지 않는다 — 조용한 강등은 이 개편이 없애려는 실패 모드 그 자체다. (구 `/cpp` 스킬은 v3.25 에서 이 등급으로 흡수·폐지됨.)
 
 ### 등급 지정 — 사용자가 정한다 (v3.25)
 
@@ -573,6 +577,121 @@ Blocker 모드면 Modify 가 첫 옵션으로 노출됨.
 
 ---
 
+## Deep 등급 파이프라인 (S0~S8) — 되묻기 0
+
+> Deep 은 Standard 의 확장이다. **"그대로 실행만 하면 완성품이 나오는"** 계획서를 만든다 — 받은 사람이 되묻기 0번으로 구현할 수 있을 때까지 깊이를 올린다. Standard 의 Phase 0~6 대신 아래 S0~S8 을 따른다.
+
+### 📜 Constitution — 양보 불가 4조항
+
+> 이 4조항은 모든 stage 위에 있다. 위반하면 어떤 stage 도 통과 못 한다. **이 조항들은 조건부 로드 뒤에 두지 않는다** — 안전조항이 조용히 무력화되는 것을 막기 위해 본문 인라인으로 유지한다.
+
+1. **Goal-Locked** — 목표는 **사용자 언어**로 "무엇이 가능해지는가". 함수·HTTP·SQL·클래스명·경로 같은 기술 토큰이 목표 문장에 있으면 reject.
+2. **Codex 양보 불가** — 교차 협의(S4)는 **하드 필수**. Codex 미감지/미인증 시 graceful degrade **금지** → **즉시 정지하고 사용자에게 보고**. (사용자가 그 턴에 명시적으로 "Codex 없이 진행"이라 지시할 때만 1회 우회.) ⚠️ Standard 등급의 "Codex 부재 시 degrade" 규칙은 **Deep 에 적용되지 않는다** — 등급별로 정반대다.
+3. **Surgical** — 자기 변경이 만든 것만 정리.
+4. **Body-Adaptive** — 불필요한 의식(ceremonial) 섹션 금지. spine 외 구조는 **주제가 정한다.** 단 **"분량 줄이기"는 목표가 아니다** — 항목은 사용자 언어로 필요한 만큼 **전량** 적는다(누락 금지). 큰 작업이면 길어지는 게 정상. **줄일 것** = 코딩 용어 주저리·중복·억지 의식 섹션 / **줄이면 안 될 것** = 항목 전량·파일별 변경·검증.
+
+### Spine (항상 존재)
+
+```text
+🎯 What (사용자 언어) + 🎬 사용 장면 · 🚧 비목표 · ❓ Why(6하원칙)
+🧰 실행 전략 & 자원 · 📜 Constitution
+🛠 How — 빌드레디 (경로+변경+검증+[P]/의존)
+🔀 검토된 대안 · 🚫 DO NOT CHANGE
+💡 시사점·⚠️주의점·🔀Side Effect · ⚠️ 리스크 레지스터
+❓ 미해결 질문(차단/비차단) · ✅ Review(검증 수단·범위·보고) · 진행상황
+```
+
+### S0 — What + Why + 사용 장면 + Constitution (LOCKED)
+
+Standard Phase 0 의 2층 목표를 계승하고 **🎬 사용 장면**(결과물을 마주치는 구체적 한 장면 — UI면 "사용자가 화면 A에서 B를 눌러 C를 본다")을 추가한다. 이 장면이 S3 프로토타입의 기준점. **게이트**: 목표가 약하거나 기술 토큰이 있거나 Why 가 비면 즉시 reject.
+
+### S1 — Clarify-to-Zero
+
+실행 단계에서 되물어야 할 모호함을 **지금** 전부 `[?]` 로 식별·해소한다. 코드/문서로 풀 수 있으면 직접 확인하고, 사용자 판단이 필요한 것만 **AskUserQuestion 으로 한 번에** 묻는다.
+
+> **게이트 (v3.25 개정)**: **차단 질문**(답이 없으면 실행 불가)만 0 이어야 한다. 비차단 질문은 **가정·기본선택·확인시점과 함께 남긴다.** ⚠️ 전량 0 을 기계적으로 강제하면 모델이 불확실성을 드러내는 대신 **임의 가정을 확정처럼 기록**한다 — 질문 은폐를 유도하는 역효과.
+
+### S2 — 전방위 Fan-out 조사 (Task 병렬)
+
+trivial 제외 항상 수행. Task 도구로 6축을 병렬 서브에이전트로 던지고 합성한다:
+
+| 축 | 조사 내용 |
+|---|---|
+| ① 코드 현실 | 지금 레포에 뭐가 있나 — 재사용할 컴포넌트/패턴/제약 |
+| ② 선행·유사 사례 | 이 레포·업계에 비슷한 구현이 어떻게 돼 있나 |
+| ③ 도메인 정석 & 라이브 신호 | 베스트 프랙티스(라이브러리=**context7**). 최신성·트렌드가 유익하면 `docs/rules/live-research.md` 대로 **agent-reach**+**insane-search** |
+| ④ 데이터·계약 | 결과물을 먹이는 실제 데이터 모양·API·상태 |
+| ⑤ 엣지·실패 | 빈/로딩/에러/권한/경계값/반응형 |
+| ⑥ 통합·파급 | 이걸 넣으면 무엇이 영향받나 (blast radius) |
+
+> **모델 배정 (v3.25)**: 6축 조사 에이전트는 **전원 중간 티어 명시**(현재 `sonnet`) — 조사는 grep·파일 읽기라 Medium. **합성 단계만** 부모 세션 또는 TOP. **TOP 상한 2** (deep 1회 기준). 모델 지정 생략(상속) 금지.
+
+결과 → `## 🔬 조사 보고` (**응축 ≠ 누락** — 발견은 전량, 줄이는 건 표현이지 항목 수가 아니다). 라이브 출처는 **URL+발행일 병기**. 라이브 조사는 (a) 외부 리소스 (b) 최신 릴리스·트렌드 민감 (c) 커뮤니티 실이슈가 중요할 때만 — 순수 내부코드는 skip.
+
+### S3 — Body-Adaptive 딥스펙 (도메인 라우터)
+
+주제 도메인을 판정해 **빌드레디 깊이**로 작성:
+
+| 도메인 | 딥스펙 |
+|---|---|
+| **UI/화면** | 컴포넌트 인벤토리 · 요소별 내용(문구) · 상태(빈/로딩/에러/성공) · **ASCII 와이어프레임** · 인터랙션 · 데이터 바인딩 · 반응형 |
+| **API/백엔드** | 엔드포인트 계약(req/res 스키마) · 데이터 모델 델타 · 에러 분류 · 시퀀스 · 마이그레이션 |
+| **리팩토링** | before/after 구조 · 이동 지도(파일·심볼) · 불변식 |
+| **콘텐츠/문서** | 아웃라인 · 섹션별 비트 · acceptance 체크리스트 |
+| **운영/인프라** | 변경 전후 상태 · dry-run 절차 · 롤백 |
+
+UI 프로토타입 = **구조 스펙 + ASCII 와이어프레임**(렌더 목업 아님). 딥스펙과 함께 `## 💡 시사점·주의점·Side Effect`(blast radius) 명시.
+
+### S4 — Codex 교차 협의 (양보 불가 하드 게이트)
+
+> Constitution 2조. **이 게이트를 통과 못 하면 S5 로 못 간다.**
+
+1. **감지** — `docs/rules/codex-integration.md` 3단계 fallback. **부재/미인증 시 degrade 금지** → 정지하고 보고: `⚠️ Codex 필수(양보 불가)인데 미감지/미인증입니다. 설치·인증을 확인하거나, 이 턴에 "Codex 없이 진행"이라고 명시해 주세요.`
+2. **호출** — §4 표준 호출. **깊이=`high` · 상한=`TMO 600` · background 필수**(대규모 — `codex-integration.md` §"깊이·시간 분기"). 프롬프트에 판단 근거를 담고 **탐색 범위를 명시 제한**한다(무제한 레포 탐색이 타임아웃의 실측 원인).
+3. **요청 항목** — ① 커버리지 공백 ② 모호함·모순(실행 시 되묻게 될 지점) ③ Constitution 위반 ④ 더 나은 접근 / 놓친 리스크.
+4. **합성** — 합의 → lock. 분기 → 코드 직접 재확인으로 판정, 불가면 trade-off 근거와 함께 선택하고 명시. → `## 🔀 Codex 교차 협의` 섹션.
+5. 커버리지 공백·모순 지적 시 **S3/S5 로 회귀** 후 재합성.
+6. **상한 초과(exit 124)**: `$OUT` 부분 본문이 있으면 "⚠️ 미완 협의"로 수거·반영하고 공백은 S5 회귀로 보강. 무한 대기 금지. *부재/미인증 degrade 금지*(1번)와 *시간 초과*는 별개다.
+
+### S5 — 빌드레디 태스크 플랜
+
+각 태스크는 **반드시 4종**을 품는다 — 받은 사람이 추가 질문 0으로 실행 가능하도록:
+
+```text
+- [ ] T1 [P] {한 일}
+      파일: {정확한 경로 — bare 이름 금지, 프로젝트 루트 기준}
+      변경: {구체적 변경 — 필요시 실제 코드/스키마/문구}
+      검증: {명령 또는 관측} → {통과 판정}
+      의존: 없음            ← [P]=병렬 가능, 의존:Tn=선행 필요
+```
+
+- **사이징**: 태스크당 ~10–20분 단위. **의존성 wave**: `[P]`·`의존:` 표기 → `/cc` fan-out 이 그대로 wave 로 묶음.
+- Constitution 4조의 "필요한 만큼"은 목표·조사·의사결정 항목에 적용된다 — **실행 태스크는 위 4종을 항상 유지**한다.
+
+### S6 — ✅ Review (EARS 검증)
+
+각 목표를 **기계가 판정 가능한 형식 문장**으로. 표 위에 **검증 수단·범위·보고**를 명시한다(`Playwright 로 staging 화면 클릭` / `DB 조회` / `tsc·build·test`).
+
+```text
+| # | EARS (WHEN <트리거>, THEN <주체> SHALL <응답>) | 확인 방법 | 통과 판정 | 종류 |
+```
+
+각 🎯 목표 → ≥1 EARS 행. 매핑 안 되면 너무 모호 = S0 회귀. **정상 경로뿐 아니라 에러·엣지도 각각 독립 행**으로.
+
+### S7 — Self-Check 게이트 ("되묻기 0?")
+
+전부 yes 여야 S8 진입: 목표가 사용자 언어인가(기술 토큰 0) · 🚧 비목표가 있는가 · ❓Why 6하원칙 · 🎬 사용 장면 구체적 · **차단 질문 0** · S2 6축 보고됨 · 🧰 실행전략 채워짐 · **🔀 검토된 대안 2개 이상 + 각 탈락 사유** · 🚫 DO NOT CHANGE 명시 · 💡시사점/⚠️주의점/🔀SideEffect · 모든 S5 태스크가 {경로+변경+검증} 4종 · ✅Review 에 검증 수단·범위·보고 · 계획 md 가 `/cc` 실행 Todo 보다 얕지 않은가 · 각 목표가 EARS 로 매핑 · **Codex 협의(S4)가 닫혔는가(양보 불가)** · 불필요한 의식 섹션 없는가.
+
+하나라도 no → 해당 stage 로 회귀.
+
+### S8 — Approve → /cc 핸드오프
+
+1. 저장: `docs/tasks/YYYY-MM-DD-{slug}.md` (frontmatter `planner: cp` · `grade: deep`) + **task-deep HTML**(슬라이드 무제한, Plan N장) + board.
+2. **AskUserQuestion**: Approve / Modify / Execute.
+3. Execute → 아래 **핸드오프 프로토콜** 그대로 + 네이티브 `/goal` 라인 출력.
+
+---
+
 ## /cp → /cc 핸드오프 프로토콜 (Goal-first 의 핵심)
 
 ### 핸드오프 시점
@@ -692,7 +811,7 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
 
 1. `<md-path>` 의 md 파일을 **Read**.
 2. `${CLAUDE_PLUGIN_ROOT}/templates/report-conversion-spec.md` 를 **Read** — 양식 규칙 흡수.
-3. **양식 판별** — 최우선으로 md frontmatter 의 `doc_kind: flow` 를 확인. **있으면 task/history 슬라이드 양식이 아니라 FLOW 뷰어로 재생성** (FLOW 모드 F4 절차, 아래 4~7의 슬라이드 재구성 미적용 — board 갱신은 동일). 이 가드가 없으면 flow 뷰어가 task 6-slide 덱으로 덮이는 사고가 난다. 다음으로 `planner: cpp` 를 확인. **있으면 task-deep**(슬라이드 무제한, Plan N장 — `report-conversion-spec.md` 의 task-deep 절) → reference 는 `report-plan.example.html` 재사용(Plan 슬라이드만 N장 복제). cpp 문서가 task 6장으로 회귀하지 않게 하는 핵심 분기. 없으면 폴더로 판별:
+3. **양식 판별** — 최우선으로 md frontmatter 의 `doc_kind: flow` 를 확인. **있으면 task/history 슬라이드 양식이 아니라 FLOW 뷰어로 재생성** (FLOW 모드 F4 절차, 아래 4~7의 슬라이드 재구성 미적용 — board 갱신은 동일). 이 가드가 없으면 flow 뷰어가 task 6-slide 덱으로 덮이는 사고가 난다. 다음으로 **`grade: deep` **또는** `planner: cpp`**(레거시 — v3.25 이전 `/cpp` 산출물)를 확인. **둘 중 하나라도 있으면 task-deep**(슬라이드 무제한, Plan N장 — `report-conversion-spec.md` 의 task-deep 절) → reference 는 `report-plan.example.html` 재사용(Plan 슬라이드만 N장 복제). deep 문서가 task 6장으로 회귀하지 않게 하는 핵심 분기. ⚠️ **`planner: cpp` 하위호환 분기를 빼면 안 된다** — 워크스페이스에 실재하는 레거시 문서 17건이 6슬라이드로 조용히 강등된다. 없으면 폴더로 판별:
    - `docs/tasks/` 하위 → task 양식(6장) → `${CLAUDE_PLUGIN_ROOT}/templates/report-plan.example.html`
    - `docs/history/` 하위 → history 양식(8장) → `${CLAUDE_PLUGIN_ROOT}/templates/report-history.example.html`
    - 그 외 → task 양식 기본 적용
@@ -1068,7 +1187,7 @@ docs/
 - 전문가 관점 — 주니어가 놓칠 통찰 제시
 - AskUserQuestion 필수 — 일반 텍스트로 선택지 물어보지 않음
 - **산출물 링크는 풀 경로** — 보고/안내 시 deliverable 파일은 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로의 클릭 가능 링크로 제시 (`docs/tasks/{id}.md`, `docs/tasks/{id}.html`, `docs/board_<repo>.html`).
-- **듀얼트랙 (v3.9+)** — **Standard+ 에서 항상** Codex 와 병렬 조사(P0.5) + 합성(P2.4). **Fast 등급은 skip** (속도 등급 섹션). Codex 부재/실패는 graceful degrade (Claude 단독 + 플래그). 상세: `docs/rules/codex-integration.md`. (대조: `/cpp` 는 Codex 협의가 양보 불가 하드 게이트.)
-- **용도 분기 (v3.15+)** — `/cp` = 빠른 수정·표준 계획. **깊은 빌드레디 계획(프로토타입·전방위 fan-out·되묻기 0)은 `/cpp` 로 안내.** Deep 신호 감지 시 진행 전 `/cpp` 제안.
+- **듀얼트랙 (v3.9+)** — **Standard+ 에서 항상** Codex 와 병렬 조사(P0.5) + 합성(P2.4). **Fast 등급은 skip** (속도 등급 섹션). Codex 부재/실패는 graceful degrade (Claude 단독 + 플래그). 상세: `docs/rules/codex-integration.md`. **⚠️ 등급별로 정반대**: `deep` 등급의 S4 교차 협의는 **양보 불가 하드 게이트**라 degrade 금지·정지·보고다(Constitution 2조). Fast/Standard 의 degrade 규칙을 deep 에 적용하지 않는다.
+- **등급 분기 (v3.25)** — `/cp` 하나로 fast/standard/deep 전부 커버. 등급은 **위험도**로 정하고, 사용자가 `/cp fast|standard|deep` 로 직접 지정할 수 있다. 지정 등급과 위험도 판정이 어긋나면 **양방향 가드**가 제안한다(낮춰 지정=강한 경고 / 높여 지정=가벼운 안내). 강제 전환 없음.
 - **5분 진행보고 (v3.16+, v3.25 강화 · 공통 규칙)** — Codex 대기·fan-out 조사·**Workflow**·Task 에이전트 등 5분 이상 걸리는 구간은 침묵 금지. **5분 주기**로 세 가지를 **전부** 보고: ① **생존 확인 결과**(추측 금지 — `TaskOutput(block=false)`·산출물 mtime 으로 실제 확인. **확인 없이 "진행 중"이라 말하지 않는다**) ② 끝난 것/남은 것(N/M) ③ **부분 산출물은 대기 중이라도 먼저 낸다**(대기가 산출을 100% 막지 않게). **"아직입니다"만 적는 보고는 위반.** 유실·정지 감지 시 즉시 보고 + **복구보다 폐기·재판단 우선 검토.** 사용자 VS Code 확장엔 진행창이 없다 — 보고 책임은 전적으로 스킬에 있다. (SoT: `docs/rules/harness-rules.md` §4.4.)
 - Phase 순서 (Standard 기준) — What+Why (P0) → **Codex 병렬 조사 (P0.5)** → Plan A=How (P1) → Plan B=How (P2) → **듀얼 합성·교차검증 (P2.4)** → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). 문서 골격은 **What→Why→How→Review** 순. **Fast 등급은 P0.5·P2·P2.4·P2.6(HTML)·P3 를 skip** 하고 What+Why→Plan A→md+board→승인 으로 직행(4주제 각 한 줄). What·Why 먼저, How·Review 는 그 다음. **완료된 Standard PLAN = {md, html, board} 원자적 3-파일 세트**, **Fast PLAN = {md, board}**.
