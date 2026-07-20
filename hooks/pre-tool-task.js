@@ -26,8 +26,14 @@ function main() {
     const toolInput = input?.tool_input || {};
     const description = toolInput.description || toolInput.prompt || toolInput.task || '';
 
-    // Register the agent in dashboard
-    const agent = registerAgent(description);
+    // Register the agent in dashboard.
+    // v3.25: record the spawn model so TOP-tier usage is auditable. An omitted
+    // model means the agent inherited the session model, which the hook cannot
+    // observe — skills must therefore always specify one explicitly.
+    const agent = registerAgent(description, {
+      model: toolInput.model || null,
+      agentType: toolInput.subagent_type || null,
+    });
 
     // Output: allow the tool to proceed + report tracking info
     const response = {
@@ -39,6 +45,8 @@ function main() {
         agentId: agent.id,
         agentName: agent.name,
         status: agent.status,
+        model: agent.model,
+        agentType: agent.agentType,
         trackedAt: agent.startedAt,
       },
     };

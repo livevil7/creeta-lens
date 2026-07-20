@@ -158,7 +158,7 @@ For each task, identify:
 - **Model** — assign based on difficulty (difficulty ladder — each rung is a *relative position* that rises automatically with new model generations, v3.24+):
   - **Easy** (file reading, search, data gathering, simple edits) → `haiku` (lightweight tier)
   - **Medium** (code writing, analysis, debugging, content creation) → `sonnet` (mid tier)
-  - **Hard** (architecture, complex refactoring, security, planning) → **TOP** (top tier — if the session model is at or above the Task tool enum's top tier (e.g. Fable), omit the model override to inherit it; otherwise explicitly assign the enum's top tier (currently `fable`, falling back to `opus` if absent). When a future model name's rank is uncertain, inheritance is the safe default.)
+  - **Hard** (architecture, complex refactoring, security, planning) → **TOP** (top tier — **always assign the model explicitly**: the Task tool enum's top tier, currently `fable`, falling back to `opus` if absent. Never omit the override to inherit — see the TOP note below.)
 
 ### 1.3 Read Project Constraints
 
@@ -609,7 +609,11 @@ Show full skill inventory (same as before):
 
 ## Model Assignment Table (difficulty ladder — v3.24+)
 
-> **TOP** = the top tier of the difficulty ladder. If the session model is at or above the Task tool enum's top tier (e.g. Fable), **inherit the session model** (omit the model override) — inheritance is itself the highest quality. Otherwise explicitly assign the enum's top tier (currently `fable`, falling back to `opus` if absent). When a future model name's rank is uncertain, inheritance is the safe default. Ladder rungs are *relative positions* — they rise automatically with new model generations. (근거: docs/rules/harness-rules.md §4.1 v3.24 개정)
+> **TOP** = the top tier of the difficulty ladder. **Always assign the model explicitly** — the Task tool enum's top tier (currently `fable`, falling back to `opus` if absent). Ladder rungs are *relative positions*, so they rise automatically with new model generations via the enum.
+>
+> **Inheritance is banned (v3.25).** Omitting the model override hides the real model from the tracking hook (`tool_input.model` is undefined), and when the session runs a top-tier model it silently promotes *every* Hard role to that tier — the measured root cause of top-tier overuse (2026-07-20). Explicit assignment is what makes usage auditable and therefore controllable.
+>
+> **Accepted trade-off**: if the session runs a model newer than the enum, explicit assignment may pick one rung lower. Claude Code refreshes the enum, so the window is narrow; auditability is worth it. (근거: docs/rules/harness-rules.md §4.1)
 
 | Role | Model | Reason |
 |------|-------|--------|
@@ -706,6 +710,10 @@ Phase 6: Final report + docs update
 | Context passing | Yes — previous task results → next task | No — tasks are independent |
 
 ## Implementation Notes
+
+### 5분 진행보고 (공통 규칙, v3.25)
+
+Worker 실행·codex 대기 등 백그라운드 작업이 5분 이상이면 침묵 금지. **5분 주기**로 세 가지를 **전부** 보고한다: ① **생존 확인 결과** — 추측 금지, `TaskOutput(block=false)`·산출물 mtime 으로 **실제 확인 후** 보고하며 **확인 없이 "진행 중"이라 말하지 않는다** ② 끝난 것/남은 것(N/M) ③ **부분 산출물은 대기 중이라도 먼저 낸다**. **"아직입니다"만 적는 보고는 위반.** 유실·정지 감지 시 즉시 보고하고 **복구보다 폐기·재판단을 우선 검토**한다. 사용자 VS Code 확장에는 진행창이 없어 스스로 확인할 수단이 없다 — 보고 책임은 전적으로 스킬에 있다. (SoT: `docs/rules/harness-rules.md` §4.4.)
 
 ### Using loop Skill for Monitor
 

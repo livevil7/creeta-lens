@@ -315,7 +315,7 @@ Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude �
 ## 🧰 실행 전략 & 자원 (난이도·모델·병렬·스킬·기존 자원)
 
 - **난이도**: {trivial / small / medium / large} — {근거}
-- **권장 모델**: {haiku / sonnet / TOP} — {난이도 대비 이유. TOP=Task enum 최상위 티어(세션 모델이 최상위 이상이면 상속), 사다리는 모델 세대와 함께 자동 상승}
+- **권장 모델**: {haiku / sonnet / TOP} — {난이도 대비 이유. TOP=Task enum 최상위 티어를 **항상 명시**(현재 `fable`, 없으면 `opus`) — 지정 생략(상속)은 v3.25 에서 금지. 사다리는 enum 갱신으로 세대와 함께 자동 상승}
 - **병렬 실행**: {단일 / N개 에이전트 / ultracode·workflow} — {몇 개를 어떻게 분할하나}
 - **활용 스킬 (설치된 것 자동 감지)**: {예: UI→디자인 스킬, 브라우저 검증→playwright, 라이브러리 문서→context7 …} — {왜 이 스킬을 쓰나}
 - **기존 자원·시스템**: {재사용할 컴포넌트/API/테이블/서비스/env} — {어떻게 활용하나}
@@ -412,7 +412,7 @@ Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적
 
 #### 3.1 Claude Pre-mortem (TOP)
 
-현재 세션 모델이 Task enum 최상위와 같거나 상위(예: Fable)면 내부 추론으로 직접 수행. 그 외 모델이면 Task tool 로 enum 최상위(현재 fable, 없으면 opus) agent 를 spawn 해 다음 프롬프트 전달:
+**세션 내부에서 직접 수행**하되 **분량을 제한한다** (v3.25). Pre-mortem 만을 위해 별도 에이전트를 띄우면 강등 이득보다 spawn 비용이 크다는 판단 — 부모 세션이 이미 컨텍스트를 갖고 있으므로 내부 수행이 정확도·비용 모두 유리하다. 대신 **발견 항목당 한 줄, 최대 12건**으로 잘라 부모 세션의 토큰 소모를 억제한다. 세션 모델이 enum 최상위 미만이면 그때만 enum 최상위(현재 `fable`, 없으면 `opus`)를 **명시 지정**해 spawn 하고 다음 프롬프트 전달:
 
 ```text
 이 작업 계획의 허점을 찾아주세요. 200단어 이내.
@@ -1038,5 +1038,5 @@ docs/
 - **산출물 링크는 풀 경로** — 보고/안내 시 deliverable 파일은 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로의 클릭 가능 링크로 제시 (`docs/tasks/{id}.md`, `docs/tasks/{id}.html`, `docs/board_<repo>.html`).
 - **듀얼트랙 (v3.9+)** — **Standard+ 에서 항상** Codex 와 병렬 조사(P0.5) + 합성(P2.4). **Fast 등급은 skip** (속도 등급 섹션). Codex 부재/실패는 graceful degrade (Claude 단독 + 플래그). 상세: `docs/rules/codex-integration.md`. (대조: `/cpp` 는 Codex 협의가 양보 불가 하드 게이트.)
 - **용도 분기 (v3.15+)** — `/cp` = 빠른 수정·표준 계획. **깊은 빌드레디 계획(프로토타입·전방위 fan-out·되묻기 0)은 `/cpp` 로 안내.** Deep 신호 감지 시 진행 전 `/cpp` 제안.
-- **5분 진행보고 (v3.16+, 공통 규칙)** — Standard 등급에서 Codex 대기·large 조사 등 5분 이상 걸리는 구간은 침묵 금지, **5분 주기** 진행 한 줄(`/loop 5m`·ScheduleWakeup). `/cc`·`/cp`·`/cpp`·`/ccp` 공통.
+- **5분 진행보고 (v3.16+, v3.25 강화 · 공통 규칙)** — Codex 대기·fan-out 조사·**Workflow**·Task 에이전트 등 5분 이상 걸리는 구간은 침묵 금지. **5분 주기**로 세 가지를 **전부** 보고: ① **생존 확인 결과**(추측 금지 — `TaskOutput(block=false)`·산출물 mtime 으로 실제 확인. **확인 없이 "진행 중"이라 말하지 않는다**) ② 끝난 것/남은 것(N/M) ③ **부분 산출물은 대기 중이라도 먼저 낸다**(대기가 산출을 100% 막지 않게). **"아직입니다"만 적는 보고는 위반.** 유실·정지 감지 시 즉시 보고 + **복구보다 폐기·재판단 우선 검토.** 사용자 VS Code 확장엔 진행창이 없다 — 보고 책임은 전적으로 스킬에 있다. (SoT: `docs/rules/harness-rules.md` §4.4.)
 - Phase 순서 (Standard 기준) — What+Why (P0) → **Codex 병렬 조사 (P0.5)** → Plan A=How (P1) → Plan B=How (P2) → **듀얼 합성·교차검증 (P2.4)** → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). 문서 골격은 **What→Why→How→Review** 순. **Fast 등급은 P0.5·P2·P2.4·P2.6(HTML)·P3 를 skip** 하고 What+Why→Plan A→md+board→승인 으로 직행(4주제 각 한 줄). What·Why 먼저, How·Review 는 그 다음. **완료된 Standard PLAN = {md, html, board} 원자적 3-파일 세트**, **Fast PLAN = {md, board}**.
