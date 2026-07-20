@@ -43,7 +43,7 @@ fi
 
 TODAY=$(date +%Y-%m-%d)
 
-echo "=== Updating 14 files ==="
+echo "=== Updating 12 files ==="
 
 # Regex patterns match ANY v MAJOR.MINOR(.PATCH)? — the patch segment is
 # optional so 2-part banners (e.g. "Lens v3.1", "Lens Multi v3.4") are caught
@@ -52,58 +52,55 @@ echo "=== Updating 14 files ==="
 
 # 1. .claude-plugin/plugin.json
 sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
-echo "[1/13] .claude-plugin/plugin.json"
+echo "[1/12] .claude-plugin/plugin.json"
 
 # 2. .claude-plugin/marketplace.json (version + ref)
 sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/marketplace.json
 sed "${SEDI[@]}" -E "s/\"ref\": \"v[0-9]+\.[0-9]+\.[0-9]+\"/\"ref\": \"v$NEW_VERSION\"/" .claude-plugin/marketplace.json
-echo "[2/13] .claude-plugin/marketplace.json"
+echo "[2/12] .claude-plugin/marketplace.json"
 
 # 3. hooks/hooks.json
 sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/hooks.json
-echo "[3/13] hooks/hooks.json"
+echo "[3/12] hooks/hooks.json"
 
 # 4. hooks/session-start.js (multiple occurrences)
 sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/session-start.js
-echo "[4/13] hooks/session-start.js"
+echo "[4/12] hooks/session-start.js"
 
 # 5. skills/c/SKILL.md
 sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens v$NEW_VERSION/g" skills/c/SKILL.md
-echo "[5/13] skills/c/SKILL.md"
+echo "[5/12] skills/c/SKILL.md"
 
 # 6. skills/cc/SKILL.md
 sed "${SEDI[@]}" -E "s/Lens Multi v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Multi v$NEW_VERSION/g" skills/cc/SKILL.md
-echo "[6/13] skills/cc/SKILL.md"
+echo "[6/12] skills/cc/SKILL.md"
 
 # 7. skills/cp/SKILL.md
 sed "${SEDI[@]}" -E "s/Lens Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
-echo "[7/13] skills/cp/SKILL.md"
+echo "[7/12] skills/cp/SKILL.md"
 
-# 7b. skills/cpp/SKILL.md (Lens Power Plan banner — note: matched BEFORE "Lens Plan" would mis-hit, but distinct prefix "Lens Power Plan" is exact here)
-sed "${SEDI[@]}" -E "s/Lens Power Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Power Plan v$NEW_VERSION/g" skills/cpp/SKILL.md
-echo "[8/13] skills/cpp/SKILL.md"
 
 # 7c. skills/ccp/SKILL.md (Lens Power Verify banner — distinct prefix)
 sed "${SEDI[@]}" -E "s/Lens Power Verify v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Power Verify v$NEW_VERSION/g" skills/ccp/SKILL.md
-echo "[9/13] skills/ccp/SKILL.md"
+echo "[8/12] skills/ccp/SKILL.md"
 
 # 8. skills/cs/SKILL.md (banner + "currently X.Y.Z" prose)
 sed "${SEDI[@]}" -E "s/Lens Sync v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Sync v$NEW_VERSION/g" skills/cs/SKILL.md
 sed "${SEDI[@]}" -E "s/currently [0-9]+\.[0-9]+\.[0-9]+/currently $NEW_VERSION/g" skills/cs/SKILL.md
-echo "[10/14] skills/cs/SKILL.md"
+echo "[9/12] skills/cs/SKILL.md"
 
 # 8b. skills/ci/SKILL.md (Creeta Install banner in the table row)
 sed "${SEDI[@]}" -E "s/Creeta Install v[0-9]+\.[0-9]+(\.[0-9]+)?/Creeta Install v$NEW_VERSION/g" skills/ci/SKILL.md
-echo "[11/14] skills/ci/SKILL.md"
+echo "[10/12] skills/ci/SKILL.md"
 
 # 9. CLAUDE.md (Current version + Updated date)
 sed "${SEDI[@]}" -E "s/Current: \*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
 sed "${SEDI[@]}" -E "s/Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Updated: $TODAY/" CLAUDE.md
-echo "[12/14] CLAUDE.md"
+echo "[11/12] CLAUDE.md"
 
 # 10. README.md (title)
 sed "${SEDI[@]}" -E "s/^# Lens v[0-9]+\.[0-9]+\.[0-9]+/# Lens v$NEW_VERSION/" README.md
-echo "[13/14] README.md"
+echo "[12/12] README.md"
 
 # 10. CHANGELOG.md - prepend new section header (user fills in details).
 # Uses awk because git-bash sed can choke on multi-line substitutions.
@@ -120,7 +117,7 @@ NR==1 {
 }
 { print }
 ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
-echo "[14/14] CHANGELOG.md (template added - fill in details)"
+echo "[--] CHANGELOG.md (template added - fill in details)"
 
 echo ""
 echo "=== Verification ==="
@@ -142,7 +139,7 @@ COUNT=$(grep -rl "v$NEW_VERSION\|\"$NEW_VERSION\"" \
   README.md \
   CHANGELOG.md 2>/dev/null | wc -l)
 
-echo "Files with v$NEW_VERSION: $COUNT/14"
+echo "Files with v$NEW_VERSION: $COUNT/12 (+CHANGELOG)"
 
 # Check stale version remnants — any v[0-9].[0-9].[0-9] that is NOT the new
 # version, across version-bearing files (excludes CHANGELOG and docs/history

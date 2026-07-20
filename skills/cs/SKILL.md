@@ -1,13 +1,13 @@
 ---
 name: "cs"
-description: "Lens Sync — Multi-repo git synchronizer. Fetches all repos under the workspace, fast-forward pulls, auto-commits dirty trees, pushes ahead changes. Run /cs to sync everything; /cs pull or /cs push for one direction."
+description: "Lens Sync — Multi-repo git synchronizer. Fetches all repos under the workspace and fast-forward pulls. Outgoing work is committed to a throwaway sync/ branch and proposed as a PR — never pushed straight to a base branch; fail-closed if gh is unavailable. Run /cs to sync everything; /cs pull or /cs push for one direction."
 argument-hint: "[pull|push|sync] (default: sync)"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.24.0 — Multi-repo git synchronizer for any multi-repo workspace. Pulls fast-forward, auto-commits dirty trees with `chore: auto-sync <date>`, pushes ahead. Fail-soft: one repo failure does not stop the others. | MIT |
+| cs | Lens Sync v3.25.0 — Multi-repo git synchronizer. Pulls fast-forward; outgoing work goes to a `sync/` branch and a PR (never a direct base-branch push). Fail-soft across repos, fail-closed on PR failure. | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,7 +17,7 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.24.0**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.25.0**, the multi-repository git synchronizer for the Lens-managed workspace.
 
 `/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — most logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
@@ -33,10 +33,37 @@ For every git repo discovered under the workspace roots:
 
 1. `git fetch` (silent)
 2. If `behind > 0` and `ahead == 0` → `git pull --ff-only`
-3. If `dirty` → stage all + auto-commit (`chore: auto-sync YYYY-MM-DD`)
-4. If `ahead > 0` after step 3 → `git push origin HEAD`
+3. If `dirty` or `ahead > 0` → **PR flow** (v3.25, see below) — never a direct push to the base branch
 
 Diverged repos (both ahead and behind) are left untouched and reported as "manual resolve required". This protects the user from accidental merges.
+
+## PR-only push (v3.25)
+
+`/cs` no longer pushes to base branches. Outgoing work is moved onto a throwaway branch and proposed as a PR:
+
+```
+create branch sync/<date>-<time>   ← BEFORE committing
+  → commit there
+  → push -u
+  → gh pr create --base <upstream branch>
+  → checkout back to base, reset --hard to origin/<base>
+```
+
+**Order is the whole trick.** Committing to the base branch first and *then* pushing it leaves nothing to compare, so no PR can be opened. The branch must be cut before the commit.
+
+**The reset is not data loss.** The commits live on the pushed branch and on the remote; resetting the local base branch just puts it back in step with origin so the next `/cs` does not see a false `diverged`.
+
+| Behaviour | Why |
+| --- | --- |
+| **Merging is left to a human** | Auto-merging on creation would make the PR a receipt, not a review gate. Out of scope for this version. |
+| **fail-closed** | If `gh` is missing, unauthenticated, or PR creation fails, `/cs` reports a failure. It never falls back to a direct base-branch push — that would silently break the PR guarantee. |
+| **base = the branch's own upstream** | Not the repo default. `Returns_ERP_v20` sits on `staging`, where `staging → main` promotion is a separate, deploy-critical procedure. Targeting `main` here would be a production incident. |
+| **duplicate PRs avoided** | An open PR with the same head is reused instead of opening another. |
+| **`.github/workflows` detected** | The `gh` token has no `workflow` scope, so GitHub rejects those pushes. Detected up front and reported as the reason. |
+| **unmerged ≠ synced** | The report warns explicitly: until the PR merges, other machines (Mac Mini and friends) do **not** have the change. Never report that as "sync complete". |
+| **PR body stays dumb** | Changed-file list only. Adding LLM diff analysis would make git sync depend on auth, cost, and model availability — a sync tool must not break for those reasons. The script stays pure POSIX shell. |
+
+**Escape hatch**: `LENS_SYNC_PR=0` restores the old direct-push behaviour for one run.
 
 ## Workspace roots
 
@@ -66,9 +93,9 @@ The script is portable shell. It uses only `git`, `awk`, `printf`, and standard 
 
 | Action | What runs | When to use |
 |--------|-----------|-------------|
-| `/cs` (no arg) | pull + auto-commit + push | normal workflow — leave the workspace synced when done |
+| `/cs` (no arg) | pull + branch + commit + PR | normal workflow — incoming pulled, outgoing proposed as PRs |
 | `/cs pull` | pull only | start of a session, just want incoming changes |
-| `/cs push` | auto-commit + push | finish a sprint, send everything outgoing |
+| `/cs push` | branch + commit + PR | finish a sprint, propose everything outgoing as PRs |
 
 `sync` is identical to running `pull` then `push` back-to-back, but in a single repo traversal.
 
@@ -108,7 +135,7 @@ In `--json` mode the human report goes to **stderr** and the **last stdout line*
 When `/cs` auto-commits dirty trees, it uses:
 
 - Author: The user's configured git identity (via `git config user.name` and `user.email`)
-- Message: `chore: auto-sync YYYY-MM-DD` (single-line)
+- Message: `chore: auto-sync YYYY-MM-DD` (single-line), committed on a `sync/<date>-<time>` branch — never on the base branch
 - Stages: `git add -A` (everything not gitignored)
 
 This is intentional. The user runs `/cs` knowing it will pick up whatever is in the working tree. If you (the agent) want to commit only specific files with a specific message, do not invoke `/cs` — use `git` directly.
@@ -124,6 +151,8 @@ Common failure modes and what they mean:
 | `diverged (ahead=N behind=M)` | Both local and remote moved | Resolve manually with rebase or merge |
 | `pull failed` | Local working tree blocks fast-forward | Stash or commit, then re-run `/cs` |
 | `push failed` | Auth or network | Re-run `/cs push` after fixing |
+| `gh 미설치 — PR 생성 불가` | No `gh`, or unauthenticated | Install/authenticate `gh`. `/cs` deliberately does **not** fall back to a direct push |
+| `push 거부 — .github/workflows` | Token lacks `workflow` scope | Push those files manually, or re-scope the token |
 | `fetch failed` | Remote unreachable | Check network or remote URL |
 
 ## Hook complement
@@ -148,4 +177,4 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 
 - Script: `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
-- Version: aligned with the Lens plugin version (currently 3.24.0)
+- Version: aligned with the Lens plugin version (currently 3.25.0)

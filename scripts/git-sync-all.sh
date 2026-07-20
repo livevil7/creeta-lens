@@ -148,24 +148,95 @@ for repo in "${REPOS[@]}"; do
         # marketplace는 fetch + pull만 수행, push는 안 함
         ;;
       *)
+        # ── PR-only 푸시 (v3.25) ──────────────────────────────────
+        # 기본 브랜치로 직접 push 하지 않는다. 변경은 임시 브랜치로 옮겨
+        # PR 로 제안한다. 병합은 사람이 한다 (auto-merge 는 이번 범위 밖 —
+        # 즉시 자동 병합은 PR 을 검토 게이트가 아니라 기록용 포장으로 만든다).
+        #
+        # 순서가 핵심: **커밋 전에** 브랜치를 만든다. 기본 브랜치에 먼저
+        # 커밋하고 그 브랜치를 push 한 뒤 PR 을 만들면 비교할 변경이 남지
+        # 않는다.
         dirty=$(git -C "$repo" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-
-        # dirty 있으면 자동 commit
-        if [ "$dirty" != "0" ]; then
-          git -C "$repo" add -A
-          commit_msg="chore: auto-sync $DATE_ISO"
-          git -C "$repo" commit -m "$commit_msg" --quiet 2>/dev/null || repo_err="commit failed (git user.name/email 미설정 확인)"
-        fi
-
-        # ahead (방금 커밋한 것 포함) 있으면 push
         ahead=$(git -C "$repo" rev-list --count @{u}..HEAD 2>/dev/null || echo "0")
-        if [ -z "$repo_err" ] && [ "$ahead" != "0" ]; then
+
+        if [ "$dirty" != "0" ] || [ "$ahead" != "0" ]; then
           upstream_remote="${upstream%%/*}"
-          if git -C "$repo" push --quiet "$upstream_remote" HEAD 2>&1; then
-            pushed+=("$name (+$ahead)")
-            did_push=true
+          base_branch="${upstream#*/}"
+
+          if [ "${LENS_SYNC_PR:-1}" = "0" ]; then
+            # 명시적 opt-out — 구 동작(기본 브랜치 직접 push)
+            if [ "$dirty" != "0" ]; then
+              git -C "$repo" add -A
+              git -C "$repo" commit -m "chore: auto-sync $DATE_ISO" --quiet 2>/dev/null \
+                || repo_err="commit failed (git user.name/email 미설정 확인)"
+            fi
+            ahead=$(git -C "$repo" rev-list --count @{u}..HEAD 2>/dev/null || echo "0")
+            if [ -z "$repo_err" ] && [ "$ahead" != "0" ]; then
+              if git -C "$repo" push --quiet "$upstream_remote" HEAD 2>&1; then
+                pushed+=("$name (+$ahead, direct)"); did_push=true
+              else
+                repo_err="push failed"
+              fi
+            fi
+          elif ! command -v gh >/dev/null 2>&1; then
+            # fail-closed — gh 없으면 기본 브랜치 직접 push 로 우회하지 않는다.
+            # 우회하면 사용자가 요구한 "PR 보장"이 조용히 무너진다.
+            repo_err="gh 미설치 — PR 생성 불가 (직접 push 로 우회하지 않음). gh 설치 후 재실행하거나 LENS_SYNC_PR=0"
           else
-            repo_err="push failed"
+            # workflow 스코프 사전 감지: .github/workflows 변경이 끼면
+            # 토큰에 workflow 스코프가 없을 때 GitHub 이 push 를 거부한다.
+            wf=$( { git -C "$repo" status --porcelain 2>/dev/null | awk '{print $NF}';
+                    git -C "$repo" diff --name-only "@{u}..HEAD" 2>/dev/null; } \
+                  | grep -c '^\.github/workflows/' || true )
+
+            branch="sync/$DATE_ISO-$(date +%H%M%S)"
+            if ! git -C "$repo" checkout -q -b "$branch" 2>/dev/null; then
+              repo_err="브랜치 생성 실패 ($branch)"
+            else
+              if [ "$dirty" != "0" ]; then
+                git -C "$repo" add -A
+                git -C "$repo" commit -m "chore: auto-sync $DATE_ISO" --quiet 2>/dev/null \
+                  || repo_err="commit failed (git user.name/email 미설정 확인)"
+              fi
+
+              if [ -z "$repo_err" ]; then
+                if git -C "$repo" push -q -u "$upstream_remote" "$branch" 2>/dev/null; then
+                  # 중복 PR 방지 — 같은 head 로 열린 PR 이 있으면 재사용
+                  pr=$(git -C "$repo" rev-parse --show-toplevel >/dev/null 2>&1 && \
+                       (cd "$repo" && gh pr list --head "$branch" --state open \
+                          --json number --jq '.[0].number' 2>/dev/null) || true)
+                  if [ -z "$pr" ] || [ "$pr" = "null" ]; then
+                    (cd "$repo" && gh pr create --base "$base_branch" --head "$branch" \
+                        --title "chore: auto-sync $DATE_ISO" \
+                        --body "\`/cs\` 자동 동기화. base: \`$base_branch\`
+
+변경 파일:
+$(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$branch" 2>/dev/null | sed 's/^/- /' | head -50)
+
+> ⚠️ **병합 전까지 다른 머신은 이 변경을 받지 못합니다.**" >/dev/null 2>&1) \
+                      || repo_err="PR 생성 실패 (gh 인증/권한 확인)"
+                  fi
+                  if [ -z "$repo_err" ]; then
+                    pushed+=("$name (PR: $branch → $base_branch, 미병합)")
+                    did_push=true
+                  fi
+                else
+                  if [ "$wf" -gt 0 ]; then
+                    repo_err="push 거부 — .github/workflows 변경 포함 (gh 토큰에 workflow 스코프 없음)"
+                  else
+                    repo_err="브랜치 push 실패"
+                  fi
+                fi
+              fi
+
+              # 원래 브랜치로 복귀. push 가 성공했을 때만 로컬을 원격 기준으로
+              # 되맞춘다 — 커밋은 원격 브랜치에 보존되므로 유실이 아니다.
+              # push 실패 시엔 되돌리지 않는다 (아직 원격에 없으므로).
+              git -C "$repo" checkout -q "$base_branch" 2>/dev/null || true
+              if [ -z "$repo_err" ]; then
+                git -C "$repo" reset -q --hard "$upstream_remote/$base_branch" 2>/dev/null || true
+              fi
+            fi
           fi
         fi
         ;;
@@ -195,6 +266,12 @@ if [ ${#pushed[@]} -gt 0 ]; then
   log ""
   log "📤 Pushed (${#pushed[@]}):"
   for x in "${pushed[@]}"; do log "   • $x"; done
+  if printf '%s
+' "${pushed[@]}" | grep -q "미병합"; then
+    log ""
+    log "   ⚠️ PR 미병합 — 병합 전까지 다른 머신(Mac Mini 등)은 이 변경을 받지 못합니다."
+    log "      \"동기화 완료\"가 아닙니다. gh pr list 로 확인 후 병합하세요."
+  fi
 fi
 if [ ${#failed[@]} -gt 0 ]; then
   log ""
