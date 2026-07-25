@@ -2,8 +2,15 @@
  * Lens - Stop Hook
  * Records final session state when Claude Code's main agent stops.
  *
- * Triggered: When the main agent finishes (Stop event)
+ * Triggered: When the main agent finishes (Stop event — i.e. at the end of EVERY
+ * turn, not only once per session)
  * Writes: .lens/agent-dashboard.json (marks session complete, orphaned agents as error)
+ *
+ * ⚠️ "Orphaned" means `running`/`pending` only. Background agents parked in
+ * `launched` are exempt from the error sweep by endSession(): the hooks never
+ * observe their completion, and because this hook runs at every turn boundary the
+ * sweep would otherwise declare a healthy background agent failed seconds after
+ * launch. Unobserved ≠ failed. SoT: docs/rules/harness-rules.md §4.5.
  *
  * Input (stdin): { stop_reason }
  * Output (stdout): { hookSpecificOutput }

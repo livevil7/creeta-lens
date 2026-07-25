@@ -53,8 +53,9 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 | SessionStart | Session start (once) | `hooks/session-start.js` | Scans plugins, caches results, loads memory, inits dashboard + plans dir, injects context |
 | UserPromptSubmit | Every message | `scripts/user-prompt-handler.js` | Keyword matching for auto-suggest; `/command` override for explicit invocation |
 | PreToolUse | Before Task tool | `hooks/pre-tool-task.js` | Registers sub-agent as "running" in dashboard |
-| PostToolUse | After Task tool | `hooks/post-tool-task.js` | Marks sub-agent "done" or "error", records duration |
-| Stop | Session end | `hooks/stop.js` | Finalizes session, marks orphaned agents as error |
+| PostToolUse | After Task tool | `hooks/post-tool-task.js` | Marks a **synchronous** sub-agent `done`/`error` with its duration. A **background** launch is marked `launched` (completion never observed) — never `done`, and excluded from "all complete" wording |
+| PostToolUse | After every tool | `hooks/post-tool-progress.js` | Enforces the 2-minute progress-report rule: injects a reminder when background work is in flight and the last report is over 2 minutes old. Silent otherwise |
+| Stop | Every turn end | `hooks/stop.js` | Finalizes the session and sweeps orphaned `running`/`pending` agents to `error`. **`launched` is exempt** — an unobserved agent is not a failed one |
 
 ## Libraries (lib/)
 

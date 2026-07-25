@@ -3,8 +3,12 @@ plan_id: 2026-07-25-branch-lifecycle-in-task-lifecycle
 planner: cp
 grade: standard
 created: 2026-07-25
-status: planned
+status: in-progress
 refs: []
+repo: creeta-lens
+base: master
+branch: feat/branch-lifecycle
+pr: 2
 ---
 
 # 브랜치 생명주기를 작업 생명주기에 붙이기 — /cp · /cc · /cp done · /cs 재배치

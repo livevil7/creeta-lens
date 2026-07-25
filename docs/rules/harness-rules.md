@@ -165,6 +165,8 @@ Lens 기존 설계와 원문 원칙이 충돌해 보인 3건의 심사 결과. (
 
 **규약**:
 
-- 백그라운드 launch 는 `done` 으로 마킹하지 않는다. `running` 으로 두고 완료 집계에서도 빼며, 훅 출력에 **"상태 미확정(done 아님)"** 을 드러낸다. 거짓 완료보다 미확정이 낫다 — 조용한 오보 금지.
-- 완료 판정은 **완료 알림 또는 `TaskOutput(block=false)`/`SendMessage` 실측**으로만 한다. 스킬·Supervisor 는 훅의 `running` 카운트를 "아직 안 끝났다"의 증거로만 쓰고, `done` 카운트를 완료의 증거로 쓰기 전에 실측을 요구한다.
-- **남은 부채 (`lib/agent-tracker.js` 변경 필요 — 훅만으로는 못 고침)**: `endSession()` 이 턴 종료 시 `running`/`pending` 을 전부 `error`("Session ended while agent was still running")로 쓸어버린다. 백그라운드 에이전트를 정직하게 `running` 으로 남기면 이번엔 **거짓 error** 가 생긴다(거짓 done 보다는 안전한 방향 — 조용하지 않고 시끄럽게 틀린다). 완전한 수정은 트래커에 `launched`(미확정) 상태를 추가해 error 스윕에서 제외하고, `SubagentStop`/`TaskCompleted` 훅으로 실제 완료를 마킹하는 것이다.
+- 백그라운드 launch 는 `done` 으로 마킹하지 않는다. **`launched`(완료 미관측)** 로 마킹하고 완료 집계에서 빼며, 훅 출력에 **"상태 미확정(done 아님)"** 을 드러낸다. 거짓 완료보다 미확정이 낫다 — 조용한 오보 금지.
+- **`launched` 는 성공도 실패도 아니다.** `endSession()` 의 고아 스윕(`running`/`pending` → `error`)에서 **제외**된다. 관측하지 못한 것은 실패가 아니기 때문이다. `running` 으로 남기면 `Stop` 훅이 **매 턴** 발화하므로 수 초 안에 거짓 `error` 가 된다(실측) — 거짓 `done` 을 고치다 거짓 `error` 를 만드는 함정이다.
+- `launched` 가 하나라도 있으면 **`All N agents complete` 류 문구를 출력하지 않는다.** 그 문구는 `running == 0 && launched == 0` 일 때만 참이다.
+- 완료 판정은 **완료 알림 또는 산출물 실측**으로만 한다. 스킬·Supervisor 는 훅의 `done` 카운트를 완료의 증거로 쓰기 전에 실측을 요구하고, **`launched` 를 in-flight 판정 근거로도 쓰지 않는다**(정의상 "모름"이라 아무것도 해제하지 못해 리마인더가 영구히 울린다). 진행보고 훅은 그래서 대시보드가 아니라 **도구 호출 스트림을 직접 관측**한다.
+- **완료 관측 경로 (조사 결론, 2026-07-25)**: `PostToolUse` 는 spawn 반환 시점에 **한 번만** 발화하므로 훅으로 완료를 볼 수 없다(실측: 220초 돌아간 에이전트에 두 번째 발화 없음). 하네스 이벤트 목록에 `SubagentStop`/`TaskCompleted`/`Notification:agent_completed` 가 존재하지만 **백그라운드 발화 여부·입력 스키마·상관 식별자가 문서화돼 있지 않아** 실측 프로빙 없이 배선할 수 없다. `launched` 는 그 배선이 생기면 `completeAgent(agentId,'done')` 으로 그대로 해소되는 **전방 호환** 상태다.

@@ -36,6 +36,25 @@ orphaned state is never removed without one. `--apply` only ever removes the
 two `delete` verdicts; `archive`, `archive_review`, `keep`, `unknown` and the
 head branch of any open PR are never touched. See docs/rules/branch-hygiene.md.
 
+Two further guards back `--apply`, both fail-closed:
+
+* The open-PR check runs through `gh`. When it cannot run (gh missing,
+  unauthenticated, transient failure) a judgment-only run warns and continues
+  — it deletes nothing — but `--apply` refuses to delete in that repo,
+  because an open PR's head can look merged and would be removed unseen.
+  `--delete-without-pr-check` is the explicit override for when the PR list
+  has been verified by hand. Same posture as /cs (skills/cs/SKILL.md): no
+  gh, no silent bypass.
+* Remote deletion is leased to the judged SHA. Verdicts are computed from the
+  local tracking ref, which another machine may have outrun since the last
+  fetch; a plain `push --delete` would then remove commits this run never
+  examined. So the delete pushes `--force-with-lease=refs/heads/<branch>:<sha>`
+  and a moved remote tip rejects it, reported as "원격이 진전됨 — fetch 후
+  재판정". The tool never fetches on its own: judgment stays read-only
+  (branch-lifecycle.md prescribes `git fetch --prune` before running), and a
+  stale judgment is safe because the lease turns it into a refusal, not a
+  deletion.
+
 Base is resolved, never assumed. `--base` overrides; otherwise the same rule
 as lib/git-branch.js `resolveBase()` (single source of truth for base
 judgment — mirrored here because this is Python and cannot require that
@@ -138,6 +157,18 @@ def _read_config() -> dict:
         return {}
 
 
+def _is_task_shaped_branch(name: str) -> bool:
+    """Is ``name`` a task branch rather than an integration branch?
+
+    Mirrors ``isTaskShapedBranch`` in lib/git-branch.js: the allowed task
+    prefixes plus ``sync/`` (the tool-only throwaway prefix). Kept as an
+    intentional duplicate because Python cannot import that module — if the JS
+    rule changes, change this too.
+    """
+    prefixes = _read_config().get("branchPrefixes") or ["feat", "fix", "ops", "docs"]
+    return any(name.startswith("%s/" % p) for p in list(prefixes) + ["sync"])
+
+
 def resolve_base(repo: Path) -> dict:
     """Resolve the integration branch of ``repo``.
 
@@ -155,6 +186,7 @@ def resolve_base(repo: Path) -> dict:
             "reason": 'lens.config.json baseBranch["%s"] 명시값' % repo_name,
         }
 
+    rejected = None
     current = _git_maybe(repo, "rev-parse", "--abbrev-ref", "HEAD")
     if current and current != "HEAD":
         upstream = _git_maybe(
@@ -162,12 +194,25 @@ def resolve_base(repo: Path) -> dict:
         )
         if upstream:
             stripped = upstream.split("/", 1)[1] if "/" in upstream else ""
+            if stripped and _is_task_shaped_branch(stripped):
+                # A pushed task branch tracks itself, so its upstream is not an
+                # integration branch. Taking it as base would stack the next task
+                # on top of the previous one. Fall through to origin/HEAD.
+                # Mirrors lib/git-branch.js resolveBase().
+                rejected = stripped
+                stripped = ""
+            else:
+                rejected = None
             if stripped:
                 return {
                     "base": stripped,
                     "source": "upstream",
                     "reason": "현재 브랜치(%s)의 upstream %s" % (current, upstream),
                 }
+
+    rejected_note = ""
+    if rejected:
+        rejected_note = "upstream %s 는 task 브랜치라 base 로 채택 안 함 → " % rejected
 
     origin_head = _git_maybe(repo, "symbolic-ref", "refs/remotes/origin/HEAD")
     if origin_head:
@@ -176,13 +221,14 @@ def resolve_base(repo: Path) -> dict:
             return {
                 "base": stripped,
                 "source": "origin-head",
-                "reason": "origin/HEAD → %s" % stripped,
+                "reason": "%sorigin/HEAD → %s" % (rejected_note, stripped),
             }
 
     return {
         "base": None,
         "source": None,
-        "reason": "config 명시 없음 + 현재 브랜치 upstream 없음 + origin/HEAD 미설정 — base 판정 불가 (main/master 추정 금지)",
+        "reason": "%sconfig 명시 없음 + 채택 가능한 upstream 없음 + origin/HEAD 미설정 — base 판정 불가 (main/master 추정 금지)"
+        % rejected_note,
     }
 
 
@@ -191,7 +237,9 @@ def _open_pr_heads(repo: Path) -> tuple[dict[str, int], str | None]:
 
     Returns (head -> PR number, warning). A missing or failing `gh` yields an
     empty map and a warning: the protection is unavailable and the caller has
-    to know that rather than assume it held.
+    to know that rather than assume it held. main() fails closed on the
+    warning for --apply (override: --delete-without-pr-check); judgment-only
+    runs just carry it.
     """
     try:
         raw = _gh_pr_list(repo)
@@ -220,22 +268,26 @@ def _gh_pr_list(repo: Path) -> str:
     ).stdout.strip()
 
 
-def _branches(repo: Path, remote: str | None) -> list[tuple[str, str]]:
-    """Return (display_name, ref) pairs for the namespace being pruned.
+def _branches(repo: Path, remote: str | None) -> list[tuple[str, str, str]]:
+    """Return (display_name, ref, sha) triples for the namespace being pruned.
 
     Symbolic refs are excluded. git abbreviates refs/remotes/origin/HEAD to
     plain `origin`, so the old `ref[len(remote) + 1:]` produced an *empty*
     branch name that slipped past the PROTECTED guard, was reported as a
     deletion, and made `--apply` abort on its first item
     (`git push origin --delete ""` → fatal, exit 128).
+
+    ``sha`` is the tip this very listing saw — the value every verdict is
+    computed from — and is what prune() leases the remote deletion to.
     """
     namespace = "refs/remotes/%s" % remote if remote else "refs/heads"
-    refs = _git(repo, "for-each-ref", "--format=%(refname:short)%09%(symref)", namespace)
+    refs = _git(repo, "for-each-ref", "--format=%(refname:short)%09%(objectname)%09%(symref)", namespace)
     pairs = []
     for line in refs.split("\n"):
         if not line:
             continue
-        ref, _, symref = line.partition("\t")
+        ref, _, rest = line.partition("\t")
+        sha, _, symref = rest.partition("\t")
         if symref:  # refs/remotes/origin/HEAD and friends
             continue
         name = ref[len(remote) + 1 :] if remote else ref
@@ -243,7 +295,7 @@ def _branches(repo: Path, remote: str | None) -> list[tuple[str, str]]:
             continue
         if remote and ref == remote:  # HEAD's short form, on gits without %(symref)
             continue
-        pairs.append((name, ref))
+        pairs.append((name, ref, sha))
     return pairs
 
 
@@ -325,7 +377,7 @@ def classify(
     base_ref = "%s/%s" % (remote, base) if remote else base
     open_prs = open_prs or {}
     report = []
-    for name, ref in _branches(repo, remote):
+    for name, ref, sha in _branches(repo, remote):
         if name == base:
             continue
         try:
@@ -339,6 +391,7 @@ def classify(
                 "commits_ahead": None,
                 "files_changed": None,
             }
+        item["sha"] = sha  # 판정 근거가 된 tip — prune() 의 lease 기준값
         if name == default_branch and item["verdict"] == "delete":
             # base 가 staging 으로 해석되는 레포(Returns_ERP_v20)에서 origin/main 은
             # staging 의 조상이라 '병합됨'으로 증명된다. 그러나 그것은 그 레포의
@@ -430,6 +483,16 @@ def prune(repo: Path, report: list[dict], *, remote: str | None) -> tuple[list[s
 
     Per-item guards and per-item error capture: one unusable ref must not abort
     the run and leave every other merged branch behind.
+
+    Remote deletion is leased to the SHA the verdict was computed from
+    (item["sha"], captured by the same for-each-ref the judgment read). The
+    tracking ref can be stale — another machine may have pushed since the last
+    fetch — and an unleased `push --delete` would remove the *current* remote
+    tip, commits this run never examined. With the lease the remote rejects
+    the delete when its tip moved ("stale info"); that is reported as a
+    refusal to re-judge, never retried with force. Local deletion keeps plain
+    `branch -D`: the judged ref *is* the ref being deleted, read moments
+    earlier in this same process, so there is no cross-machine staleness gap.
     """
     deleted: list[str] = []
     skipped: list[str] = []
@@ -445,13 +508,30 @@ def prune(repo: Path, report: list[dict], *, remote: str | None) -> tuple[list[s
             continue
         try:
             if remote:
-                _git(repo, "push", remote, "--delete", name)
+                sha = item.get("sha")
+                if not sha:
+                    skipped.append("%s: 판정 시점 SHA 없음 — lease 삭제 불가, 건너뜀" % name)
+                    continue
+                _git(
+                    repo,
+                    "push",
+                    "--force-with-lease=refs/heads/%s:%s" % (name, sha),
+                    remote,
+                    ":refs/heads/%s" % name,
+                )
             else:
                 _git(repo, "branch", "-D", name)
             deleted.append(name)
         except (subprocess.CalledProcessError, OSError) as exc:
-            detail = (getattr(exc, "stderr", "") or str(exc)).strip().splitlines()
-            skipped.append("%s: 삭제 실패 — %s" % (name, detail[-1] if detail else "원인 불명"))
+            stderr = getattr(exc, "stderr", "") or str(exc)
+            if remote and "stale info" in stderr:
+                skipped.append(
+                    "%s: 원격이 진전됨 — 판정 SHA %s 가 더는 원격 tip 이 아니다. 삭제 거부, fetch 후 재판정 필요"
+                    % (name, (item.get("sha") or "")[:12])
+                )
+            else:
+                detail = stderr.strip().splitlines()
+                skipped.append("%s: 삭제 실패 — %s" % (name, detail[-1] if detail else "원인 불명"))
     return deleted, skipped
 
 
@@ -484,6 +564,7 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
         "remote": remote,
         "skipped": None,
         "warnings": [],
+        "pr_guard_ok": None,
         "branches": [],
     }
     if not resolved["base"]:
@@ -496,6 +577,7 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
         return result
 
     open_prs, warning = _open_pr_heads(repo)
+    result["pr_guard_ok"] = warning is None
     if warning:
         result["warnings"].append(warning)
     origin_head = _git_maybe(repo, "symbolic-ref", "refs/remotes/origin/HEAD")
@@ -589,11 +671,20 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="actually delete the merged branches; without it nothing is removed",
     )
+    parser.add_argument(
+        "--delete-without-pr-check",
+        action="store_true",
+        help="열린 PR head 보호 검사(gh)를 수행하지 못한 레포에서도 --apply 삭제를 강행한다. "
+        "기본은 fail-closed: 검사가 안 된 레포에서는 아무것도 지우지 않는다. "
+        "PR 목록을 직접 확인한 뒤에만 쓸 것",
+    )
     parser.add_argument("--json", action="store_true", help="emit the report as JSON")
     args = parser.parse_args(argv)
 
     if args.repo and args.repo_root:
         parser.error("--repo 와 --repo-root 는 함께 쓸 수 없다")
+    if args.delete_without_pr_check and not args.apply:
+        parser.error("--delete-without-pr-check 는 --apply 와 함께만 의미가 있다")
 
     if args.repo_root:
         root = args.repo_root
@@ -608,8 +699,18 @@ def main(argv: list[str] | None = None) -> int:
             print(_render_multi(results, skipped_dirs))
         if args.apply:
             lines = []
+            blocked = False
             for result in results:
                 if result["skipped"]:
+                    continue
+                if not result["pr_guard_ok"] and not args.delete_without_pr_check:
+                    # fail-closed: 열린 PR head 보호를 증명하지 못한 레포에서는 지우지 않는다.
+                    blocked = True
+                    lines.append(
+                        "%s: --apply 차단 (fail-closed) — 열린 PR 보호 검사 불가: %s"
+                        % (result["repo"], "; ".join(result["warnings"]) or "원인 불명")
+                    )
+                    lines.append("  PR 목록을 직접 확인한 뒤에만 --delete-without-pr-check 로 강행하라. 삭제 실행 안 함.")
                     continue
                 deleted, skipped = prune(Path(result["path"]), result["branches"], remote=remote)
                 if deleted or skipped:
@@ -618,6 +719,8 @@ def main(argv: list[str] | None = None) -> int:
             if not args.json:
                 print("")
                 print("\n".join(lines) if lines else "삭제 완료: 없음")
+            if blocked:
+                return 1
         return 0
 
     repo = args.repo or Path.cwd()
@@ -636,6 +739,14 @@ def main(argv: list[str] | None = None) -> int:
         print(_render(report, args.remote, base_ref))
 
     if args.apply:
+        if not result["pr_guard_ok"] and not args.delete_without_pr_check:
+            # fail-closed: 열린 PR 의 head 가 병합된 것처럼 보이면 그대로 지워질 수 있다.
+            print(
+                "--apply 차단 (fail-closed): 열린 PR head 보호 검사를 수행하지 못했다 — 아무것도 삭제하지 않았다.",
+                file=sys.stderr,
+            )
+            print("PR 목록을 직접 확인한 뒤에만 --delete-without-pr-check 로 강행하라.", file=sys.stderr)
+            return 1
         deleted, skipped = prune(repo, report, remote=args.remote)
         if not args.json:
             print("")

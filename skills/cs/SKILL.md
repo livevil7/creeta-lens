@@ -98,6 +98,16 @@ Any repo with **more than 5** remote branches gets a warning line, because `sync
 
 Report only. `/cs` never deletes branches itself — pruning is `scripts/prune_branches.py`'s job and it asks before removing anything.
 
+When you do point someone at that script, three things about it matter:
+
+| | |
+|---|---|
+| **Judgement is the default** | Without `--apply` it deletes nothing. `--apply` removes only the two merge-proven verdicts — never `아카이브 검토`, `유지`, `unknown`, a repo's default branch, or an open PR's head. |
+| **`--apply` is fail-closed without `gh`** | Open-PR protection needs `gh`. If `gh` is missing, unauthenticated, or failing, `--apply` **aborts** for that repo rather than risk deleting a live PR's head — the same posture as `/cs`'s own PR-only rule. `--delete-without-pr-check` overrides it, and it exists so that override is a deliberate, visible act. Judgement-only runs still complete with a warning. |
+| **Deletion carries a lease** | Deletion is tied to the SHA the judgement was made on. If another machine advanced the branch in the meantime, git refuses and the script reports `원격이 진전됨 — 삭제 거부, fetch 후 재판정 필요`. Run `git fetch origin --prune` first so the judgement is not made on a stale ref. |
+
+`--base` has no default: pass it to override, or let the script resolve config → upstream → `origin/HEAD` per `docs/rules/branch-lifecycle.md`. `--repo-root <dir>` walks every repo underneath.
+
 ## Workspace roots
 
 Auto-detected from `$HOME` (no hardcoded user/machine paths), overridable via `GIT_ROOTS` env var. The script probes these standard candidates and uses whichever directories exist:

@@ -10,6 +10,12 @@
  * 311s and 567s (실측 2026-07-25). Marking those 'done' emitted a false
  * "All N agents complete" while every agent was still working. See isAsyncLaunch().
  *
+ * ⚠️ …and it fires only once, at launch. No hook observes the completion of a
+ * background agent, so this hook cannot ever resolve one. Async launches are
+ * therefore parked in the 'launched' status (= unknown), which is excluded from
+ * the done count AND from the Stop hook's orphan→error sweep. Neither a false
+ * 'done' nor a false 'error'. SoT: docs/rules/harness-rules.md §4.5.
+ *
  * Input (stdin): { tool_name, tool_input, tool_response, tool_output, tool_error }
  * Output (stdout): { hookSpecificOutput }
  */
@@ -22,7 +28,12 @@ const { installFailSoftHandlers, readJsonInput, writeJson } = require(path.join(
 installFailSoftHandlers('post-tool-task');
 
 // Load agent tracker
-const { completeAgentByDescription, loadDashboard } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
+const {
+  completeAgentByDescription,
+  markAgentLaunchedByDescription,
+  loadDashboard,
+  LAUNCHED_STATUS,
+} = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
 
 /**
  * Flatten a tool response into searchable text.
@@ -71,25 +82,32 @@ function main() {
     const toolInput = input?.tool_input || {};
     const description = toolInput.description || toolInput.prompt || toolInput.task || '';
 
-    // Async launch: the agent has only STARTED. Leave it 'running' — do not
-    // complete it and do not count it as done. An honest "unresolved" beats a
-    // false completion. (durationMs here is the spawn call's own duration, which
-    // is why the old path reported "done (132ms)" for agents that ran for minutes.)
+    // Async launch: the agent has only STARTED. Park it in the dedicated
+    // 'launched' status — not 'done' (false completion), and not left 'running'
+    // either: the Stop hook fires at the end of every turn and sweeps 'running'
+    // into 'error', which would turn a successful background agent into a false
+    // failure within seconds. 'launched' says "unknown" and is exempt from that
+    // sweep. (durationMs here is the spawn call's own duration, which is why the
+    // old path reported "done (132ms)" for agents that ran for minutes.)
     if (!hasError && isAsyncLaunch(input)) {
+      const agent = markAgentLaunchedByDescription(description);
       const s = loadDashboard().summary;
-      const name = description ? String(description).split('\n')[0].slice(0, 40) : 'task';
+      const launched = s.launched ?? 0; // pre-1.1.0 dashboards have no counter
+      const name = agent?.name
+        || (description ? String(description).split('\n')[0].slice(0, 40) : 'task');
       writeJson({
         hookSpecificOutput: {
           hookEventName: 'PostToolUse',
           matcher: 'Task',
-          additionalContext: `[Lens] sub-agent "${name}" 백그라운드 실행 시작 — 상태 미확정(done 아님). 이 훅은 완료를 관측할 수 없다: 완료 알림 또는 TaskOutput(block=false)/SendMessage 로 실측하기 전에는 완료로 간주·보고 금지. 대시보드: ${s.running} running / ${s.done} done / ${s.error} error. 지금부터 2분 주기 진행보고 의무 (docs/rules/harness-rules.md §4.4).`,
+          additionalContext: `[Lens] sub-agent "${name}" 백그라운드 실행 시작 — 상태 '${LAUNCHED_STATUS}'(완료 미관측, done 아님). 이 훅은 완료를 관측할 수 없다: 완료 알림 또는 TaskOutput(block=false)/SendMessage 로 실측하기 전에는 완료로 간주·보고 금지. 대시보드: ${s.running} running / ${launched} ${LAUNCHED_STATUS}(미확정) / ${s.done} done / ${s.error} error. '${LAUNCHED_STATUS}' 는 성공도 실패도 아니며 턴/세션 종료 시 error 로 바뀌지 않는다 — 실패 증거로도 쓰지 마라. 지금부터 2분 주기 진행보고 의무 (docs/rules/harness-rules.md §4.4).`,
+          agentId: agent?.id || 'unknown',
           agentName: name,
-          status: 'running',
+          status: LAUNCHED_STATUS,
           launch: 'async',
           resolved: false,
           durationMs: null,
           dashboardSummary: {
-            total: s.total, running: s.running, done: s.done, error: s.error,
+            total: s.total, running: s.running, launched, done: s.done, error: s.error,
           },
         },
       });
@@ -107,13 +125,25 @@ function main() {
     // sees failures without having to cat .lens/agent-dashboard.json. Keep it terse;
     // emphasize errors, stay quiet-ish on routine success.
     const finalStatus = agent?.status || status;
+
+    // Unobserved background launches must poison every "everything is finished"
+    // claim, otherwise the false completion just moves from the per-agent status
+    // into the aggregate sentence. "All N agents complete" is only printable when
+    // nothing is running AND nothing is unresolved.
+    const launched = summary.launched ?? 0; // pre-1.1.0 dashboards have no counter
+    const launchedNote = launched > 0
+      ? ` ⚠️ ${launched} background agent(s) unresolved ('${LAUNCHED_STATUS}' = completion never observed, NOT failed) — verify with TaskOutput(block=false)/completion notice before declaring done.`
+      : '';
+
     let additionalContext;
     if (finalStatus === 'error') {
-      additionalContext = `[Lens] sub-agent "${agent?.name || description || 'task'}" FAILED${errorMsg ? `: ${String(errorMsg).slice(0, 200)}` : ''}. Dashboard: ${summary.running} running / ${summary.done} done / ${summary.error} error.`;
+      additionalContext = `[Lens] sub-agent "${agent?.name || description || 'task'}" FAILED${errorMsg ? `: ${String(errorMsg).slice(0, 200)}` : ''}. Dashboard: ${summary.running} running / ${launched} ${LAUNCHED_STATUS} / ${summary.done} done / ${summary.error} error.`;
     } else if (summary.error > 0) {
-      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ⚠️ ${summary.error} earlier agent(s) errored — check before declaring done. ${summary.running} still running.`;
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ⚠️ ${summary.error} earlier agent(s) errored — check before declaring done. ${summary.running} still running.${launchedNote}`;
     } else if (summary.running > 0) {
-      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done. ${summary.running} still running, ${summary.done} done.`;
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done. ${summary.running} still running, ${summary.done} done.${launchedNote}`;
+    } else if (launched > 0) {
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ${summary.done} observed complete, 0 running — NOT "all complete".${launchedNote}`;
     } else {
       additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). All ${summary.done} agents complete.`;
     }
@@ -130,6 +160,7 @@ function main() {
         dashboardSummary: {
           total: summary.total,
           running: summary.running,
+          launched,
           done: summary.done,
           error: summary.error,
         },

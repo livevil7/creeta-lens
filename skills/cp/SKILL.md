@@ -1094,7 +1094,13 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
 >
 > ⚠️ **DONE 모드는 git 조작이 허용되는 예외다.** `/cp` 의 절대 규칙("계획 & 문서화만 — 문서 외 파일 수정 금지")은 **PLAN 모드**에 적용된다. DONE 모드는 작업을 *닫는* 정리 단계이므로 push·PR 생성·**병합된** 브랜치 삭제를 수행한다. 대신 **Phase 1.4 의 안전 규칙을 그대로 상속**한다 — 자동 삭제 절대 금지, 사용자 승인 필수, 추측 삭제 금지. 브랜치 **생성**은 여전히 `/cc` 의 일이고 `/cp` PLAN 모드는 이름만 정한다.
 
-Phase 1.3 에서 정리 대상으로 선택된 각 task 에 대해, 문서 frontmatter 에 `branch` 가 있으면 `lib/git-branch.js` 의 `mergedState(repoPath, branch, base)` 로 판정한다:
+Phase 1.3 에서 정리 대상으로 선택된 각 task 에 대해, 문서 frontmatter 에 `branch` 가 있으면 `lib/git-branch.js` 의 `mergedState(repoPath, branch, base)` 로 판정한다.
+
+**판정 직전에 원격 ref 를 최신화한다 (선행 조건 — 생략 불가)** — `mergedState` 가 읽는 것은 **로컬에 저장된 원격 추적 ref** 다. 그 ref 가 마지막으로 갱신된 뒤 원격 task 브랜치에 새 커밋이 들어오면, 낡은 tip 을 보고 "머지됨" 으로 분류하고 **Phase 4 의 삭제가 더 새로운 원격 작업을 지운다.** 이 워크스페이스는 Windows 개발 머신과 Mac Mini 양쪽에서 같은 레포를 쓰므로 가정이 아니라 실제로 일어나는 시나리오다. 따라서:
+
+- 판정 **바로 전에** base 와 task 브랜치의 원격 ref 를 가져온다 (`git fetch <remote> <base> <branch>`, 삭제된 원격 브랜치까지 반영하려면 `--prune` 을 포함한 fetch). 정확한 문법·호출 위치는 구현(`lib/git-branch.js`)에 위임하고, 문서가 고정하는 규칙은 **"fetch 없이 나온 판정은 삭제 근거로 쓰지 않는다"** 다.
+- fetch 가 실패하면(네트워크 단절·인증 실패·원격 부재) **판정을 진행하지 않는다.** "원격 상태 확인 불가 — 삭제 보류" 로 보고하고 그 task 는 history 이동·브랜치 삭제 **둘 다 보류**한다. `gh` 조회 불가와 같은 취급 — 조용히 넘어가지 않는다.
+- 같은 원칙("판정 직전 refresh + SHA lease")이 배치 정리 도구 `scripts/prune_branches.py` 에도 적용된다. 두 경로의 판정 원칙은 항상 같아야 한다 (SoT: `docs/rules/branch-lifecycle.md`).
 
 ```bash
 node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3])))" . feat/<slug> <base>
@@ -1102,13 +1108,15 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(
 
 반환값의 `state` 가 아래 5상태이고 `reason` 이 판정 근거다. **PR 유무는 `mergedState` 가 모른다** — `gh pr list --head <branch> --json number,state` 로 따로 조회한다. `gh` 부재·인증 실패면 **조용히 넘어가지 말고** "PR 상태 조회 불가" 를 표시하고 history 이동은 보류한다(머지 미확인과 같은 취급).
 
-| 상태 | 의미 | 처리 |
-|---|---|---|
-| `unpushed` | 원격에 브랜치가 없다 | **push + PR 생성 제안** (AskUserQuestion). history 이동 보류 |
-| `unmerged` (PR 없음) | 원격에 있고 미머지, PR 도 아직 없다 | **PR 생성 제안**. history 이동 보류 |
-| `unmerged` (PR 열림) | 리뷰 대기 | **history 로 내리지 않는다** → **"In Review"** 로 보고. task 파일은 `docs/tasks/` 에 그대로 둔다 |
-| `merged` / `patch-merged` | 병합이 증명됐다 | Phase 2~3(완료 인터뷰 → history 기록) → Phase 4(브랜치 삭제)로 진행 |
-| `unknown` | 계보가 달라 **도구가 병합을 증명 못 함** | **자동 처리 금지.** 사람 확인 요청 — history 이동·브랜치 삭제 **둘 다 보류** |
+| 상태 | 의미 | 처리 | 판정에 쓴 SHA 기록 |
+|---|---|---|---|
+| `unpushed` | 원격에 브랜치가 없다 | **push + PR 생성 제안** (AskUserQuestion). history 이동 보류 | — (원격 ref 없음) |
+| `unmerged` (PR 없음) | 원격에 있고 미머지, PR 도 아직 없다 | **PR 생성 제안**. history 이동 보류 | `origin/<branch>` tip |
+| `unmerged` (PR 열림) | 리뷰 대기 | **history 로 내리지 않는다** → **"In Review"** 로 보고. task 파일은 `docs/tasks/` 에 그대로 둔다 | `origin/<branch>` tip |
+| `merged` / `patch-merged` | 병합이 증명됐다 | Phase 2~3(완료 인터뷰 → history 기록) → Phase 4(브랜치 삭제)로 진행 | **필수** — `origin/<branch>` tip + 비교에 쓴 `origin/<base>` tip. Phase 4 가 이 값을 lease 로 쓴다 |
+| `unknown` | 계보가 달라 **도구가 병합을 증명 못 함** | **자동 처리 금지.** 사람 확인 요청 — history 이동·브랜치 삭제 **둘 다 보류** | 기록만(사람 확인용). 삭제 근거로는 쓰지 않는다 |
+
+**판정에 쓴 SHA 를 기록한다** — fetch 직후 판정에 실제로 사용한 tip SHA 를 판정 결과와 함께 남긴다. 이 값이 Phase 4 의 **lease** 다: 삭제 시점에 그 SHA 가 여전히 원격 tip 일 때만 지운다. **SHA 없이 나온 판정으로는 브랜치를 삭제하지 않는다.**
 
 #### 1.5.1 이중 게이트 우선순위 — git 판정이 우선
 
@@ -1193,9 +1201,11 @@ Q5. 남은 작업이나 주의사항? (선택)
 1. `docs/tasks/`에서 원본 Task 파일 **삭제**
 2. **병합된 브랜치 삭제 (v3.25+)** — Phase 1.5 판정이 `merged` / `patch-merged` 이고 `lens.config.json` 의 `autoDeleteMergedBranch` 가 `true` 일 때만, 해당 task 의 `branch` 를 **로컬·원격 둘 다** 삭제한다. 브랜치를 남기면 작업은 끝났는데 브랜치만 쌓인다 — 이 개편이 없애려는 상태 그 자체다.
 
+   **삭제 직전 lease 확인 (필수)** — Phase 1.5 가 기록한 SHA 가 **여전히 원격 tip 인지** 확인하고, 같을 때만 지운다. 판정과 삭제 사이에 다른 머신(Mac Mini 등)이 push 했다면 lease 없는 삭제는 그 커밋을 그대로 날린다. 원격 tip 을 다시 읽어 기록한 SHA 와 비교하든, git 이 지원하는 lease 옵션으로 원자적으로 확인하든 — 방식은 구현에 위임하고 규칙은 하나다: **"판정에 쓴 SHA = 현재 원격 tip" 이 삭제의 전제 조건이다.** 다르면 지우지 않고 "원격이 진전됨 — 재판정 필요" 로 보고한다. 조용히 지나가지 않는다.
+
    ```bash
    git branch -d <branch>            # 병합 안 됐으면 git 이 스스로 거부한다 (-D 쓰지 않는다)
-   git push origin --delete <branch>
+   git push origin --delete <branch> # ⚠️ Phase 1.5 의 SHA 가 현재 원격 tip 일 때만 (lease 확인 후)
    ```
 
    **삭제 금지 조건 (Phase 1.4 안전 규칙 상속 — 하나라도 걸리면 삭제하지 않고 사유를 보고)**:
@@ -1203,6 +1213,8 @@ Q5. 남은 작업이나 주의사항? (선택)
    - **열린 PR 의 head 브랜치** — 삭제하면 PR 이 닫힌다. In Review 는 아직 완료가 아니다.
    - `autoDeleteMergedBranch` 가 `false` — 삭제하지 않고 "수동 정리 대상" 으로 보고만 한다.
    - `-D`(force) 는 쓰지 않는다. `-d` 가 거부하면 그건 삭제하면 안 된다는 신호다.
+   - **판정 직전 fetch 를 못 했다** — 원격 상태를 확인하지 못한 판정에는 삭제 근거가 없다. "원격 상태 확인 불가 — 삭제 보류" 로 보고한다(Phase 1.5 선행 조건).
+   - **lease 불일치 — 원격이 진전됐다** — 판정에 쓴 SHA 가 현재 원격 tip 이 아니면 삭제하지 않고 "원격이 진전됨 — 재판정 필요" 로 보고한다. 사용자가 `/cp done` 을 재실행하면 새 fetch 로 다시 판정된다. 기록된 SHA 가 없으면 lease 를 걸 수 없으므로 이 조건에 걸린 것으로 취급한다.
 3. TodoWrite 항목 전부 `completed` 처리
 4. 완료 메시지 표시: 생성된 history 파일 경로 + 삭제된 task 파일 + **삭제된 브랜치(로컬/원격)** 또는 삭제하지 않은 사유
 
@@ -1388,7 +1400,7 @@ docs/
 
 - **Goal 은 절대 양보 금지** — Phase 0 게이트 통과 못한 Goal 로 Phase 5 진입 불가, `/cc` 핸드오프 시 Goal 빈 페이로드 금지
 - **계획서 골격 (v3.21+)** — 모든 계획서(Standard+)는 🎯What(사람 언어) · ❓Why(6하원칙) · 🧰실행전략(난이도·모델·병렬·스킬·자원) · 🛠How(빌드레디, 실행 Todo보다 자세) · 💡시사점·⚠️주의점·🔀Side Effect · ✅Review(검증 수단·범위·보고)로 선다. **원칙 0: 글 길이 줄이기는 목표가 아니다 — 간결=군더더기 제거지 내용 삭제가 아니며, 충돌 시 완전성 승. 계획 md는 `/cc` 실행 Todo보다 자세해야 한다.** Why·검증수단이 비면 게이트 reject.
-- `/cp` 는 **계획 & 문서화만** — 코드 실행, 파일 수정 (문서 외) 금지. **PLAN 모드는 브랜치 이름만 정하고 만들지 않는다**(생성은 `/cc`). **예외: DONE 모드의 정리 단계** — 작업을 닫는 단계이므로 push·PR 생성·**병합된** 브랜치 삭제를 수행한다(Phase 1.5·4). 이 예외도 Phase 1.4 안전 규칙(자동 삭제 금지·사용자 승인 필수·`unknown` 추측 삭제 금지)을 상속한다.
+- `/cp` 는 **계획 & 문서화만** — 코드 실행, 파일 수정 (문서 외) 금지. **PLAN 모드는 브랜치 이름만 정하고 만들지 않는다**(생성은 `/cc`). **예외: DONE 모드의 정리 단계** — 작업을 닫는 단계이므로 push·PR 생성·**병합된** 브랜치 삭제를 수행한다(Phase 1.5·4). 이 예외도 Phase 1.4 안전 규칙(자동 삭제 금지·사용자 승인 필수·`unknown` 추측 삭제 금지)을 상속하고, **판정 직전 원격 refresh + 삭제 시 SHA lease** 를 만족하지 못하면 삭제하지 않는다.
 - 자동 저장 필수 — "저장할까요?" 묻지 않음
 - 사용자 언어로 응답 (한국어 우선)
 - 전문가 관점 — 주니어가 놓칠 통찰 제시
