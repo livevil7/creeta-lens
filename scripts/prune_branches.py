@@ -237,16 +237,27 @@ def _protected_branch_names(repo_name: str) -> frozenset[str]:
     return frozenset(explicit) | frozenset(workspace_bases) | GIT_DEFAULT_BRANCH_NAMES
 
 
+# Prefixes the rules already list as *not* integration branches (§3). The
+# allowed four are what we write today; these are the forbidden ones that still
+# exist from before. Measured: livevil-research sat checked out on an open PR's
+# head (claude/…), and that branch resolved as the repo's base — planning there
+# would have aimed the PR at another PR's branch instead of main.
+NON_INTEGRATION_PREFIXES = ["sync", "agent", "claude", "codex", "task", "feature", "backup"]
+
+
 def _is_task_shaped_branch(name: str) -> bool:
     """Is ``name`` a task branch rather than an integration branch?
 
     Mirrors ``isTaskShapedBranch`` in lib/git-branch.js: the allowed task
-    prefixes plus ``sync/`` (the tool-only throwaway prefix). Kept as an
-    intentional duplicate because Python cannot import that module — if the JS
-    rule changes, change this too.
+    prefixes plus the forbidden-but-extant ones above. Kept as an intentional
+    duplicate because Python cannot import that module — if the JS rule
+    changes, change this too.
     """
     prefixes = _read_config().get("branchPrefixes") or ["feat", "fix", "ops", "docs"]
-    return any(name.startswith("%s/" % p) for p in list(prefixes) + ["sync"])
+    return any(
+        name.startswith("%s/" % p)
+        for p in list(prefixes) + NON_INTEGRATION_PREFIXES
+    )
 
 
 def resolve_base(repo: Path) -> dict:
