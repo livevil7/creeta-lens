@@ -54,10 +54,19 @@ head branch of any open PR are never touched. See docs/rules/branch-hygiene.md.
 
 Three further guards back `--apply`, all fail-closed:
 
-* The open-PR check runs through `gh`. When it cannot run (gh missing,
-  unauthenticated, transient failure) a judgment-only run warns and continues
-  — it deletes nothing — but `--apply` refuses to delete in that repo,
-  because an open PR's head can look merged and would be removed unseen.
+* The open-PR check runs through `gh`, pinned to the repo the *selected*
+  remote's URL resolves to (`--repo OWNER/REPO`; local mode proxies through
+  origin, like the default-branch guard below). Unpinned, gh picks its own
+  base repo (`gh repo set-default` / multi-remote resolution), and a query
+  that "succeeds" against a different repo passes the protection check while
+  this remote's open PR heads go unprotected — a failure no fail-closed
+  guard on the gh call itself can see. A remote whose GitHub repo cannot be
+  resolved (non-GitHub host, unreadable URL) means the tool does not know
+  whose PRs it would be checking, so it is treated exactly like a failed
+  check. When the check cannot run (gh missing, unauthenticated, transient
+  failure) a judgment-only run warns and continues — it deletes nothing —
+  but `--apply` refuses to delete in that repo, because an open PR's head
+  can look merged and would be removed unseen.
   The query is capped (OPEN_PR_LIMIT); a reply that reaches the cap may be
   truncated, so it is treated exactly like a failed check — warning plus
   blocked `--apply` — never accepted as complete. `--delete-without-pr-check`
@@ -113,6 +122,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -323,7 +333,43 @@ def resolve_base(repo: Path) -> dict:
     }
 
 
-def _open_pr_heads(repo: Path) -> tuple[dict[str, int], str | None]:
+def _remote_github_repo(repo: Path, remote: str) -> tuple[str | None, str | None]:
+    """Resolve ``remote`` to the OWNER/REPO identifier ``gh --repo`` accepts.
+
+    Returns (identifier, None) or (None, why-not). gh 에는 git remote *이름*
+    을 받는 옵션이 없다 — `gh pr list --help` (gh 2.86.0) 기준 레포 지정
+    수단은 상속 플래그 `-R/--repo [HOST/]OWNER/REPO` 하나뿐이므로, 선택한
+    remote 의 URL 에서 그 식별자를 직접 해석한다. 해석 실패(= None)는
+    호출자가 gh 실패와 동일하게 fail-closed 로 다룬다: 어느 레포의 PR 인지
+    모르는 채로 보호 검사를 "성공"으로 칠 수 없다.
+
+    github.com 이 아닌 호스트(사설 git 서버·로컬 경로 원격)도 None 이다 —
+    이 도구가 아는 PR 조회 수단은 gh(GitHub)뿐이고, 증명 못 하면 유지가
+    이 도구의 자세다.
+    """
+    url = _git_maybe(repo, "remote", "get-url", remote)
+    if not url:
+        return None, "remote %s 의 URL 을 읽지 못했다" % remote
+    # scheme 형식(https://·ssh://·git://, 선택적 user@·포트) 또는 scp 형식
+    # (git@host:path). scp 분기의 (?!//) 는 미지 scheme 의 `://` 를 호스트로
+    # 오인하지 않기 위한 가드 — 해석 실패는 어차피 fail-closed 로 떨어진다.
+    m = re.match(r"^(?:git\+)?(?:https?|ssh|git)://(?:[^/@]+@)?([^/:]+)(?::\d+)?/(.*)$", url)
+    if not m:
+        m = re.match(r"^(?:[^@/]+@)?([^:/]+):(?!//)(.*)$", url)
+    if not m:
+        return None, "remote %s 의 URL(%s)에서 호스트를 해석하지 못했다" % (remote, url)
+    host, path = m.group(1).lower(), m.group(2)
+    if host not in ("github.com", "ssh.github.com"):
+        return None, "remote %s 의 URL(%s)이 github.com 레포가 아니다" % (remote, url)
+    parts = [p for p in path.strip("/").split("/") if p]
+    if len(parts) == 2 and parts[1].endswith(".git"):
+        parts[1] = parts[1][: -len(".git")]
+    if len(parts) != 2 or not all(parts):
+        return None, "remote %s 의 URL(%s)에서 OWNER/REPO 를 해석하지 못했다" % (remote, url)
+    return "/".join(parts), None
+
+
+def _open_pr_heads(repo: Path, remote: str | None) -> tuple[dict[str, int], str | None]:
     """Head branches of open PRs, which must never be deleted.
 
     Returns (head -> PR number, warning). A missing or failing `gh` yields an
@@ -334,9 +380,25 @@ def _open_pr_heads(repo: Path) -> tuple[dict[str, int], str | None]:
     still protected, but the check is incomplete). main() fails closed on the
     warning for --apply (override: --delete-without-pr-check); judgment-only
     runs just carry it.
+
+    The query is pinned to the repo the *selected* remote's URL resolves to
+    (local mode proxies through origin, the same proxy the default-branch
+    guard uses). Unpinned, gh resolves its own base repo — set-default /
+    multi-remote — which can be a different repo entirely; that reply comes
+    back as a *success*, so no gh-failure guard catches it, and the selected
+    remote's open PR heads would be judged unprotected. An unresolvable
+    remote therefore gets the same warning as a failed gh run: the tool
+    cannot name the repo whose PRs it would be checking.
     """
+    pr_remote = remote or "origin"
+    repo_id, why = _remote_github_repo(repo, pr_remote)
+    if repo_id is None:
+        return {}, (
+            "PR 조회 대상 레포 미해석(%s) — 어느 GitHub 레포의 열린 PR 을 확인해야 하는지 알 수 없어 "
+            "열린 PR head 보호 검사를 못 했다. --apply 전에 PR 목록을 직접 확인하라." % why
+        )
     try:
-        raw = _gh_pr_list(repo)
+        raw = _gh_pr_list(repo, repo_id)
     except FileNotFoundError:
         return {}, "gh 없음 — 열린 PR head 보호 검사를 못 했다. --apply 전에 PR 목록을 직접 확인하라."
     except subprocess.CalledProcessError as exc:
@@ -359,9 +421,14 @@ def _open_pr_heads(repo: Path) -> tuple[dict[str, int], str | None]:
     return heads, None
 
 
-def _gh_pr_list(repo: Path) -> str:
+def _gh_pr_list(repo: Path, repo_id: str) -> str:
+    # --repo 로 조회 레포를 못 박는다. 없으면 gh 가 자체 규칙(set-default /
+    # 다중 remote)으로 base 레포를 골라, --remote 가 가리키는 것과 *다른*
+    # 레포의 PR 목록이 성공으로 돌아올 수 있다 — 그 목록으로는 이 remote 의
+    # 열린 PR head 를 보호하지 못한다. repo_id 는 _remote_github_repo() 가
+    # 선택한 remote 의 URL 에서 해석한 값.
     return subprocess.run(
-        ["gh", "pr", "list", "--state", "open", "--limit", str(OPEN_PR_LIMIT), "--json", "number,headRefName"],
+        ["gh", "pr", "list", "--repo", repo_id, "--state", "open", "--limit", str(OPEN_PR_LIMIT), "--json", "number,headRefName"],
         cwd=repo,
         check=True,
         capture_output=True,
@@ -858,7 +925,7 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
         result["skipped"] = "base ref %s 가 없다 (fetch 안 됨 / 이름 불일치) — 판정 불가" % base_ref
         return result
 
-    open_prs, warning = _open_pr_heads(repo)
+    open_prs, warning = _open_pr_heads(repo, remote)
     result["pr_guard_ok"] = warning is None
     if warning:
         result["warnings"].append(warning)

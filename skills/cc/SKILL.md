@@ -473,7 +473,7 @@ Monitor는 **백그라운드에서 실행**되며, 다른 Agent와 독립적입�
 
 **같은 메시지에서 모든 Worker를 시작합니다 (= Task 도구 N회 병렬 호출).** Worker 간 대기 없음.
 
-**충돌 방지 — worktree 국소 사용 (조건부)**: 서로 다른 Worker 2개 이상이 **같은 파일**을 건드리는 경우에만 해당 Worker 들에 worktree 격리(`isolation: worktree`)를 적용한다. task 격리의 기본 수단은 0.4 의 task 브랜치이며, worktree 는 단일 레포 한정이라 기본 수단으로는 쓰지 않는다 (기본 채택은 기각된 접근).
+**충돌 방지 — worktree 국소 사용 (조건부)**: 서로 다른 Worker 2개 이상이 **같은 파일**을 건드리는 경우에만 해당 Worker 들에 worktree 격리(`isolation: worktree`)를 적용한다. task 격리의 기본 수단은 0.4 의 task 브랜치이며, worktree 는 단일 레포 한정이라 기본 수단으로는 쓰지 않는다 (기본 채택은 기각된 접근). **격리했으면 Phase 3.5 통합이 필수다** — worktree 안의 편집은 task 브랜치 작업트리에 나타나지 않는다. 격리한 Worker 번호를 기록해 두고 3.5 로 넘긴다.
 
 각 Worker에 할당:
 - 고유 Worker ID (#1, #2, #N)
@@ -622,7 +622,91 @@ Monitor가 모든 Worker 완료를 보고할 때까지 대기합니다.
 
 ---
 
+### Phase 3.5: worktree 산출물 통합 (조건부 — 3.2 에서 격리한 경우에만)
+
+> **일반 경로는 이 phase 전체를 건너뛴다.** 3.2 의 격리 조건(같은 파일을 건드리는 Worker 2개 이상)에 걸리지 않은 실행에서 Worker 는 task 브랜치의 작업트리를 직접 고쳤으므로 통합할 것이 없다. 건너뛸 때 별도 보고·기록도 필요 없다 — 대부분의 실행이 여기 해당한다.
+
+> **왜 필요한가**: worktree 로 격리하면 Worker 의 편집은 `.claude/worktrees/<name>/` 안에 남고 **task 브랜치 작업트리에는 나타나지 않는다.** 통합 단계가 없으면 Phase 4 Supervisor 와 Phase 6 QA 가 **Worker 변경이 빠진 트리**를 검토·검증하고 7.4 가 그 빠진 상태를 커밋한다 — 격리했더니 결과물이 사라지는 구조다. 그래서 **검토 전에** 통합한다.
+>
+> 이 단계는 branch-lifecycle 계획이 규정한 **"같은 파일을 건드리는 worker 2개 이상이면 worktree 격리 + Leader 만 task 브랜치에 직렬 통합(lock)"** 의 실행 구현이다. **lock 은 여기서 구조적이다** — task 브랜치 작업트리를 만지는 주체가 Leader 하나뿐이고 Worker 산출물을 **한 번에 하나씩** 넣으므로 동시 쓰기가 성립하지 않는다. 이 phase 를 Worker 에게 위임하지 않는다.
+
+#### 3.5.1 통합 수단 = 패치 전송 (merge·cherry-pick 아님)
+
+worktree 브랜치를 task 브랜치로 **merge 하지도, cherry-pick 하지도 않는다.** 이력이 아니라 **내용만** 옮긴다. 근거 두 가지:
+
+1. **Worker 는 커밋하지 않는다.** `/cc` 에서 커밋 주체는 7.4 의 Leader 뿐이다(`canCommitTo` 판정). 따라서 worktree 브랜치에는 보통 **커밋이 0개**이고 산출물은 미커밋 상태로 worktree 작업트리에만 있다. 이 상태에서 merge·cherry-pick 은 **아무것도 가져오지 않으면서 성공으로 끝난다** — 지금 고치는 결함이 그대로 재발하되 "통합했다"는 거짓 신호까지 붙는다.
+2. **worktree 브랜치의 시작점이 task 브랜치가 아니다.** worktree 는 `.claude/worktrees/` 아래 **새 브랜치**로 만들어지고 시작 ref 는 `worktree.baseRef` 설정을 따른다 — 기본값 `fresh` 는 `origin/<기본 브랜치>` 이고 현재 HEAD 는 `head` 로 설정했을 때뿐이다. 즉 **task 브랜치의 base 와 다를 수 있다.** 이 브랜치를 merge 하면 task 와 무관한 기본 브랜치 이력이 PR 에 딸려 들어간다. base 가 `main` 이 아닌 레포(`Returns_ERP_v20` = `staging`)에서는 그것이 곧 오배포 경로다.
+
+#### 3.5.2 절차 (Leader 가 task 브랜치 작업트리에서 · Worker 번호 순으로 하나씩)
+
+1. **대상 확인** — `git worktree list --porcelain` 으로 worktree 경로를 얻는다(경로를 추측하지 않는다). 3.2 에서 격리한 Worker 수와 개수가 다르면 멈추고 3.5.4.
+2. **수거** (worktree 안에서):
+
+   ```bash
+   WT="<git worktree list 로 얻은 경로>"
+   P=".lens/patches/worker-<N>.patch"                  # mkdir -p .lens/patches — .lens/ 는 git-ignored 런타임 디렉토리
+   START=$(git -C "$WT" rev-list -g HEAD | tail -1)    # 그 worktree 가 만들어진 시점의 커밋
+   git -C "$WT" add -A                                 # 미추적 포함. .gitignore 는 그대로 존중 (7.4 규칙 1 과 같은 원칙)
+   git -C "$WT" diff --binary --cached "$START" > "$P"
+   ```
+
+   `--cached "$START"` 는 **인덱스(= `add -A` 이후의 전체 트리 상태)** 를 시작점과 비교하므로 Worker 가 커밋을 남겼든 안 남겼든 **한 경로로** 전부 담긴다. `--binary` 는 이미지 등 바이너리 산출물이 조용히 빠지는 것을 막는다. `$START` 가 비면(reflog 를 읽을 수 없음) 시작점을 증명할 수 없으므로 3.5.4.
+3. **빈 패치 판정** — `[ -s "$P" ]`. 비었는데 Worker 가 파일을 변경했다고 보고했으면 → 3.5.4 (산출물이 어디 있는지 모르는 상태다). 비었고 Worker 도 "변경 없음" 이면 정상이므로 다음 Worker 로.
+4. **적용** (프로젝트 루트 = task 브랜치 작업트리):
+
+   ```bash
+   git apply --3way --index "$P"        # non-zero = 충돌 → 3.5.3
+   git apply --reverse --check "$P"     # exit 0 = 패치 내용이 트리에 전부 들어 있음
+   ```
+
+   `--3way` 인 이유: worktree 의 출발 내용이 task 브랜치와 다를 수 있어(3.5.1-2) 일반 `git apply` 는 컨텍스트 불일치만으로 패치 전체를 거부한다. 3-way 는 blob 을 찾아 병합하고 **진짜로 겹치는 변경일 때만** 충돌을 남긴다.
+   `--reverse --check` 가 검증인 이유: 거꾸로 적용할 수 있다는 것은 그 내용이 **이미 트리에 있다**는 관측이다 — "적용했다"는 주장 대신 관측을 남긴다. non-zero 면 3.5.4.
+5. **다음 Worker** — 1~4 를 반복한다. 병렬로 돌리지 않는다 (그것이 lock 이다).
+6. **기록** — 전부 끝나면 통합한 Worker 번호·파일 목록(`git status --porcelain`)·패치 경로를 남기고 Phase 4 로 간다. 최종 보고(Phase 7)에 "worktree {N}개 통합" 한 줄을 포함한다.
+
+#### 3.5.3 충돌은 사람이 본다 (자동 해결 금지)
+
+`git apply --3way` 가 non-zero 로 끝나면 충돌이다. 격리의 목적이 충돌 회피였는데 통합 시점에 충돌이 났다는 것은 **두 Worker 가 실제로 같은 줄을 바꿨다**는 뜻이고, 어느 쪽이 맞는지 판단할 근거를 Lens 는 갖고 있지 않다.
+
+- **되감지 않는다.** `git reset --hard`·`git checkout -- .` 금지 — 그 시점엔 앞선 Worker 들의 산출물이 이미 작업트리에 들어와 있어 함께 사라진다. 패치는 `.lens/patches/` 에 남아 있으므로 멈춰도 잃는 것이 없다.
+- 충돌 경로(`git diff --name-only --diff-filter=U`) · 관련 Worker 번호 · 패치 경로를 보이고 **AskUserQuestion**: ① **중단**(기본·권장) — 사람이 정리한 뒤 `/cc` 재실행 ② **지금 사람이 해결** — 해결 후 `git apply --reverse --check "$P"` 가 통과해야 다음 Worker 로 간다.
+  **"그 Worker 산출물을 빼고 진행" 은 선택지로 두지 않는다** — 빠진 상태를 검토·커밋하는 것이 이 phase 가 막으려는 사고 그 자체다.
+- **헤드리스**(`LENS_NONINTERACTIVE=1`): 자동 선택 금지 — 0.4 의 dirty 게이트와 같게 충돌 목록·패치 경로만 출력하고 종료한다.
+- **재실행 시 강등**: 충돌이 한 번이라도 났으면 그 task 는 다음 실행에서 worktree 격리를 다시 쓰지 말고, 같은 파일을 건드리는 Worker 들을 **하나로 합치거나 순차 실행**한다(계획서 R3 의 중단 조건). 이 사실을 최종 보고에 적는다.
+
+#### 3.5.4 통합 실패 = Phase 4 로 진행하지 않는다 (fail-closed)
+
+다음 중 하나라도 해당하면 **Supervisor(Phase 4)·QA(Phase 6) 에 진입하지 않는다**:
+
+- worktree 를 찾지 못했거나 개수가 3.2 에서 격리한 Worker 수와 다름
+- 시작점(`START`) 판정 불가
+- Worker 가 변경을 보고했는데 패치가 비어 있음
+- `git apply --3way` 실패(충돌 — 3.5.3)
+- `git apply --reverse --check` 가 non-zero
+
+**왜 멈추나**: Supervisor 와 QA 는 task 브랜치의 작업트리를 읽는다. 미통합 상태로 넘기면 Supervisor 는 **없는 코드를 지적**하고 QA 는 **없는 결과를 통과**시키며, 7.4 는 그 빠진 상태를 커밋한다. 잘못된 통과 신호가 멈추는 것보다 비싸다.
+
+보고에는 **무엇이 어디 있는지** 반드시 포함한다: worktree 경로, 패치 경로, 미통합 Worker 번호. 산출물은 지우지 않는다.
+
+#### 3.5.5 worktree 정리 (통합·검증이 전부 통과한 뒤에만)
+
+- Task 도구의 `isolation: worktree` 는 **변경이 없을 때만** 자동 정리한다. Worker 는 정의상 변경을 남기므로 **자동으로 사라지지 않는다** — 안 치우면 `.claude/worktrees/` 가 실행마다 쌓인다.
+- `ExitWorktree` 는 **그 세션의 `EnterWorktree` 가 만든 worktree 만** 다루므로 Worker 격리 worktree 에는 no-op 일 수 있다. git 으로 직접 지운다:
+
+  ```bash
+  git worktree remove --force "$WT"       # 수거 때 add -A 로 스테이징돼 dirty 이므로 --force 필요
+  git branch -D "<그 worktree 의 브랜치>"   # 내용은 이미 task 브랜치에 있다
+  git worktree prune
+  ```
+
+- **순서가 계약이다** — `git apply --reverse --check` 통과 **후에만** 제거한다. 검증 전에 지우면 실패했을 때 산출물의 유일한 사본이 사라진다. 3.5.3·3.5.4 로 멈춘 경우 worktree 를 **남긴다**(사람이 봐야 한다).
+- `.lens/patches/*.patch` 는 실행이 끝날 때까지 남긴다. `.lens/` 는 git-ignored 라 7.4 커밋에 섞이지 않는다.
+
+---
+
 ### Phase 4: Supervisor — 품질 검토
+
+> **전제**: Phase 3.5 를 **건너뛰었거나**(worktree 미사용 — 일반 경로) **통과**했을 때만 진입한다. 미통합 트리를 검토하면 Supervisor 는 없는 코드를 지적하고 QA 는 없는 결과를 통과시킨다.
 
 #### 4.0 Supervisor 모델
 
@@ -1102,6 +1186,7 @@ QA 검증: 모든 페이지 렌더링 OK, 라우팅 작동, 테스트 5/5 통과
 - **핸드오프 페이로드 검증** — `[HANDOFF FROM /cp]` 페이로드 수신 시 plan 문서를 Read 로 직접 읽어 일치 확인, 불일치 시 plan 문서가 SoT
 - **User approval 없는 실행 금지** — 항상 Phase 1.5 에서 AskUserQuestion 사용
 - **Worker = Task 도구 서브에이전트, 동시 spawn** — Phase 3 에서 각 Worker 를 **Task 도구로 spawn 하되 하나의 턴에서 N번 병렬 호출**(순차 await 없음). Worker 를 텍스트로 나열만 하고 멈추면 그건 `/cc` 가 아니다 (병렬 미실행 = 회귀).
+- **격리했으면 통합 후 검토 (Phase 3.5)** — worktree 격리를 쓴 실행은 Supervisor·QA 로 가기 전에 Worker 산출물을 **Leader 가 직렬로** task 브랜치에 통합하고 `git apply --reverse --check` 로 검증한다. 통합·검증 실패면 Phase 4 로 진행 금지(fail-closed), 통과 후에만 worktree 제거. worktree 를 안 쓴 일반 경로는 이 단계 자체가 없다.
 - **Monitor 필수** — 모든 실행에 포함, 백그라운드에서 2분마다 보고. 2분 주기는 Lens 훅이 경과시간 추적으로 강제한다 — 2분 초과 무보고, 또는 3요소(생존확인 실측·N/M·부분 산출물) 미충족 보고는 위반
 - **Passed 작업 재수행 금지** — 재반복 시, 통과한 작업은 유지
 - **Supervisor & QA 분리** — Workers 와 별도 Agent 로 실행

@@ -132,6 +132,7 @@ feat/<slug>  ──PR──▶  staging  ──[배포·검증]──▶  promot
 | --- | --- | --- |
 | 계획 승인 | `/cp` | 브랜치 **이름을 확정**해 task 문서 frontmatter 에 기록한다: `repo` / `base`(감지값) / `branch: feat/<slug>` / `pr`(초기 null). **브랜치를 만들지는 않는다** — `/cp` 는 문서만 쓴다 |
 | 실행 진입 | `/cc` | base 를 fetch·최신화한 뒤 `checkout -b <문서의 branch>` — **`requireTaskBranch` 값과 무관하게 항상 만든다**(그 플래그는 "만드느냐" 가 아니라 **"확보에 실패했을 때 차단하느냐"** 만 통제한다). diverged·base 판정 불가면 **차단**(fail-closed). dirty 면 차단하되, **그 dirty 가 전부 이 task 의 계획 산출물(plan md·board)이면 예외** — `/cp` 는 계획 문서를 커밋하지 않고 넘기므로 정상 핸드오프는 항상 dirty 다. 그 외 dirty 는 목록을 보여주고 (중단 / stash / 명시 승인) 을 묻는다. 헤드리스는 fail-closed |
+| 병렬 worker 격리 | `/cc` Phase 3.5 | worktree 로 격리했으면 Leader 가 **패치 전송으로 직렬 통합**한다(merge·cherry-pick 금지 — worker 는 커밋하지 않아 worktree 브랜치는 보통 커밋 0개이고, merge 는 **아무것도 안 가져오면서 성공**한다. 게다가 worktree 는 task base 가 아니라 `origin/<기본 브랜치>` 에서 갈라진다). 통합 결과를 역적용 검사로 **관측**한 뒤에만 worktree 를 제거하고, 충돌·실패면 검토 단계로 **진행하지 않는다**(fail-closed) |
 | 실행 중 커밋 | `/cc` | **현재 브랜치가 문서의 `branch` 와 같을 때만 커밋한다.** 그 외는 커밋을 거부하고 보고 — 판정 순서는 §2.1, 구현은 `canCommitTo(repoPath, planBranch)` |
 | 완료 처리 | `/cp done` | ① PR 생성/확인 → ② 머지 판정(§5) → ③ **브랜치 정리를 먼저 한다**(lease 통과, 또는 `autoDeleteMergedBranch:false` 같은 정당한 skip) → ④ 그 다음 history 기록 + task 문서 삭제 → ⑤ **미머지면 history 로 내리지 않고 "In Review" 로 보고** |
 | 워크스페이스 스윕 | `/cs` | task 브랜치를 **소유하지 않는다.** task 브랜치는 건너뛴다(재포장·reset 금지). `sync/` 브랜치는 계획 밖 dirty 변경 전용이다(§3.2) |
@@ -381,6 +382,12 @@ backup/macmini-preIA-20260723  아카이브 검토 — 자동커밋 누적 의�
   `--base` 를 직접 주려면 §4 로 감지한 값을 넣는다. `main` 을 기본값으로 가정하지 않는다(옵션을 비우면 도구가 §4 우선순위로 감지한다).
 
 - `--apply` 가 지우는 것은 §5 표의 두 `merged` 판정뿐이다. `계보 다름`(→ 태그 아카이브), `아카이브 검토`(§6.1), `유지`, `판정 불가` 는 지우지 않는다.
+- **`--apply` 를 막는 fail-closed 사유 4가지** (판정 전용 실행은 경고만 내고 완주한다 — 아무것도 지우지 않으므로):
+  1. **PR 보호 검사 불가** — `gh` 부재·미인증·일시 실패. 열린 PR 의 head 가 병합처럼 보이면 지워진다.
+  2. **PR 목록이 한도에 도달** — 잘려 나간 head 는 본 적이 없으므로 검사가 불완전한 것이다.
+  3. **PR 조회 대상 레포 미해석** — 선택한 remote 의 URL 에서 GitHub 레포를 못 뽑으면(비 GitHub 호스트 포함) **어느 레포의 PR 을 확인하는지 모른다.** ⚠️ 이건 gh 호출 자체의 가드가 **못 잡는** 종류다 — 레포를 고정하지 않으면 gh 가 제 기본 레포를 골라 **다른 레포의 PR 목록을 "성공" 으로 반환**한다(실측: 원격 2개 + `gh repo set-default` 상태에서 엉뚱한 레포의 PR 55개를 받아왔고, 이 레포의 열린 PR head 는 보호 목록에 없었다). 그래서 조회는 `--repo OWNER/REPO` 로 **못 박는다**.
+  4. **remote 의 기본 브랜치 미해석** — 어느 브랜치를 default 로 보는지 모르는 상태로 지우지 않는다.
+  - 로컬 모드는 `origin` 을 proxy 로 쓴다(3·4 공통). 우회는 `--delete-without-pr-check` 하나뿐이고, **그것이 명시적·가시적 행위가 되도록** 설계됐다.
 
 ### 7.1 삭제하는 방법 — 원자적 lease, check-then-delete 금지
 
