@@ -9,7 +9,21 @@ an ancestor of the base and ancestry alone would call it live work forever.
 
 So merge state is decided by patch equivalence (`git cherry`, which compares
 patch-ids) with ancestry as the cheap fast path, and the report separately
-carries how many files the branch's content actually differs by.
+carries how many files the branch's content actually differs by. Patch-ids
+have two blind spots, both covered by a content-level recheck (`git merge-tree
+--write-tree` merge simulation — merge-ort, read-only, ref/index/worktree
+untouched; the mirror of lib/git-branch.js mergedState, and the two must not
+diverge): a multi-commit squash merge rewrites N patches into one, so
+live-looking `+` lines are re-proven merged when the simulated merge tree
+equals the base tree; and `git cherry` never enumerates merge commits, so an
+empty `+` list alone is NOT proof — content that arrived only in a merge
+commit (evil merge / conflict resolution) shows zero unmerged patches while
+carrying live content, and only the same tree comparison can clear it. A
+conflicting or failing simulation (or git <2.38) never asserts "merged":
+these verdicts delete branches, so a zero-`+` branch whose tree differs is
+`keep` and one whose tree cannot be computed is `unknown` — exactly the
+states lib/git-branch.js returns ('unmerged' / 'unknown') for the same
+evidence.
 
 Verdicts:
   delete          every patch on the branch is already in the base — nothing to
@@ -23,8 +37,10 @@ Verdicts:
                   that docs/rules/branch-hygiene.md says to move by hand and
                   then archive as a tag. A signal for a human, never a deletion.
   keep            at least one patch is not in the base
-  unknown         a git query failed for this branch — state unproven, so it is
-                  reported and left alone
+  unknown         a git query failed for this branch, or the content-level
+                  merge proof could not be computed (merge-tree conflict /
+                  failure with zero unmerged patch-ids) — state unproven, so
+                  it is reported and left alone
 
 A branch whose patch was edited on the way in (a conflict resolved during
 rebase) is reported as `keep`: its patch-id no longer matches, so the tool
@@ -36,15 +52,26 @@ orphaned state is never removed without one. `--apply` only ever removes the
 two `delete` verdicts; `archive`, `archive_review`, `keep`, `unknown` and the
 head branch of any open PR are never touched. See docs/rules/branch-hygiene.md.
 
-Two further guards back `--apply`, both fail-closed:
+Three further guards back `--apply`, all fail-closed:
 
 * The open-PR check runs through `gh`. When it cannot run (gh missing,
   unauthenticated, transient failure) a judgment-only run warns and continues
   — it deletes nothing — but `--apply` refuses to delete in that repo,
   because an open PR's head can look merged and would be removed unseen.
-  `--delete-without-pr-check` is the explicit override for when the PR list
-  has been verified by hand. Same posture as /cs (skills/cs/SKILL.md): no
-  gh, no silent bypass.
+  The query is capped (OPEN_PR_LIMIT); a reply that reaches the cap may be
+  truncated, so it is treated exactly like a failed check — warning plus
+  blocked `--apply` — never accepted as complete. `--delete-without-pr-check`
+  is the explicit override for when the PR list has been verified by hand.
+  Same posture as /cs (skills/cs/SKILL.md): no gh, no silent bypass.
+* The protected default branch is read from the *selected* remote's HEAD
+  (`refs/remotes/<remote>/HEAD`; local mode uses origin as the proxy) — not
+  hard-wired to origin/HEAD, which under `--remote upstream` could be absent
+  or point at a different branch while upstream's own default judges
+  `delete` (a base like staging has main as an ancestor). When that HEAD
+  cannot be resolved the tool does not know which branch the remote
+  considers default, so `--apply` is blocked for that repo
+  (`git remote set-head <remote> --auto`, then rerun). Judgment-only runs
+  warn and continue — they delete nothing.
 * Remote deletion is leased to the judged SHA. Verdicts are computed from the
   local tracking ref, which another machine may have outrun since the last
   fetch; a plain `push --delete` would then remove commits this run never
@@ -76,6 +103,11 @@ import sys
 from pathlib import Path
 
 PROTECTED = frozenset({"HEAD"})
+
+# gh pr list 조회 한도. 응답 개수가 이 값에 닿으면 목록이 잘렸을 수 있다 —
+# 잘려 나간 열린 PR 의 head 는 보호받지 못한 채 삭제될 수 있으므로, 한도
+# 도달은 "보호 검사 불완전"으로 취급해 --apply 를 fail-closed 로 차단한다.
+OPEN_PR_LIMIT = 200
 
 # lens.config.json sits next to the executing code (parent of scripts/), the
 # same convention lib/git-branch.js uses for PLUGIN_ROOT.
@@ -237,7 +269,10 @@ def _open_pr_heads(repo: Path) -> tuple[dict[str, int], str | None]:
 
     Returns (head -> PR number, warning). A missing or failing `gh` yields an
     empty map and a warning: the protection is unavailable and the caller has
-    to know that rather than assume it held. main() fails closed on the
+    to know that rather than assume it held. A reply whose item count reaches
+    OPEN_PR_LIMIT may be truncated by gh — the missing open PRs' heads would
+    go unprotected — so it carries the same warning (the known heads are
+    still protected, but the check is incomplete). main() fails closed on the
     warning for --apply (override: --delete-without-pr-check); judgment-only
     runs just carry it.
     """
@@ -251,14 +286,23 @@ def _open_pr_heads(repo: Path) -> tuple[dict[str, int], str | None]:
             detail[-1] if detail else "원인 불명"
         )
     try:
-        return {item["headRefName"]: item["number"] for item in json.loads(raw)}, None
+        items = json.loads(raw)
+        heads = {item["headRefName"]: item["number"] for item in items}
     except (ValueError, KeyError, TypeError):
         return {}, "gh pr list 출력을 해석하지 못했다 — 열린 PR head 보호 검사를 못 했다."
+    if len(items) >= OPEN_PR_LIMIT:
+        # 조회가 한도에 닿았다 = 그 뒤가 잘렸을 수 있다. 잘린 열린 PR 의
+        # head 는 이 맵에 없어 보호받지 못하므로, 검사 실패와 동일하게 취급.
+        return heads, (
+            "열린 PR %d개가 조회 한도(%d)에 도달 — 목록이 잘렸을 수 있어 열린 PR head 보호 검사가 불완전하다."
+            % (len(items), OPEN_PR_LIMIT)
+        )
+    return heads, None
 
 
 def _gh_pr_list(repo: Path) -> str:
     return subprocess.run(
-        ["gh", "pr", "list", "--state", "open", "--limit", "200", "--json", "number,headRefName"],
+        ["gh", "pr", "list", "--state", "open", "--limit", str(OPEN_PR_LIMIT), "--json", "number,headRefName"],
         cwd=repo,
         check=True,
         capture_output=True,
@@ -310,6 +354,27 @@ def _unmerged_patches(repo: Path, base_ref: str, ref: str) -> list[str]:
     return [line[2:] for line in output.split("\n") if line.startswith("+")]
 
 
+def _tree_merged(repo: Path, base_ref: str, ref: str) -> bool | None:
+    """Does merging ``ref`` into ``base_ref`` leave the base tree unchanged?
+
+    `git merge-tree --write-tree` (merge-ort, read-only — ref/index/worktree
+    untouched) simulates the merge; a result tree identical to the base tree
+    means the branch has nothing to add. Mirror of lib/git-branch.js
+    mergedState's tree recheck — the two implementations must not diverge.
+
+    True  = 병합 시뮬레이션 tree == base tree (브랜치 내용 전부 base 에 반영됨)
+    False = tree 다름 — base 에 없는 내용이 있다
+    None  = 증명 불가: 충돌(exit 1)·구버전 git(<2.38, --write-tree 없음)·실행
+            실패. 이 판정으로 브랜치가 삭제되므로 증명 불가는 절대 '병합됨'이
+            되지 않는다 (fail-safe).
+    """
+    merged_tree = _git_maybe(repo, "merge-tree", "--write-tree", base_ref, ref)
+    base_tree = _git_maybe(repo, "rev-parse", "%s^{tree}" % base_ref)
+    if merged_tree is None or base_tree is None:
+        return None
+    return merged_tree == base_tree
+
+
 def _classify_one(repo: Path, name: str, ref: str, base_ref: str) -> dict:
     if _git_ok(repo, "merge-base", "--is-ancestor", ref, base_ref):
         return {
@@ -330,12 +395,51 @@ def _classify_one(repo: Path, name: str, ref: str, base_ref: str) -> dict:
             "files_changed": None,
         }
     unmerged = _unmerged_patches(repo, base_ref, ref)
+    tree_merged = _tree_merged(repo, base_ref, ref)
     if not unmerged:
+        # `git cherry` 는 머지 커밋을 열거하지 않는다. 머지 커밋으로만 들어온
+        # 변경(evil merge·충돌 해결분)은 `+` 0개로 보이므로, patch-id 만으로
+        # 병합을 단정하면 그 내용이 삭제된다. patch_merged 는 tree 동일까지
+        # 증명돼야 한다 — lib/git-branch.js mergedState 와 같은 원칙.
+        if tree_merged is True:
+            return {
+                "branch": name,
+                "ref": ref,
+                "verdict": "delete",
+                "reason": "patch_merged",
+                "commits_ahead": 0,
+                "files_changed": 0,
+            }
+        if tree_merged is False:
+            changed = _git(repo, "diff", "--name-only", "%s...%s" % (base_ref, ref))
+            return {
+                "branch": name,
+                "ref": ref,
+                "verdict": "keep",
+                "reason": "merge_commit_content",
+                "commits_ahead": 0,
+                "files_changed": len([line for line in changed.split("\n") if line]),
+            }
+        # tree_merged is None — 증명 불가(충돌·구버전 git·실패). 머지 커밋에만
+        # 존재하는 변경 가능성을 배제할 수 없으므로 병합 단정 금지 = 판정 불가.
+        # lib/git-branch.js 는 같은 증거에서 'unknown' 을 반환한다.
+        return {
+            "branch": name,
+            "ref": ref,
+            "verdict": "unknown",
+            "reason": "tree_unverified",
+            "commits_ahead": None,
+            "files_changed": None,
+        }
+    if tree_merged is True:
+        # 다중 커밋 squash 병합: 원본 patch-id 들이 합쳐진 단일 커밋과 달라
+        # `+` 로 남지만, 병합 시뮬레이션 tree 가 base 와 같으면 base 에 더할
+        # 내용이 없다 = 이미 반영됨.
         return {
             "branch": name,
             "ref": ref,
             "verdict": "delete",
-            "reason": "patch_merged",
+            "reason": "tree_merged",
             "commits_ahead": 0,
             "files_changed": 0,
         }
@@ -411,7 +515,11 @@ def classify(
 def _detail(item: dict) -> str:
     verdict = item["verdict"]
     if verdict == "delete":
-        return "MERGED — 삭제" if item["reason"] == "merged" else "MERGED(patch 동일) — 삭제"
+        if item["reason"] == "merged":
+            return "MERGED — 삭제"
+        if item["reason"] == "tree_merged":
+            return "MERGED(squash — 병합 시뮬레이션 tree 가 base 와 동일) — 삭제"
+        return "MERGED(patch 동일 + tree 동일) — 삭제"
     if verdict == "archive":
         return "계보 다름 — 태그로 아카이브 (커밋 %d, 병합 대상 아님)" % item["commits_ahead"]
     if verdict == "archive_review":
@@ -421,11 +529,15 @@ def _detail(item: dict) -> str:
             item["commits_ahead"] / max(item["files_changed"], 1),
         )
     if verdict == "unknown":
+        if item["reason"] == "tree_unverified":
+            return "판정 불가 — patch-id 미병합 0개지만 merge-tree 검사 실패(충돌/구버전 git), 병합 단정 금지 — 손대지 않는다"
         return "판정 불가 (%s) — 손대지 않는다" % item["reason"]
     if item["reason"] == "open_pr":
         return "열린 PR #%d head — 유지 (병합 증명돼도 삭제 안 함)" % item["open_pr"]
     if item["reason"] == "default_branch":
-        return "레포 기본 브랜치(origin/HEAD) — 유지 (병합 증명돼도 삭제 안 함)"
+        return "레포 기본 브랜치 — 유지 (병합 증명돼도 삭제 안 함)"
+    if item["reason"] == "merge_commit_content":
+        return "머지 커밋에만 있는 변경 (patch-id 미병합 0개지만 tree 상이, 변경 파일 %d) — 병합 미증명, 유지" % item["files_changed"]
     detail = "커밋 %d / 변경 파일 %d" % (item["commits_ahead"], item["files_changed"])
     if "open_pr" in item:
         detail += " (열린 PR #%d)" % item["open_pr"]
@@ -565,6 +677,7 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
         "skipped": None,
         "warnings": [],
         "pr_guard_ok": None,
+        "default_guard_ok": None,
         "branches": [],
     }
     if not resolved["base"]:
@@ -580,9 +693,24 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
     result["pr_guard_ok"] = warning is None
     if warning:
         result["warnings"].append(warning)
-    origin_head = _git_maybe(repo, "symbolic-ref", "refs/remotes/origin/HEAD")
-    default_branch = origin_head.replace("refs/remotes/origin/", "", 1) if origin_head else None
+    # 보호할 기본 브랜치는 *선택한 remote* 의 HEAD 에서 읽는다. origin/HEAD 를
+    # 고정으로 보면 --remote upstream 일 때 upstream 의 default(예: main)가
+    # base(예: staging)의 조상이라는 이유로 삭제 대상으로 분류된다. 해석 불가면
+    # 어느 브랜치가 default 인지 모르는 상태 — --apply 는 fail-closed 로 차단.
+    head_remote = remote or "origin"
+    remote_head = _git_maybe(repo, "symbolic-ref", "refs/remotes/%s/HEAD" % head_remote)
+    default_branch = None
+    if remote_head:
+        stripped = remote_head.replace("refs/remotes/%s/" % head_remote, "", 1)
+        if stripped and stripped != remote_head:
+            default_branch = stripped
     result["default_branch"] = default_branch
+    result["default_guard_ok"] = default_branch is not None
+    if default_branch is None:
+        result["warnings"].append(
+            "refs/remotes/%s/HEAD 미해석 — 이 remote 의 기본 브랜치를 알 수 없어 기본 브랜치 보호가 불가하다. "
+            "--apply 는 차단된다 (git remote set-head %s --auto 후 재실행)." % (head_remote, head_remote)
+        )
     result["branches"] = classify(
         repo,
         base=resolved["base"],
@@ -712,6 +840,15 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     lines.append("  PR 목록을 직접 확인한 뒤에만 --delete-without-pr-check 로 강행하라. 삭제 실행 안 함.")
                     continue
+                if not result["default_guard_ok"]:
+                    # fail-closed: 기본 브랜치가 무엇인지 모르는 상태로 삭제하지 않는다.
+                    blocked = True
+                    lines.append(
+                        "%s: --apply 차단 (fail-closed) — refs/remotes/%s/HEAD 미해석, 기본 브랜치 보호 불가"
+                        % (result["repo"], remote)
+                    )
+                    lines.append("  git remote set-head %s --auto 로 HEAD 를 설정한 뒤 재실행하라. 삭제 실행 안 함." % remote)
+                    continue
                 deleted, skipped = prune(Path(result["path"]), result["branches"], remote=remote)
                 if deleted or skipped:
                     lines.append("%s: 삭제 %s" % (result["repo"], ", ".join(deleted) if deleted else "없음"))
@@ -746,6 +883,15 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             print("PR 목록을 직접 확인한 뒤에만 --delete-without-pr-check 로 강행하라.", file=sys.stderr)
+            return 1
+        if not result["default_guard_ok"]:
+            # fail-closed: 기본 브랜치가 무엇인지 모르는 상태로 삭제하지 않는다.
+            print(
+                "--apply 차단 (fail-closed): refs/remotes/%s/HEAD 를 해석하지 못해 기본 브랜치 보호가 불가하다 — 아무것도 삭제하지 않았다."
+                % (args.remote or "origin"),
+                file=sys.stderr,
+            )
+            print("git remote set-head %s --auto 로 HEAD 를 설정한 뒤 재실행하라." % (args.remote or "origin"), file=sys.stderr)
             return 1
         deleted, skipped = prune(repo, report, remote=args.remote)
         if not args.json:
