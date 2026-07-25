@@ -1110,12 +1110,12 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(
 
 | 상태 | 의미 | 처리 | 판정에 쓴 SHA 기록 |
 |---|---|---|---|
-| `unpushed` | 원격에 브랜치가 없고, **내용도 base 에 없다** | **push + PR 생성 제안** (AskUserQuestion). history 이동 보류 | — (원격 ref 없음) |
+| `unpushed` | 원격에 브랜치가 없고, **내용이 base 에 없음이 증명됐다** | **push + PR 생성 제안** (AskUserQuestion). history 이동 보류 | — (원격 ref 없음) |
 | `merged-deleted` | 원격 브랜치가 없지만 **로컬 ref 기준으로 내용이 base 에 들어갔음이 증명됐다** — 머지 직후 head 를 삭제한 정상 흐름(§3 이 규정한 것) | `merged`/`patch-merged` 와 동일하게 Phase 2~3 진행. Phase 4 는 **원격 삭제를 건너뛴다**(지울 ref 가 없다) — **로컬 브랜치만** 삭제 | `branchSha` 는 `null`(원격 ref 부재). 대신 `localSha` 를 로컬 삭제의 lease 로 쓴다 |
 | `unmerged` (PR 없음) | 원격에 있고 미머지, PR 도 아직 없다 | **PR 생성 제안**. history 이동 보류 | `origin/<branch>` tip |
 | `unmerged` (PR 열림) | 리뷰 대기 | **history 로 내리지 않는다** → **"In Review"** 로 보고. task 파일은 `docs/tasks/` 에 그대로 둔다 | `origin/<branch>` tip |
 | `merged` / `patch-merged` | 병합이 증명됐다 | Phase 2~3(완료 인터뷰 → history 기록) → Phase 4(브랜치 삭제)로 진행 | **필수** — `origin/<branch>` tip + 비교에 쓴 `origin/<base>` tip. Phase 4 가 이 값을 lease 로 쓴다 |
-| `unknown` | 계보가 달라 **도구가 병합을 증명 못 함** | **자동 처리 금지.** 사람 확인 요청 — history 이동·브랜치 삭제 **둘 다 보류** | 기록만(사람 확인용). 삭제 근거로는 쓰지 않는다 |
+| `unknown` | **도구가 증명하지 못했다** — 계보가 다르거나, 원격 ref 가 없는데 내용 반영 여부도 확인 불가(merge-tree 충돌·구버전 git·로컬 ref 도 없음) | **자동 처리 금지.** 사람 확인 요청 — history 이동·브랜치 삭제 **둘 다 보류**. ⚠️ **push + PR 생성을 제안하지 않는다** — 이미 머지된 작업일 수 있다(그 제안은 `unpushed` 전용) | 기록만(사람 확인용). 삭제 근거로는 쓰지 않는다 |
 
 **판정에 쓴 SHA 를 기록한다** — fetch 직후 판정에 실제로 사용한 tip SHA 를 판정 결과와 함께 남긴다. 이 값이 Phase 4 의 **lease** 다: 삭제 명령에 이 SHA 를 **실어 보내고**, 원격 tip 이 다르면 git 이 삭제를 거부한다("확인한 뒤 삭제" 가 아니다 — Phase 4). **SHA 없이 나온 판정으로는 브랜치를 삭제하지 않는다.**
 

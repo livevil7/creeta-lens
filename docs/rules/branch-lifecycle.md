@@ -131,12 +131,15 @@ feat/<slug>  ──PR──▶  staging  ──[배포·검증]──▶  promot
 | 시점 | 소유자 | 하는 일 |
 | --- | --- | --- |
 | 계획 승인 | `/cp` | 브랜치 **이름을 확정**해 task 문서 frontmatter 에 기록한다: `repo` / `base`(감지값) / `branch: feat/<slug>` / `pr`(초기 null). **브랜치를 만들지는 않는다** — `/cp` 는 문서만 쓴다 |
-| 실행 진입 | `/cc` | base 를 fetch·최신화한 뒤 `checkout -b <문서의 branch>`. dirty·diverged·upstream 부재면 실행을 **차단**하고 보고(fail-closed) |
+| 실행 진입 | `/cc` | base 를 fetch·최신화한 뒤 `checkout -b <문서의 branch>` — **`requireTaskBranch` 값과 무관하게 항상 만든다**(그 플래그는 "만드느냐" 가 아니라 **"확보에 실패했을 때 차단하느냐"** 만 통제한다). diverged·base 판정 불가면 **차단**(fail-closed). dirty 면 차단하되, **그 dirty 가 전부 이 task 의 계획 산출물(plan md·board)이면 예외** — `/cp` 는 계획 문서를 커밋하지 않고 넘기므로 정상 핸드오프는 항상 dirty 다. 그 외 dirty 는 목록을 보여주고 (중단 / stash / 명시 승인) 을 묻는다. 헤드리스는 fail-closed |
 | 실행 중 커밋 | `/cc` | **현재 브랜치가 문서의 `branch` 와 같을 때만 커밋한다.** 그 외는 커밋을 거부하고 보고 — 판정 순서는 §2.1, 구현은 `canCommitTo(repoPath, planBranch)` |
 | 완료 처리 | `/cp done` | ① PR 생성/확인 → ② 머지 판정(§5) → ③ 머지됨이 증명되면 history 기록 + 원격·로컬 브랜치 삭제 → ④ **미머지면 history 로 내리지 않고 "In Review" 로 보고** |
 | 워크스페이스 스윕 | `/cs` | task 브랜치를 **소유하지 않는다.** task 브랜치는 건너뛴다(재포장·reset 금지). `sync/` 브랜치는 계획 밖 dirty 변경 전용이다(§3.2) |
 
-- 하나의 task 문서가 여러 레포를 건드리면 **레포별로 브랜치와 PR 을 따로 만든다.** 문서는 하나여도 브랜치·PR 은 레포 수만큼 생긴다(frontmatter 에 레포별 항목으로 기록).
+- **1 task = 1 레포가 이 규칙의 전제다.** frontmatter 의 `repo`/`base`/`branch`/`pr` 은 스칼라 4필드이고, 레포별 구조를 담지 않는다. 하나의 task 가 여러 레포를 건드려야 한다면 **레포마다 task 문서를 나눈다.**
+  - 다중 레포를 한 문서에 담는 것은 **이번 범위 밖**이다(계획서의 명시적 전제). 스칼라 필드에 구조를 넣으면 파싱이 `[object Object]` 같은 값을 만들고, 핸드오프·DONE·board 소비자가 전부 깨진다.
+  - 실제로 여러 레포가 얽히는 작업은 있다 — 이 규칙을 도입한 작업 자체가 `creeta-lens` 와 `livevil-setting` 두 곳을 건드렸다. 그때도 **레포별로 브랜치와 PR 을 따로** 만들었고(`feat/branch-lifecycle` / `docs/progress-report-2min`), 문서만 하나였다. 그 방식이 지금 지원되는 형태다: **문서는 주 레포에 두고, 부수 레포의 브랜치·PR 은 본문에 적는다.** frontmatter 는 주 레포 하나만 기술한다.
+  - 레포별 메타데이터를 frontmatter 로 구조화하는 것은 후속 과제다. 필요해지면 `plan-manager` 파싱·`/cp` 핸드오프·DONE 판정·board 조인을 **함께** 바꿔야 한다.
 - 브랜치 하나에 두 개의 task 를 태우지 않는다. 머지 판정과 완료 처리가 서로를 막는다.
 - PR base 는 **그 레포의 base** 다. 다른 작업 브랜치를 base 로 삼지 않는다 — 그 브랜치가 머지·삭제되면 PR 이 의미를 잃는다.
 
@@ -277,7 +280,14 @@ git cherry origin/<base> origin/<branch> | grep '^+'
 | ② 출력 있음 | `unmerged` | **삭제 금지.** 남은 패치 수와 함께 보고 |
 | merge-base 없음 | `계보 다름` | **삭제 금지.** 태그 아카이브(§6) |
 | 원격 ref 부재 + **로컬 ref 로 내용 증명됨** | `merged-deleted` | 로컬 브랜치만 삭제(원격은 이미 없다). §7.1 의 로컬 삭제 조건을 따른다 |
-| 원격 ref 부재 + 내용이 base 에 없음 | `unpushed` | **삭제·머지 판정 금지.** push 흔적이 있으면 "병합 없이 원격에서 삭제됐을 수 있음" 을 함께 보고 |
+| 원격 ref 부재 + **내용이 base 에 없음이 증명됨** | `unpushed` | **삭제·머지 판정 금지.** push+PR 제안은 여기서만 한다. upstream 흔적이 있으면 "병합 없이 원격에서 삭제됐을 수 있음" 을 함께 보고 |
+| 원격 ref 부재 + **증명 실패** (merge-tree 충돌·git &lt;2.38·로컬 ref 도 없음) | `unknown` | **자동 처리 금지.** 사람 확인. push+PR 을 제안하지 않는다 |
+
+> **`unpushed` 와 `unknown` 의 경계는 증명의 방향이다.** `unpushed` 는 "원격에 없다" 가 아니라 **"내용이 base 에 없음이 실제로 증명됐다"** 는 뜻이다. 증명이 실패하면 `unknown` 이다.
+>
+> upstream 설정 유무를 판정 근거로 쓰지 않는다 — **`-u` 없이 push 하면 흔적이 남지 않으므로** "흔적 없음" 과 "push 된 적 없음" 은 구분할 수 없다. 그 정보는 `reason` 을 풍부하게 하는 데만 쓴다.
+>
+> 왜 중요한가: 거짓 "머지됨" 이 ref 를 지우는 것과 대칭으로, **거짓 "미푸시" 는 이미 머지된 작업에 대해 `/cp done` 이 "push 하고 PR 을 여시겠습니까" 를 제안하게 만든다.** 둘 다 만들지 않는다.
 
 > **`merged-deleted` 가 필요한 이유**: 머지 직후 head 브랜치 삭제는 이 문서가 규정한 정상 흐름(§3)이고 GitHub 이 자동으로 하기도 한다. 그러면 `git fetch --prune` 이 `origin/<branch>` 를 지우고, 원격 ref 만 보는 판정은 그것을 **"한 번도 push 안 됨"** 으로 읽는다 — 완료된 작업에 대해 "push 하고 PR 을 또 여시겠습니까" 를 묻게 된다. 그래서 원격 ref 가 없을 때는 **로컬 ref 를 기준으로** 조상 검사 → merge-tree 비교를 한 번 더 돌린다. 증명되면 `merged-deleted`, 증명 안 되면 머지로 올리지 않는다.
 
@@ -304,7 +314,7 @@ git cherry origin/<base> origin/<branch> | grep '^+'
 ```sh
 git tag archive/<목적>-<YYYYMMDD> <commit>
 git push origin archive/<목적>-<YYYYMMDD>
-git push origin --delete <원래-브랜치>
+git push --force-with-lease=refs/heads/<원래-브랜치>:<판정SHA> origin :refs/heads/<원래-브랜치>
 ```
 
 - 태그는 브랜치 목록을 오염시키지 않으면서 커밋을 영구 보존한다. 브랜치 목록은 **지금 진행 중인 작업만** 보여야 한다.
@@ -364,8 +374,15 @@ git push --force-with-lease=refs/heads/<branch>:<판정SHA> origin :refs/heads/<
 
 **로컬 삭제는 조상 검사를 반복하지 않는다.** `patch-merged` 는 squash·rebase 머지에서 나오고, 그 경우 브랜치 tip 이 base 의 조상이 **아닌 것이 정상**이다(커밋이 새로 쓰였으니까). 그래서 `git branch -d` 는 내용 증명이 끝난 뒤에도 **거부**한다 — 그대로 두면 그런 완료마다 로컬 브랜치가 쌓인다.
 
-- `git branch -D <branch>` 는 **두 조건이 모두 참일 때만** 쓴다: ① `mergedState` 가 `merged`/`patch-merged` (내용 증명) ② 로컬 tip = 판정 SHA (SHA 증명).
-- 그 외에는 `-D` 도 `-d` 도 쓰지 않는다. `unknown`·`unmerged`·판정 SHA 없음은 전부 금지다.
+- **로컬 삭제도 원자적으로 한다** — 원격과 같은 이유다. 판정과 삭제 사이에 다른 프로세스가 로컬 브랜치를 진전시키면 비교-후-삭제는 그 커밋을 지운다.
+
+  ```sh
+  git update-ref -d refs/heads/<branch> <판정SHA>
+  ```
+
+  기대값이 현재 값과 다르면 git 이 `is at <실제> but expected <기대>` 로 **거부**한다 → "로컬이 진전됨 — 재판정 필요" 로 보고하고 멈춘다.
+- **삭제 조건은 그대로 둘 다 참일 때만**: ① `mergedState` 가 `merged`/`patch-merged`/`merged-deleted` (내용 증명) ② 로컬 tip = 판정 SHA (SHA 증명). `unknown`·`unmerged`·판정 SHA 없음은 전부 금지다. `git branch -d` 는 patch 머지를 판정할 능력이 없으므로 이 자리에서 쓰지 않는다.
+- ⚠️ **체크아웃된 브랜치는 건너뛴다.** `update-ref -d` 는 `git branch -D` 와 달리 현재 체크아웃된 브랜치도 **말없이 지워 HEAD 를 깨뜨린다**(git 2.53 실측). 삭제 전에 현재 브랜치인지 확인하고, 맞으면 건너뛰고 보고한다.
 - 로컬에 아직 push 되지 않은 커밋이 있으면(tip ≠ 판정 SHA) **보류**한다.
 - 즉 열린 것은 "증명이 끝난 브랜치에 대해 중복 조상 검사를 우회하는 것" 하나뿐이고, **증명 없는 강제 삭제는 열리지 않는다.** 반대로 증명된 브랜치를 `-d` 거부만으로 방치하는 것도 금지다.
 - **삭제 자동화 없이 생성 자동화를 켜지 않는다.** 브랜치 자동 생성만 도입하면 이미 실측된 누적 문제(§0.5)를 가속한다. `lens.config.json` 의 `requireTaskBranch` 는 ① 선행 정리 1회 완료 ② `prune_branches.py` 가 이 레포에서 동작 — 두 조건이 충족된 뒤 `true` 로 전환한다. 두 조건 없이 `true` 로 켜는 것도, 조건이 갖춰졌는데 `false` 로 방치하는 것도 금지다(정리 수단을 생성 기능과 같은 릴리즈에 넣는다).

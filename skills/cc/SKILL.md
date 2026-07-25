@@ -266,9 +266,16 @@ original_request: {원본 요청}
 
 1. **preflight** — `lib/git-branch.js` 의 `preflight(repoPath)` 와 `resolveBase(repoPath)` 를 실행해 base 를 확정하고 사용자에게 표시한다.
 2. **브랜치 이름** — 핸드오프 페이로드에 `[BRANCH]` 블록(`repo`/`base`/`branch`)이 있으면 그 `branch` 를 쓰고, 없으면(직접 호출 포함) `branchName('feat', <plan slug>)` 로 정한다.
-3. **생성** — base 최신화(fetch) 후 그 base 위에서 `git checkout -b <branch>`.
-4. **fail-closed** — `preflight.diverged === true` 또는 `base === null` 이면 **실행 차단** 후 사유 보고. dirty 는 차단하지 않되 경고한다.
-5. **config 게이트** — `lens.config.json` 의 `requireTaskBranch` 가 `true` 면 이 단계를 강제, `false` 면 **경고만 하고 건너뛴다**(기존 동작 보존). 기본값은 현재 `false` 이며, 브랜치 정리 자동화가 완비된 뒤 `true` 로 전환한다.
+3. **fail-closed** — `preflight.diverged === true` 면 **실행 차단** 후 사유 보고 (config 무관 — 브랜치 이전에 레포 자체가 수동 해결 필요 상태다). `base === null`(원격 ref 부재 포함)이면 브랜치를 확보할 수 없으므로 6의 config 게이트로 넘긴다.
+4. **dirty 게이트 — 실패한 preflight 로 취급** (`docs/rules/branch-lifecycle.md` §2 실행 진입 행과 동일). dirty 트리에서 `checkout -b` 를 하면 기존 변경이 새 브랜치를 따라오고, 7.4 의 `git add -A` 가 **무관한 작업을 task PR 에 커밋**한다. 조용한 통과 금지:
+   - **자기 산출물 예외**: dirty 경로가 **전부 이 task 의 계획 산출물**(`plan_doc_path` 파일 + 같은 plan 의 board·deck 파일)뿐이면 게이트를 적용하지 않고 진행한다. `/cp` 는 계획 문서를 쓰기만 하고 커밋하지 않으므로 정상 핸드오프는 항상 이 상태로 도착한다 — 이것까지 막으면 기본 경로가 매번 게이트에 걸린다. 이 파일들은 task 의 일부라 7.4 에서 함께 커밋되는 것이 맞다.
+   - **그 외 dirty**: `git status --porcelain` 목록을 보여주고 **AskUserQuestion** 으로 선택받는다: ① **중단**(기본·권장) — 사용자가 직접 커밋·정리 후 `/cc` 재실행 ② **stash 후 진행** — `git stash push -u -m "lens-cc-preflight {plan_id}"` 로 치워두고 깨끗한 트리에서 계속. **자동 pop 금지**(복원 충돌 위험) — 최종 보고에 stash ref 와 복원 방법 명시 ③ **변경 동반 진행**(명시적 승인) — 이 파일들이 task 브랜치를 따라와 7.4 커밋에 포함됨을 경고한 뒤 진행하고, 선택 사실을 plan 문서 `## 진행상황` 과 최종 보고에 기록.
+   - **헤드리스**(`LENS_NONINTERACTIVE=1`): 자동 진행하지 않는다 — 1.5 폴백의 파괴적 경로와 같게 **계획만 출력하고 종료**. 무인 환경에서 stash 는 그 머신의 라이브 상태(크론이 쓰는 tracked 파일)를 바꾸고, 동반 커밋은 이 게이트가 막으려는 사고 그 자체다 — 어느 쪽도 안전한 기본값이 없다(fail-closed). 사람이 상호작용 세션에서 정리 후 재실행한다.
+5. **생성** — base 최신화(fetch) 후 그 base 위에서 `git checkout -b <branch>`. **`requireTaskBranch` 값과 무관하게, 이름이 확정되고 3·4 를 통과했으면 만든다** — 계획 문서가 브랜치의 SoT 다(branch-lifecycle §2: 실행 진입 = `checkout -b <문서의 branch>`). 여기서 안 만들면 기본 설정(`requireTaskBranch: false` + `autoCommitOnComplete: true`)에서 7.4 의 커밋 판정(현재 브랜치 == 계획 브랜치)이 100% 거부돼 자동 커밋이 죽은 글자가 된다. 같은 이름 브랜치가 이미 로컬에 있으면(중단된 실행 재개) 새로 만들지 않고 그 브랜치를 checkout 한다.
+6. **config 게이트 — `requireTaskBranch` 는 "만드느냐"가 아니라 "없이도 실행하느냐"다**: 생성은 5에서 항상 시도되고, 이 플래그는 **브랜치를 확보하지 못했을 때**(base 판정 불가·이름 확정 불가·checkout 실패) 실행을 차단하는지만 통제한다.
+   - `true`: 확보 실패 → **실행 차단** 후 사유 보고.
+   - `false`(현재 기본값): 확보 실패 → **경고 후 현재 브랜치에서 실행은 계속**한다. 단 이 강등 경로에서 7.4 자동 커밋은 성립하지 않는다 — `canCommitTo` 가 거부하므로(계획 브랜치 불일치 또는 base) **커밋 없이 변경 요약+제안으로 종료하는 것까지가 정의된 동작**이다. base 에 커밋되는 일은 없다.
+   - 브랜치 정리 자동화(`scripts/prune_branches.py`·`/cp done` 삭제)가 갖춰진 뒤 `true` 로 전환한다 (branch-lifecycle §7.1).
 
 ---
 
@@ -938,7 +945,7 @@ Worker #2  |  점수: {score}/100  |  ✓ 통과
 `lens.config.json` 의 `autoCommitOnComplete` 가 `true` 이거나 사용자의 전역 규칙이 "완료 후 커밋"을 요구하면, 다음 **안전 규칙**으로 commit + sync:
 
 1. **`.gitignore` 존중 (시크릿 임의 제외 절대 금지)** — `git add -A` 는 `.gitignore` 에 없는 것만 스테이징한다. **Lens 가 추가로 ".env 같으니 빼자"는 시크릿 필터를 걸지 않는다.** 무엇을 숨길지의 SoT 는 사용자의 `.gitignore` 다. 사용자는 민감파일(쿠키·세션·크레덴셜·키)을 **의도적으로 버전관리**하므로(예: `livevil-setting` 에 commit·push) 추적된 파일은 그대로 커밋한다. (사용자 강한 룰 — `feedback_sensitive_files_to_livevil_setting`: 민감파일은 숨기지 말 것. 임의 제외는 이 룰 위반.)
-2. **task 브랜치에서만 커밋** — `lib/git-branch.js` 의 `canCommitTo(repoPath, planBranch)` 로 판정한다. **커밋 허용 조건 = 현재 브랜치가 plan 문서에 기록된 `branch` 와 같을 때만.** 그 외(감지된 base 포함)는 커밋하지 않고 사유와 함께 보고한다. 브랜치 **이름 문자 비교를 판정 근거로 쓰지 않는다** — base 는 레포마다 다르다(워크스페이스 27개 레포 실측: `master` 만 11 / `main` 만 13 / 둘 다 1 / `main`+`staging` 1 / 원격에 둘 다 없음 1. 이름 비교는 staging 을 놓쳐, 커밋이 곧 배포인 레포에 직접 커밋되는 사고 경로였다). base 판정이 불가한 레포에서도 커밋하지 않는다(모르는 상태에서 커밋 금지).
+2. **task 브랜치에서만 커밋** — `lib/git-branch.js` 의 `canCommitTo(repoPath, planBranch)` 로 판정한다. `planBranch` 는 **Phase 0.4 에서 확정한 브랜치**다(핸드오프면 plan 문서의 `branch`, 직접 호출이면 0.4 가 정한 이름). **커밋 허용 조건 = 현재 브랜치가 그 브랜치와 같을 때만.** 그 외(감지된 base 포함)는 커밋하지 않고 사유와 함께 보고한다 — 특히 0.4 강등 경로(`requireTaskBranch: false` + 브랜치 확보 실패)로 여기 도달했으면 **거부가 정의된 동작**이다: 커밋 없이 변경 요약+제안으로 끝낸다. 0.4 가 브랜치 **이름조차 확정하지 못한 채** 진행한 경우에만 `canCommitTo(repoPath, null)` 로 판정한다 — 이 경로는 "허용 접두사 4종 + base 아님"일 때만 허용한다(branch-lifecycle §2.1 규칙 3). 어느 경로로도 base 직접 커밋은 열리지 않는다. 브랜치 **이름 문자 비교를 판정 근거로 쓰지 않는다** — base 는 레포마다 다르다(워크스페이스 27개 레포 실측: `master` 만 11 / `main` 만 13 / 둘 다 1 / `main`+`staging` 1 / 원격에 둘 다 없음 1. 이름 비교는 staging 을 놓쳐, 커밋이 곧 배포인 레포에 직접 커밋되는 사고 경로였다). base 판정이 불가한 레포에서도 커밋하지 않는다(모르는 상태에서 커밋 금지).
 3. **커밋** — 변경을 스테이징 후 한 줄 메시지로 커밋. (커밋 메시지 trailer 규칙은 사용자/프로젝트 컨벤션 따름)
 4. **동기화** — ahead 면 push. 운영 머신(Mac Mini 등)까지 동기화가 필요한 레포면 `/cs` 패턴(pull→commit→push) 안내/실행.
 5. **diverged 면 보고만** — 원격과 갈라졌으면 자동 push 금지, "수동 해결 필요" 로 보고.

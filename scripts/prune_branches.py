@@ -80,7 +80,9 @@ Three further guards back `--apply`, all fail-closed:
   재판정". The tool never fetches on its own: judgment stays read-only
   (branch-lifecycle.md prescribes `git fetch --prune` before running), and a
   stale judgment is safe because the lease turns it into a refusal, not a
-  deletion.
+  deletion. Local deletion carries the same expectation — `update-ref -d`
+  with the judged SHA — so a branch another process advanced after the
+  judgment is refused ("로컬이 진전됨"), never deleted. See prune().
 
 The base and the remote's HEAD are not the only refs off limits. namane-cms
 carries a residual `origin/main` whose base resolves to `master` and whose
@@ -629,13 +631,22 @@ def _render(report: list[dict], remote: str | None, base_ref: str) -> str:
     archive = [item for item in report if item["verdict"] == "archive"]
     if archive:
         lines.append("")
-        lines.append("아카이브는 삭제하지 않는다. 태그를 먼저 밀어 커밋을 보존한 뒤 브랜치를 지운다:")
+        lines.append("아카이브는 삭제하지 않는다. 태그를 먼저 밀어 커밋을 보존한 뒤 브랜치를 지운다.")
+        # 태그 대상과 lease 기대값은 둘 다 판정 시점 tip(item["sha"])이다. ref
+        # 이름을 태그하면 실행 시점의 tip 이 잡혀 판정 안 된 커밋이 보존 대상인
+        # 척하게 되고, lease 없는 --delete 는 분류 후 진전된 원격 커밋을 지운다
+        # (branch-lifecycle.md §7.1 — lease 없는 삭제 금지, 아카이브도 예외 아님).
+        lines.append(
+            "태그·lease 의 SHA 는 판정 시점 tip 이다 — 그 뒤 원격이 진전됐다면 태그는 최신 커밋을 보존하지 않으며, lease 가 삭제를 거부한다(fetch 후 재판정):"
+        )
         for item in archive:
             tag = "archive/%s" % item["branch"].split("/", 1)[-1]
-            target = item["ref"] if remote else item["branch"]
-            lines.append("  git tag -a %s %s -m '<보존 이유>'" % (tag, target))
+            lines.append("  git tag -a %s %s -m '<보존 이유>'" % (tag, item["sha"]))
             lines.append("  git push %s %s" % (remote or "origin", tag))
-            lines.append("  git push %s --delete %s" % (remote or "origin", item["branch"]))
+            lines.append(
+                "  git push --force-with-lease=refs/heads/%s:%s %s :refs/heads/%s"
+                % (item["branch"], item["sha"], remote or "origin", item["branch"])
+            )
 
     review = [item for item in report if item["verdict"] == "archive_review"]
     if review:
@@ -658,9 +669,19 @@ def prune(repo: Path, report: list[dict], *, remote: str | None) -> tuple[list[s
     fetch — and an unleased `push --delete` would remove the *current* remote
     tip, commits this run never examined. With the lease the remote rejects
     the delete when its tip moved ("stale info"); that is reported as a
-    refusal to re-judge, never retried with force. Local deletion keeps plain
-    `branch -D`: the judged ref *is* the ref being deleted, read moments
-    earlier in this same process, so there is no cross-machine staleness gap.
+    refusal to re-judge, never retried with force.
+
+    Local deletion carries the same expected value: `update-ref -d <ref>
+    <judged sha>` (branch-lifecycle.md §7.1 — 로컬 tip = 판정 SHA 일 때만).
+    Even within this one process another process can advance the branch
+    between the listing and the delete, and an unconditional `branch -D`
+    would then remove commits this run never judged. Putting the expectation
+    inside the delete itself is atomic — a compare-then-delete would leave
+    the same window open, just smaller. A moved tip makes git refuse ("but
+    expected"), reported as "로컬이 진전됨 — 재판정 필요", never retried.
+    One guard `branch -D` had for free must be explicit now: `update-ref -d`
+    deletes the checked-out branch without complaint and leaves HEAD dangling
+    (probed on git 2.53), so the current branch is skipped, never deleted.
     """
     deleted: list[str] = []
     skipped: list[str] = []
@@ -681,12 +702,12 @@ def prune(repo: Path, report: list[dict], *, remote: str | None) -> tuple[list[s
         if "open_pr" in item:
             skipped.append("%s: 열린 PR #%d head — 건너뜀" % (name, item["open_pr"]))
             continue
+        sha = item.get("sha")
+        if not sha:
+            skipped.append("%s: 판정 시점 SHA 없음 — 판정 근거 없이는 삭제하지 않는다, 건너뜀" % name)
+            continue
         try:
             if remote:
-                sha = item.get("sha")
-                if not sha:
-                    skipped.append("%s: 판정 시점 SHA 없음 — lease 삭제 불가, 건너뜀" % name)
-                    continue
                 _git(
                     repo,
                     "push",
@@ -695,14 +716,29 @@ def prune(repo: Path, report: list[dict], *, remote: str | None) -> tuple[list[s
                     ":refs/heads/%s" % name,
                 )
             else:
-                _git(repo, "branch", "-D", name)
+                if _git_maybe(repo, "symbolic-ref", "--quiet", "HEAD") == "refs/heads/%s" % name:
+                    # update-ref -d 는 branch -D 와 달리 체크아웃된 브랜치도
+                    # 지워 HEAD 를 깨뜨린다(실측). 현재 브랜치는 삭제하지 않는다.
+                    skipped.append(
+                        "%s: 현재 체크아웃된 브랜치 — 삭제하면 HEAD 가 깨진다. 건너뜀, 다른 브랜치로 이동 후 재실행" % name
+                    )
+                    continue
+                # 판정 SHA 를 기대값으로 실은 원자적 삭제(branch-lifecycle.md §7.1).
+                # 판정과 삭제 사이에 다른 프로세스가 이 브랜치를 진전시켰으면
+                # git 이 거부한다 — 비교-후-삭제는 그 사이 창이 남으므로 안 쓴다.
+                _git(repo, "update-ref", "-d", "refs/heads/%s" % name, sha)
             deleted.append(name)
         except (subprocess.CalledProcessError, OSError) as exc:
             stderr = getattr(exc, "stderr", "") or str(exc)
             if remote and "stale info" in stderr:
                 skipped.append(
                     "%s: 원격이 진전됨 — 판정 SHA %s 가 더는 원격 tip 이 아니다. 삭제 거부, fetch 후 재판정 필요"
-                    % (name, (item.get("sha") or "")[:12])
+                    % (name, sha[:12])
+                )
+            elif not remote and "but expected" in stderr:
+                skipped.append(
+                    "%s: 로컬이 진전됨 — 판정 SHA %s 가 더는 로컬 tip 이 아니다. 삭제 거부, 재판정 필요"
+                    % (name, sha[:12])
                 )
             else:
                 detail = stderr.strip().splitlines()
