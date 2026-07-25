@@ -13,6 +13,7 @@
   "buildBoard": true,
   "autoCommitOnComplete": true,
   "baseBranch": { "Returns_ERP_v20": "staging", "namane-cms": "master" },
+  "protectedBranches": { "namane-cms": ["main"] },
   "requireTaskBranch": false,
   "autoDeleteMergedBranch": true,
   "branchPrefixes": ["feat", "fix", "ops", "docs"],

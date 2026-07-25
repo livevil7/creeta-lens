@@ -1106,17 +1106,18 @@ Phase 1.3 에서 정리 대상으로 선택된 각 task 에 대해, 문서 front
 node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3])))" . feat/<slug> <base>
 ```
 
-반환값의 `state` 가 아래 5상태이고 `reason` 이 판정 근거다. **PR 유무는 `mergedState` 가 모른다** — `gh pr list --head <branch> --json number,state` 로 따로 조회한다. `gh` 부재·인증 실패면 **조용히 넘어가지 말고** "PR 상태 조회 불가" 를 표시하고 history 이동은 보류한다(머지 미확인과 같은 취급).
+반환값의 `state` 가 아래 6상태이고 `reason` 이 판정 근거다. **PR 유무는 `mergedState` 가 모른다** — `gh pr list --head <branch> --json number,state` 로 따로 조회한다. `gh` 부재·인증 실패면 **조용히 넘어가지 말고** "PR 상태 조회 불가" 를 표시하고 history 이동은 보류한다(머지 미확인과 같은 취급).
 
 | 상태 | 의미 | 처리 | 판정에 쓴 SHA 기록 |
 |---|---|---|---|
-| `unpushed` | 원격에 브랜치가 없다 | **push + PR 생성 제안** (AskUserQuestion). history 이동 보류 | — (원격 ref 없음) |
+| `unpushed` | 원격에 브랜치가 없고, **내용도 base 에 없다** | **push + PR 생성 제안** (AskUserQuestion). history 이동 보류 | — (원격 ref 없음) |
+| `merged-deleted` | 원격 브랜치가 없지만 **로컬 ref 기준으로 내용이 base 에 들어갔음이 증명됐다** — 머지 직후 head 를 삭제한 정상 흐름(§3 이 규정한 것) | `merged`/`patch-merged` 와 동일하게 Phase 2~3 진행. Phase 4 는 **원격 삭제를 건너뛴다**(지울 ref 가 없다) — **로컬 브랜치만** 삭제 | `branchSha` 는 `null`(원격 ref 부재). 대신 `localSha` 를 로컬 삭제의 lease 로 쓴다 |
 | `unmerged` (PR 없음) | 원격에 있고 미머지, PR 도 아직 없다 | **PR 생성 제안**. history 이동 보류 | `origin/<branch>` tip |
 | `unmerged` (PR 열림) | 리뷰 대기 | **history 로 내리지 않는다** → **"In Review"** 로 보고. task 파일은 `docs/tasks/` 에 그대로 둔다 | `origin/<branch>` tip |
 | `merged` / `patch-merged` | 병합이 증명됐다 | Phase 2~3(완료 인터뷰 → history 기록) → Phase 4(브랜치 삭제)로 진행 | **필수** — `origin/<branch>` tip + 비교에 쓴 `origin/<base>` tip. Phase 4 가 이 값을 lease 로 쓴다 |
 | `unknown` | 계보가 달라 **도구가 병합을 증명 못 함** | **자동 처리 금지.** 사람 확인 요청 — history 이동·브랜치 삭제 **둘 다 보류** | 기록만(사람 확인용). 삭제 근거로는 쓰지 않는다 |
 
-**판정에 쓴 SHA 를 기록한다** — fetch 직후 판정에 실제로 사용한 tip SHA 를 판정 결과와 함께 남긴다. 이 값이 Phase 4 의 **lease** 다: 삭제 시점에 그 SHA 가 여전히 원격 tip 일 때만 지운다. **SHA 없이 나온 판정으로는 브랜치를 삭제하지 않는다.**
+**판정에 쓴 SHA 를 기록한다** — fetch 직후 판정에 실제로 사용한 tip SHA 를 판정 결과와 함께 남긴다. 이 값이 Phase 4 의 **lease** 다: 삭제 명령에 이 SHA 를 **실어 보내고**, 원격 tip 이 다르면 git 이 삭제를 거부한다("확인한 뒤 삭제" 가 아니다 — Phase 4). **SHA 없이 나온 판정으로는 브랜치를 삭제하지 않는다.**
 
 #### 1.5.1 이중 게이트 우선순위 — git 판정이 우선
 
@@ -1201,20 +1202,34 @@ Q5. 남은 작업이나 주의사항? (선택)
 1. `docs/tasks/`에서 원본 Task 파일 **삭제**
 2. **병합된 브랜치 삭제 (v3.25+)** — Phase 1.5 판정이 `merged` / `patch-merged` 이고 `lens.config.json` 의 `autoDeleteMergedBranch` 가 `true` 일 때만, 해당 task 의 `branch` 를 **로컬·원격 둘 다** 삭제한다. 브랜치를 남기면 작업은 끝났는데 브랜치만 쌓인다 — 이 개편이 없애려는 상태 그 자체다.
 
-   **삭제 직전 lease 확인 (필수)** — Phase 1.5 가 기록한 SHA 가 **여전히 원격 tip 인지** 확인하고, 같을 때만 지운다. 판정과 삭제 사이에 다른 머신(Mac Mini 등)이 push 했다면 lease 없는 삭제는 그 커밋을 그대로 날린다. 원격 tip 을 다시 읽어 기록한 SHA 와 비교하든, git 이 지원하는 lease 옵션으로 원자적으로 확인하든 — 방식은 구현에 위임하고 규칙은 하나다: **"판정에 쓴 SHA = 현재 원격 tip" 이 삭제의 전제 조건이다.** 다르면 지우지 않고 "원격이 진전됨 — 재판정 필요" 로 보고한다. 조용히 지나가지 않는다.
+   **원격 삭제는 원자적 lease 삭제로만 한다 (필수) — check-then-delete 금지** — "현재 원격 tip 을 읽어 판정 SHA 와 같은지 **확인한 뒤** 지운다"는 순서는 **금지**다. 확인과 삭제는 별개의 두 명령이고, 그 사이에 다른 머신(Mac Mini 등)이 push 하면 방금 확인한 값은 이미 낡은 값이다 — 그 새 커밋이 그대로 지워진다. 확인은 원자적이지 않으므로 **확인으로는 이 경쟁 상태를 막을 수 없다.** 대신 **기대 SHA 를 삭제 명령 자체에 실어 보내고, 원격 tip 이 그와 다르면 git 이 서버 단계에서 삭제를 거부**하게 한다. 판정과 삭제 사이의 원자성은 우리가 비교해서 얻는 것이 아니라 git 이 보장하는 것이다.
 
    ```bash
-   git branch -d <branch>            # 병합 안 됐으면 git 이 스스로 거부한다 (-D 쓰지 않는다)
-   git push origin --delete <branch> # ⚠️ Phase 1.5 의 SHA 가 현재 원격 tip 일 때만 (lease 확인 후)
+   # 원격 — 기대 SHA(Phase 1.5 판정 SHA)를 삭제 명령에 실은 lease 삭제
+   git push --force-with-lease=refs/heads/<branch>:<판정SHA> origin :refs/heads/<branch>
+
+   # 로컬 — 아래 "로컬 삭제" 두 조건을 만족할 때만
+   git branch -D <branch>
    ```
+
+   lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "원격이 진전됨 — fetch 후 재판정 필요" 로 보고하고 멈춘다. 기록된 SHA 가 없으면 lease 를 걸 수 없으므로 삭제하지 않는다.
+
+   **`merged-deleted` 는 원격 삭제를 건너뛴다** — 그 상태는 원격 ref 가 이미 없다는 뜻이다(머지 직후 head 삭제 = 정상 흐름). 지울 원격 ref 가 없으므로 lease 삭제를 시도하지 않고, `branchSha` 가 `null` 이라 위의 "기록된 SHA 없으면 삭제 안 함" 규칙이 자동으로 막는다. **로컬 브랜치만** 삭제하고, 그때의 lease 는 `localSha` 다(로컬 tip 이 그 값과 같을 때만). 이 형태는 배치 정리 도구 `scripts/prune_branches.py` 가 실제로 쓰는 것과 **같아야 한다** — 두 경로가 다른 삭제 방식을 쓰면 한쪽에만 경쟁 상태가 남는다 (SoT: `docs/rules/branch-lifecycle.md`).
+
+   **로컬 삭제 — 증명이 끝난 뒤에는 조상 검사를 반복하지 않는다** — `git branch -d` 가 보는 것은 "브랜치 tip 이 base 의 조상인가" 하나뿐이다. 그런데 `patch-merged` 는 **정의상 조상이 아니다** — squash·rebase 머지가 커밋을 새로 썼기 때문이고, 그건 사고가 아니라 의도된 결과다. 그래서 Phase 1.5 가 patch-id 동등성으로 "모든 내용이 base 에 들어갔다" 를 증명해도 `-d` 는 매번 거부하고, **그런 완료마다 로컬 브랜치가 계속 남는다.** 이미 더 강한 증명이 끝났는데 더 약한 검사가 결과를 뒤집는 셈이다. 따라서:
+   - **다음 두 조건을 모두 만족할 때만** 조상 검사를 우회하는 삭제(`git branch -D`)를 허용한다.
+     1. Phase 1.5 판정이 `merged` 또는 `patch-merged` — 도구가 병합을 **증명**했다(내용 증명).
+     2. 로컬 브랜치 tip 이 Phase 1.5 의 **판정 SHA 와 같다** — 판정에 들어가지 않은 로컬 커밋이 없다(SHA 증명).
+   - 로컬 tip 이 판정 SHA 와 다르면 push 안 된 로컬 커밋이 있다는 뜻이다 → 지우지 않고 "로컬에 미푸시 커밋 있음 — 삭제 보류" 로 보고한다.
+   - 그 외 모든 경우(`unknown`·`unmerged`·판정 SHA 없음·증명 없음)에는 **`-D` 금지가 그대로다.** 여기서 열리는 것은 "**증명이 끝난** 브랜치의 중복 조상 검사 우회" 하나뿐이고, "증명 없는 강제 삭제" 는 열리지 않는다.
 
    **삭제 금지 조건 (Phase 1.4 안전 규칙 상속 — 하나라도 걸리면 삭제하지 않고 사유를 보고)**:
    - `unknown` 상태 — **절대 자동 삭제 금지.** 도구가 병합을 증명하지 못한 브랜치를 지우면 코드가 사라진다. 추측 삭제 금지.
    - **열린 PR 의 head 브랜치** — 삭제하면 PR 이 닫힌다. In Review 는 아직 완료가 아니다.
    - `autoDeleteMergedBranch` 가 `false` — 삭제하지 않고 "수동 정리 대상" 으로 보고만 한다.
-   - `-D`(force) 는 쓰지 않는다. `-d` 가 거부하면 그건 삭제하면 안 된다는 신호다.
+   - **증명 없는 강제 삭제 금지** — `-D` 는 위 "로컬 삭제" 두 조건(증명된 `merged`/`patch-merged` **그리고** 로컬 tip = 판정 SHA)을 모두 만족할 때만 쓴다. 증명이 없거나 SHA 가 어긋나면 `-D` 도 `-d` 도 쓰지 않는다. 반대로 **증명이 끝난 브랜치를 `-d` 거부만을 이유로 남기지도 않는다** — 조상 검사는 patch 머지를 판정할 능력이 없다.
    - **판정 직전 fetch 를 못 했다** — 원격 상태를 확인하지 못한 판정에는 삭제 근거가 없다. "원격 상태 확인 불가 — 삭제 보류" 로 보고한다(Phase 1.5 선행 조건).
-   - **lease 불일치 — 원격이 진전됐다** — 판정에 쓴 SHA 가 현재 원격 tip 이 아니면 삭제하지 않고 "원격이 진전됨 — 재판정 필요" 로 보고한다. 사용자가 `/cp done` 을 재실행하면 새 fetch 로 다시 판정된다. 기록된 SHA 가 없으면 lease 를 걸 수 없으므로 이 조건에 걸린 것으로 취급한다.
+   - **lease 거부 — 원격이 진전됐다** — lease 삭제가 `stale info` 로 거부되면 판정에 쓴 SHA 가 더는 원격 tip 이 아니라는 뜻이다. **force 로 재시도하지 않고** "원격이 진전됨 — 재판정 필요" 로 보고한다. 사용자가 `/cp done` 을 재실행하면 새 fetch 로 다시 판정된다. 기록된 SHA 가 없으면 lease 를 걸 수 없으므로 애초에 삭제하지 않는다.
 3. TodoWrite 항목 전부 `completed` 처리
 4. 완료 메시지 표시: 생성된 history 파일 경로 + 삭제된 task 파일 + **삭제된 브랜치(로컬/원격)** 또는 삭제하지 않은 사유
 

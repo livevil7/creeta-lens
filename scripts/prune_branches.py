@@ -82,6 +82,19 @@ Three further guards back `--apply`, all fail-closed:
   stale judgment is safe because the lease turns it into a refusal, not a
   deletion.
 
+The base and the remote's HEAD are not the only refs off limits. namane-cms
+carries a residual `origin/main` whose base resolves to `master` and whose
+remote HEAD is `master` too, so neither protection fires — yet `main` is an
+ancestor of `master` and proves `delete`. branch-lifecycle.md §4.2 says its
+deletion is the repo owner's call and Lens must not touch it. So a third,
+name-level protection demotes such verdicts to `keep`: branches listed in
+lens.config.json `protectedBranches[<repo dir name>]`, and — as the fallback
+when that key is absent — any ref whose *name* is an integration-branch name
+(every value of the `baseBranch` map plus git's defaults main|master). A ref
+named like an integration branch that is not the resolved base is a state
+for a human to look at; a name collision is not proof of a task branch, and
+this tool's posture is "증명 못 하면 유지".
+
 Base is resolved, never assumed. `--base` overrides; otherwise the same rule
 as lib/git-branch.js `resolveBase()` (single source of truth for base
 judgment — mirrored here because this is Python and cannot require that
@@ -103,6 +116,13 @@ import sys
 from pathlib import Path
 
 PROTECTED = frozenset({"HEAD"})
+
+# git 의 역사적 기본 브랜치 이름. 이 이름을 단 ref 가 base 도 remote HEAD 도
+# 아니라면(namane-cms 의 잔여 origin/main — base=master) 그 삭제는 레포
+# 소유자의 판단이다(branch-lifecycle.md §4.2). 여기 없는 통합 브랜치 이름
+# (staging 등)은 lens.config.json baseBranch 맵의 값에서 합류한다 —
+# _protected_branch_names() 참조.
+GIT_DEFAULT_BRANCH_NAMES = frozenset({"main", "master"})
 
 # gh pr list 조회 한도. 응답 개수가 이 값에 닿으면 목록이 잘렸을 수 있다 —
 # 잘려 나간 열린 PR 의 head 는 보호받지 못한 채 삭제될 수 있으므로, 한도
@@ -187,6 +207,31 @@ def _read_config() -> dict:
         return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+
+
+def _protected_branch_names(repo_name: str) -> frozenset[str]:
+    """Branch names exempt from auto-delete in ``repo_name``, beyond base/HEAD.
+
+    Two layers, so the protection works with or without config:
+
+    * lens.config.json ``protectedBranches[<repo dir name>]`` — the explicit
+      per-repo list. branch-lifecycle.md §4.2 documents the case this exists
+      for: namane-cms's residual ``origin/main`` is fully absorbed into
+      ``master`` (proven ancestor → would verdict `delete`), but its deletion
+      is the repo owner's call and Lens must not touch it.
+    * Fallback when that key is absent: every *value* of the ``baseBranch``
+      map (the integration-branch names this workspace actually uses, e.g.
+      staging) plus git's default names main|master. A ref that merely
+      *shares a name* with an integration branch cannot be proven a task
+      branch, and unproven means keep — never delete.
+
+    Only names, never patterns: a broad match would start protecting real
+    task branches and silently disable the tool.
+    """
+    config = _read_config()
+    explicit = (config.get("protectedBranches") or {}).get(repo_name) or []
+    workspace_bases = (config.get("baseBranch") or {}).values()
+    return frozenset(explicit) | frozenset(workspace_bases) | GIT_DEFAULT_BRANCH_NAMES
 
 
 def _is_task_shaped_branch(name: str) -> bool:
@@ -480,6 +525,7 @@ def classify(
 ) -> list[dict]:
     base_ref = "%s/%s" % (remote, base) if remote else base
     open_prs = open_prs or {}
+    protected_names = _protected_branch_names(repo.resolve().name)
     report = []
     for name, ref, sha in _branches(repo, remote):
         if name == base:
@@ -502,6 +548,14 @@ def classify(
             # 기본·운영 브랜치다. 병합 증명 여부와 무관하게 지우지 않는다.
             item["verdict"] = "keep"
             item["reason"] = "default_branch"
+        if name in protected_names and item["verdict"] == "delete":
+            # namane-cms: base 와 remote HEAD 가 둘 다 master 라 잔여 origin/main 은
+            # 어느 보호에도 안 걸린 채 조상으로 증명돼 delete 가 된다. 그러나
+            # branch-lifecycle.md §4.2 — 그 삭제는 레포 소유자의 판단이고 Lens 는
+            # 건드리지 않는다. 통합 브랜치 이름을 단 ref 는 base 가 아니어도
+            # 자동 삭제 대상에서 뺀다 (protectedBranches 명시 + 이름 폴백).
+            item["verdict"] = "keep"
+            item["reason"] = "protected_name"
         if name in open_prs:
             item["open_pr"] = open_prs[name]
             if item["verdict"] == "delete":
@@ -536,6 +590,8 @@ def _detail(item: dict) -> str:
         return "열린 PR #%d head — 유지 (병합 증명돼도 삭제 안 함)" % item["open_pr"]
     if item["reason"] == "default_branch":
         return "레포 기본 브랜치 — 유지 (병합 증명돼도 삭제 안 함)"
+    if item["reason"] == "protected_name":
+        return "보호 브랜치(base 아닌 통합 브랜치 이름/명시 보호 목록) — 유지, 삭제는 레포 소유자 판단"
     if item["reason"] == "merge_commit_content":
         return "머지 커밋에만 있는 변경 (patch-id 미병합 0개지만 tree 상이, 변경 파일 %d) — 병합 미증명, 유지" % item["files_changed"]
     detail = "커밋 %d / 변경 파일 %d" % (item["commits_ahead"], item["files_changed"])
@@ -608,12 +664,19 @@ def prune(repo: Path, report: list[dict], *, remote: str | None) -> tuple[list[s
     """
     deleted: list[str] = []
     skipped: list[str] = []
+    # classify() 가 이미 protected_name 으로 강등하지만, prune() 은 삭제를
+    # 실행하는 마지막 지점이므로 여기서도 같은 목록을 다시 검사한다 —
+    # open_pr 이 verdict 강등 + prune 재검사로 이중 가드인 것과 같은 패턴.
+    protected_names = _protected_branch_names(repo.resolve().name)
     for item in report:
         if item["verdict"] != "delete":
             continue
         name = item["branch"]
         if not name or name in PROTECTED or (remote and name == remote):
             skipped.append("%s: 보호 대상/빈 이름 — 건너뜀" % (name or "<빈 이름>"))
+            continue
+        if name in protected_names:
+            skipped.append("%s: 보호 브랜치(통합 브랜치 이름/명시 보호 목록) — 삭제 안 함, 건너뜀" % name)
             continue
         if "open_pr" in item:
             skipped.append("%s: 열린 PR #%d head — 건너뜀" % (name, item["open_pr"]))
