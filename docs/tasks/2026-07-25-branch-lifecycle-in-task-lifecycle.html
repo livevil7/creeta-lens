@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>브랜치 생명주기를 작업 생명주기에 붙이기 · 보고서</title>
+<meta name="lens:source" content="docs/tasks/2026-07-25-branch-lifecycle-in-task-lifecycle.md">
+<meta name="lens:source-hash" content="6d4f578657b0">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">06</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 06 · COVER</div>
+  <div class="meta">
+    <span>2026-07-25</span>
+    <span class="dot">·</span>
+    <span class="badge task">Task</span>
+    <span class="dot">·</span>
+    <span>lens · git lifecycle</span>
+  </div>
+
+  <h1 class="h-title">브랜치 생명주기를 작업 생명주기에 붙이기 — /cp · /cc · /cp done · /cs 재배치</h1>
+  <p class="lede">
+    Lens 는 "작업의 완료"를 문서 위치(<code>docs/tasks/</code> → <code>docs/history/</code>)로만 정의하고
+    git 의 완료(브랜치 → PR → 머지 → 삭제)와 연결하지 않는다. 그 결과 브랜치는 작업이 끝난 뒤
+    <code>/cs</code> 가 급조하고, 완료 처리는 머지 여부를 모른 채 문서만 옮긴다.
+    <strong>1 task = 1 문서 = 1 브랜치 = 1 PR</strong> 로 두 장부를 하나로 합친다.
+  </p>
+
+  <div class="hero">
+    <div class="num">25<span class="unit">/ 26 repos on base</span></div>
+    <div class="caption">
+      실측: 26개 레포 중 <strong>25개가 통합 브랜치(main·master·staging) 위에서 직접 작업</strong> 중.
+      피처 브랜치는 <code>livevil-research</code> 하나뿐이고, 그것도 main 과 갈라진 채
+      <strong>자기 자신을 upstream 으로</strong> 갖고 있어 사실상 base 로 승격됐다.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / tasks</span>
+    <span>2026-07-25-branch-lifecycle-in-task-lifecycle</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 06 · AT A GLANCE</div>
+  <h2 class="title">계획 규모</h2>
+  <p class="sub">등급 standard · 난이도 medium. 브랜치 모델은 <strong>2단</strong>(사용자 확정) — staging 은 배포 환경이 있는 1개 레포만.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">objectives</div>
+      <div class="v">5</div>
+      <div class="desc">자기 브랜치 작업 · 리뷰 후 병합 · 브랜치 자동 소멸 · 배포 오트리거 차단 · 병렬 충돌 방지.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">tasks</div>
+      <div class="v accent">13</div>
+      <div class="desc">T0(선행 정리) + T1~T12. 파일 배타 소유로 10 worker 동시 실행.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">branch 개념 있는 스킬</div>
+      <div class="v warn">1 / 11</div>
+      <div class="desc"><code>/cs</code> 만 19곳. <code>/cp</code>·<code>/cc</code>·<code>/c</code>·<code>/ccp</code> 는 <strong>0곳</strong>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">접두사 혼재</div>
+      <div class="v warn">9</div>
+      <div class="desc"><code>livevil-research</code> 원격 실측: agent/ claude/ codex/ feat/ feature/ task/ ops/ backup/ sync/.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">T0 정리 결과</div>
+      <div class="v good">6</div>
+      <div class="desc">병합 증명된 원격 브랜치 6개 삭제, 잔존 5개(열린 PR·사람 확인 대상). 재판정 <strong>삭제 대상 0건</strong>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">실행 중 발견 결함</div>
+      <div class="v warn">12</div>
+      <div class="desc">D1~D12. 계획 시점엔 몰랐던 것 — 판정 도구·검증 함수·훅·계약 자체의 오류.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Goal -->
+<section class="slide" id="goal">
+  <div class="page-no">03 / 06 · GOAL</div>
+  <h2 class="title">목표 — 무엇이 가능해지는가</h2>
+  <p class="sub">왜: 작업 중간 상태가 통합 브랜치에 바로 쌓여 "지금 main 이 배포 가능한가"를 알 수 없고, <code>staging</code> 체크아웃 레포는 커밋 보호에서 아예 빠져 있다.</p>
+
+  <div class="goal-list" style="margin-top:24px">
+    <div class="goal"><div class="box"></div><div class="t"><strong>자기 브랜치에서 작업</strong> — 새 작업을 시작하면 그 작업만의 브랜치에서 코드가 바뀐다. 통합 브랜치가 중간 상태로 오염되지 않는다.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>병합 확인 후 완료</strong> — 완료 처리하면 변경이 리뷰 가능한 상태로 올라가고, 병합이 확인된 뒤에야 완료 기록으로 내려간다. "문서상 완료인데 코드는 어디 있는지 모르는" 상태가 사라진다.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>브랜치 자동 소멸</strong> — 병합이 끝난 브랜치는 없어진다. 브랜치 목록을 열면 지금 진행 중인 작업만 보인다.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>배포 오트리거 차단</strong> — 배포 환경이 있는 레포에서 작업이 실수로 배포를 트리거하지 않는다. <em>지금은 막혀 있지 않다.</em></div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>병렬 작업 안전</strong> — 여러 worker 가 동시에 같은 레포를 고쳐도 서로의 변경을 지우지 않는다.</div></div>
+  </div>
+
+  <div class="next" style="margin-top:20px">
+    <div class="l">Done = ?</div>
+    <p>아무 레포에서나 새 작업을 계획하고 실행한 뒤 완료 처리했을 때, 그 작업의 코드가 자기 브랜치에서 리뷰를 거쳐 통합 브랜치에 들어가 있고, 그 브랜치는 지워져 있고, 완료 기록 문서가 남아 있다.</p>
+  </div>
+</section>
+
+<!-- 4. Plan -->
+<section class="slide" id="plan">
+  <div class="page-no">04 / 06 · PLAN</div>
+  <h2 class="title">소유권 재배치 + 10개 태스크</h2>
+  <p class="sub"><code>/cp</code> 가 이름을 정하고 · <code>/cc</code> 가 만들어 그 위에서만 커밋하고 · <code>/cp done</code> 이 PR·머지·삭제로 닫는다. <code>/cs</code> 는 task 브랜치를 소유하지 않는다.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">T0</div>
+      <h3>선행 정리</h3>
+      <div class="what"><code>livevil-research</code> 원격 10개 판정 → 병합분 삭제 / 계보 다른 것 태그 아카이브. 체크아웃 <code>main</code> 복귀. 잔여 <code>sync/</code> 정리. <strong>삭제 수단 없이 생성 자동화 배포 금지.</strong></div>
+    </div>
+    <div class="step">
+      <div class="n">T1</div>
+      <h3>규칙 SoT</h3>
+      <div class="what"><code>docs/rules/branch-lifecycle.md</code> 신설 — 2단 모델 · 접두사 <code>feat/ fix/ ops/ docs/</code> · base 판정 3단 우선순위 · 머지 판정 2단 · <code>Returns_ERP_v20</code> 예외. 출처는 <code>livevil-research/docs/rules/branch-hygiene.md</code>.</div>
+    </div>
+    <div class="step">
+      <div class="n">T2</div>
+      <h3>판정 lib</h3>
+      <div class="what"><code>lib/git-branch.js</code> — <code>resolveBase</code>(config→upstream→origin/HEAD) · <code>canCommitTo</code> · <code>mergedState</code>(ancestor→cherry) · <code>preflight</code>. 브랜치 지식을 한 곳으로 모아 스킬 간 판정 불일치를 없앤다.</div>
+    </div>
+    <div class="step">
+      <div class="n">T3</div>
+      <h3>frontmatter</h3>
+      <div class="what"><code>lib/plan-manager.js</code> 에 <code>repo</code>/<code>base</code>/<code>branch</code>/<code>pr</code> 4필드. 기존 문서 하위호환(필드 없으면 null).</div>
+    </div>
+    <div class="step">
+      <div class="n">T4</div>
+      <h3>/cp PLAN</h3>
+      <div class="what">Phase 2.5 템플릿에 브랜치 필드, Phase 5.0 게이트에 <strong>base 감지 결과 표시</strong>(사용자가 승인 화면에서 staging 을 눈으로 확인), 핸드오프에 <code>[BRANCH]</code> 블록.</div>
+    </div>
+    <div class="step">
+      <div class="n">T5</div>
+      <h3>/cc 실행</h3>
+      <div class="what">Phase 0 에 preflight+브랜치 생성. Phase 7.4 의 <code>main|master</code> 문자 비교를 <code>canCommitTo(plan.branch)</code> 로 교체. 같은 파일 건드리는 worker 2+ 는 worktree 격리.</div>
+    </div>
+    <div class="step">
+      <div class="n">T6</div>
+      <h3>/cp done</h3>
+      <div class="what">Phase 1.5 신설(미푸시 / PR 없음 / PR 열림 / 머지됨 판정) + Phase 4 브랜치 삭제. <strong>미머지 task 는 history 이동 금지</strong> → "In Review" 보고.</div>
+    </div>
+    <div class="step">
+      <div class="n">T7</div>
+      <h3>board</h3>
+      <div class="what">To do / Doing / <strong>In Review</strong> / Done 4칼럼. <code>gh pr list</code> 조인. gh 부재 시 3칼럼 + 사유 표시(조용한 실패 금지).</div>
+    </div>
+    <div class="step">
+      <div class="n">T8</div>
+      <h3>prune 승격</h3>
+      <div class="what"><code>prune_branches.py</code> 를 Lens 로 복제(원본 유지) + 멀티레포 지원 + <code>/cs</code> 종료 시 "5개 초과" 경고. <code>--apply</code> 는 두 <em>삭제</em> 판정만.</div>
+    </div>
+    <div class="step">
+      <div class="n">T9</div>
+      <h3>config</h3>
+      <div class="what"><code>baseBranch</code> 맵 · <code>requireTaskBranch</code>(기본 <strong>false</strong>, T0·T8 완료가 전환 조건) · <code>autoDeleteMergedBranch</code> · <code>branchPrefixes</code>.</div>
+    </div>
+  </div>
+
+  <div class="next" style="margin-top:20px">
+    <div class="l">브랜치 모델 — 2단 (확정)</div>
+    <p><code>feat/&lt;slug&gt;</code> ──PR──▶ 그 레포의 base(<strong>main | master | staging — 레포마다 감지</strong>) ──▶ 브랜치 삭제.
+    예외 1개: <code>Returns_ERP_v20</code> 은 base 가 <code>staging</code> 이고, 그 뒤 <code>promote-to-main.sh</code> 로 main 승격 — <strong>그 레포 고유 절차이므로 Lens 는 관여하지 않는다.</strong></p>
+  </div>
+</section>
+
+<!-- 5. Risks -->
+<section class="slide" id="risks">
+  <div class="page-no">05 / 06 · RISKS</div>
+  <h2 class="title">리스크 레지스터</h2>
+  <p class="sub">Claude(세션 컨텍스트) + Codex(독립 코드 분석) 듀얼 조사. 핵심은 <strong>생성 자동화가 누적 문제를 가속</strong>하는 것과 <strong>staging 오배포</strong>.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">R1 · 높음</div>
+      <h3>브랜치 자동 생성이 누적을 가속</h3>
+      <p>트리거: <code>requireTaskBranch:true</code> 후 임의 레포 원격 브랜치 5개 초과. → T8(prune)을 같은 릴리즈에 묶고 T0 를 완료 조건으로. <strong>중단: T8 미완이면 true 로 올리지 않는다.</strong></p>
+    </div>
+    <div class="next warn">
+      <div class="l">R2 · 높음 (운영 사고)</div>
+      <h3>Returns_ERP_v20 staging 오배포</h3>
+      <p>트리거: base 판정이 staging 을 놓쳐 main 을 base 로 PR, 또는 staging 직접 커밋. → config 명시값 우선 + 이 레포를 첫 검증 대상. <strong>중단: 감지 base ≠ config 명시값이면 그 레포 실행 차단.</strong></p>
+    </div>
+    <div class="next warn">
+      <div class="l">R3 · 중간</div>
+      <h3>병렬 worker 변경 유실</h3>
+      <p>트리거: 같은 파일 대상 worker 2개 이상. → worktree 격리 + <code>hook-utils.js</code> lock 으로 Leader 직렬 통합. <strong>중단: 충돌 1회 감지 시 순차 강등.</strong></p>
+    </div>
+    <div class="next">
+      <div class="l">R4 · 중간</div>
+      <h3>gh 부재 · workflow 스코프</h3>
+      <p>트리거: T5 검증에서 PR 실패 레포 3개 이상. → Plan B(로컬 머지 모드) 전환, 레포별 오버라이드. <strong>중단: 3레포 이상이면 <code>mergeMode:"local"</code>.</strong></p>
+    </div>
+    <div class="next">
+      <div class="l">R5 · 중간</div>
+      <h3>기존 stale 브랜치·열린 PR 충돌</h3>
+      <p>트리거: T0 없이 T2~T6 도입. <code>livevil-research</code> 는 지금 base 아닌 브랜치에 체크아웃돼 있어 <code>resolveBase</code> 가 그 피처 브랜치를 base 로 판정한다. <strong>중단: T0 미완이면 T2 검증 실행 금지.</strong></p>
+    </div>
+    <div class="next">
+      <div class="l">R6 · 낮음</div>
+      <h3>patch-id 로 머지 증명 불가</h3>
+      <p>리베이스 충돌 해결 이력이 있는 브랜치(<code>task/community-insight-surface-v3</code>). → 자동 삭제 제외, <em>유지</em> 로 남겨 사람이 확인. <strong>추측 삭제 금지.</strong></p>
+    </div>
+  </div>
+
+  <div class="next warn" style="margin-top:20px">
+    <div class="l">⚠️ 지금 존재하는 결함 (before/after 대조가 곧 증거)</div>
+    <p><code>/cc</code> Phase 7.4 의 브랜치 보호는 <code>main</code>·<code>master</code> <strong>문자 비교</strong>다. <code>Returns_ERP_v20</code> 은 <code>staging</code> 체크아웃(GitHub default 는 main)이라 <strong>보호에서 빠지고 staging 에 직접 커밋된다</strong> — staging 은 배포 트리거다. 이것이 현재 유일한 배포 사고 경로다.</p>
+  </div>
+</section>
+
+<!-- 6. Resume -->
+<section class="slide" id="resume">
+  <div class="page-no">06 / 06 · RESUME</div>
+  <h2 class="title">실행 결과 · 재개 포인트</h2>
+  <p class="sub">T0~T12 구현 완료. 남은 것은 리뷰·QA·PR 과 사람 판단이 필요한 잔여 3건.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">계획은 "생성 자동화보다 삭제 자동화가 먼저"라고 적었는데, 실제로는 <strong>판정 자체가 틀린 것</strong>이 더 먼저였다 — D1 은 첫 <code>--apply</code> 에서, D7 은 두 번째 커밋에서 각각 터진다.</div>
+    <ol>
+      <li class="done">
+        <h4>완료 — T0 정리 + T1~T12 구현</h4>
+        <div class="det">병합 증명된 원격 브랜치 6개 삭제(해시 기록), <code>main</code> 복귀. 신규 4파일(<code>lib/git-branch.js</code> 343줄 · <code>docs/rules/branch-lifecycle.md</code> 347줄 · <code>scripts/prune_branches.py</code> 649줄 · <code>hooks/post-tool-progress.js</code> 160줄) + 14파일 수정.</div>
+      </li>
+      <li class="done">
+        <h4>실증된 것</h4>
+        <div class="det">27개 레포 base 판정 실패 0건 · <code>Returns_ERP_v20</code> staging 커밋 차단(두 경로) · CRLF 문서 파싱 복구 · 2분 리마인더 훅 발화/침묵 4케이스 · 훅 거짓 완료 신호 수정.</div>
+      </li>
+      <li class="todo">
+        <h4>사람 판단 대기 3건</h4>
+        <div class="det">① <code>sync/2026-07-25-215207</code>(33파일)이 PR base 삭제로 미아 — 재타겟 필요 ② <code>namane-cms</code> 의 잔여 <code>origin/main</code> 삭제 여부 ③ <code>backup/macmini-preIA-20260723</code>(169커밋/4파일) 태그 아카이브.</div>
+      </li>
+      <li class="todo">
+        <h4>미해결(비차단)</h4>
+        <div class="det"><code>master</code>→<code>main</code> rename(가정: 안 함) · <code>requireTaskBranch</code> 를 언제 <code>true</code> 로 전환할지 · D9·D10·D12(범위 밖 보고분).</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

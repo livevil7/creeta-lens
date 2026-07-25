@@ -65,6 +65,39 @@ create branch sync/<date>-<time>   ← BEFORE committing
 
 **Escape hatch**: `LENS_SYNC_PR=0` restores the old direct-push behaviour for one run.
 
+## Task branches are off-limits
+
+`/cs` has no notion of "the task I am working on right now" — it sweeps whatever is dirty into one commit. On a task branch that produces a PR full of unrelated work (measured: a `chore: auto-sync` PR mixing changes from several different tasks).
+
+- **Branches prefixed `feat/`, `fix/`, `ops/`, `docs/` are task branches.** `/cs` does not repackage them onto a `sync/` branch, does not commit on top of them, and never `reset --hard`s them. They belong to whoever is running that task, and their commits need real messages.
+- **`sync/` is for out-of-plan dirty changes only** — stray edits that belong to no task (machine-local config tweaks, files touched by tooling). That is the entire remit of the `sync/<date>-<time>` flow.
+- **Fast-forward pulling a task branch is still fine.** Only the commit/PR/reset half is skipped.
+
+**How the agent enforces this** (the guard lives here, not in the script — `git-sync-all.sh` is deliberately left alone):
+
+1. Before any run that can commit (`/cs`, `/cs push`), check each repo's current branch:
+   ```
+   git -C <repo> rev-parse --abbrev-ref HEAD
+   ```
+2. If a repo is on a task branch **and** is dirty or ahead, do **not** let the commit path run over it. Run `/cs pull` instead and report those repos as `task 브랜치 — 건너뜀 (담당자가 직접 커밋)`.
+3. Proceed with the full `sync`/`push` run only when no repo is on a task branch with outgoing work, or when the user explicitly overrides after seeing the list.
+
+## Branch count warning (on exit)
+
+After reporting the sync result, count remote branches per repo:
+
+```
+git -C <repo> ls-remote --heads origin | wc -l
+```
+
+Any repo with **more than 5** remote branches gets a warning line, because `sync/` and task branches accumulate silently and stale branches make it unclear which one is live:
+
+```
+⚠️ 브랜치 과다: <repo> (원격 N개 > 5) — 정리: python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py"
+```
+
+Report only. `/cs` never deletes branches itself — pruning is `scripts/prune_branches.py`'s job and it asks before removing anything.
+
 ## Workspace roots
 
 Auto-detected from `$HOME` (no hardcoded user/machine paths), overridable via `GIT_ROOTS` env var. The script probes these standard candidates and uses whichever directories exist:
@@ -164,6 +197,7 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 ## When NOT to use /cs
 
 - **Mid-edit unfinished work**: `/cs push` will commit your in-progress edits with a chore message. Either finish the edit and use a real commit, or stash before invoking.
+- **Mid-task on a task branch**: `feat/`·`fix/`·`ops/`·`docs/` branches are skipped by policy (see "Task branches are off-limits"). Commit that work yourself with a real message — do not route it through `/cs`.
 - **Branches you do not want pushed**: `/cs` pushes the current branch of each repo. If a repo is on a feature branch you are not ready to share, switch to your default branch first.
 - **Repos with sensitive untracked files**: `git add -A` adds everything not in `.gitignore`. Make sure your `.gitignore` is up to date before running.
 

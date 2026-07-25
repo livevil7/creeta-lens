@@ -330,7 +330,41 @@ Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude �
 
 `docs/tasks/YYYY-MM-DD-{slug}.md` 로 저장합니다.
 
+#### frontmatter — 이 작업이 살 브랜치를 여기서 정한다 (v3.25+)
+
+지금까지 Lens 는 "작업의 완료"를 **문서 위치**(`docs/tasks/` → `docs/history/`)로만 정의하고 git 의 완료(브랜치 → PR → 머지 → 삭제)와 연결하지 않았다. 그래서 브랜치는 작업이 *끝난 뒤* 급조되고 계속 쌓인다 (실측: 한 레포의 원격 브랜치 10개 중 살아있는 작업이 1개). 계획 시점에 브랜치 **이름을 정해 문서에 박아두면** `/cc` 가 그 브랜치를 만들어 그 위에서만 커밋하고, DONE 모드가 PR·머지 확인·삭제로 닫는다. **1 task = 1 문서 = 1 브랜치 = 1 PR.** 규칙 SoT: `docs/rules/branch-lifecycle.md`.
+
+| 필드 | 값 | 채우는 주체 |
+|---|---|---|
+| `repo` | 레포 디렉토리명 | `/cp` (Phase 2.5) |
+| `base` | `resolveBase()` 로 **감지한** 값 | `/cp` (Phase 2.5) |
+| `branch` | `feat/<slug>` — 접두사는 `feat/` `fix/` `ops/` `docs/` **4종만** | `/cp` 가 **이름만** 정함 |
+| `pr` | `null` (계획 시점엔 PR 이 없다) | DONE 모드가 채움 |
+
+- **`/cp` 는 브랜치를 만들지 않는다** — 이름만 정해 문서에 적는다. 실제 생성·체크아웃은 `/cc` 가 실행 진입 시 한다. (`/cp` 는 계획·문서화 전용이라는 절대 규칙 그대로.)
+- **이름에 날짜를 넣지 않는다** — 커밋이 이미 날짜를 갖고 있다. 도구 이름 접두사(`lens/…`)도 금지.
+- **base 는 감지한다 — `main`|`master` 로 문자 추정 금지.** 레포마다 다르다 (워크스페이스 27개 레포 실측: `master` 만 11 / `main` 만 13 / 둘 다 1 / `main`+`staging` 1 / 원격에 둘 다 없음 1 — 수치의 SoT 는 `docs/rules/branch-lifecycle.md`). 감지 우선순위는 ① `lens.config.json` 의 `baseBranch.<repo>` 명시값 → ② 현재 브랜치의 upstream → ③ `origin/HEAD` 이며, `lib/git-branch.js` 의 `resolveBase(repoPath)` 가 그 판정을 갖고 있다:
+
+  ```bash
+  node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.resolveBase(process.argv[1])))" .
+  ```
+
+  반환값의 `base` 를 frontmatter 에 그대로 쓰고, 판정 출처(`config`|`upstream`|`origin-head`)는 Phase 5.0 승인 화면과 핸드오프 `[BRANCH]` 블록에 표시한다. **판정 불가면 추정으로 채우지 않는다** — `base:` 를 비우고 "base 판정 불가" 를 Phase 5.0 게이트에 표시해 사용자에게 진행 여부를 확인한다.
+
 ```markdown
+---
+plan_id: YYYY-MM-DD-<slug>
+planner: cp
+grade: fast|standard|deep
+created: YYYY-MM-DD
+status: planned
+repo: <레포 디렉토리명>
+base: <resolveBase 로 감지한 값>
+branch: feat/<slug>
+pr: null
+refs: []
+---
+
 # {제목}
 
 ## 🎯 What — 목표 (무엇이 가능해지는가, 사람 언어)
@@ -395,16 +429,6 @@ Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
 - [ ] step 1: …
 - [ ] step 2: …
 
-### 🔀 검토된 대안 (Alternatives Considered)
-
-> **이 섹션이 계획서의 최고 신호다.** 기능은 "선택안이 목표에 비추어 최선임을 명시적으로 증명"하는 것 — 저자가 해법 공간을 실제로 탐색했는지, 첫 아이디어를 그대로 적었는지가 여기서 드러난다. **Plan B 로 대체되지 않는다**: Plan B = "A가 깨지면 쓸 우회로", 검토된 대안 = "왜 B가 아니라 A를 골랐나". 성격이 다르다.
-> **최소 2개 + 각 탈락 사유** (Standard+ 필수). 되돌리기 비싼 결정은 본문에 묻지 말고 별도 기록으로 분리해 링크한다.
-
-**대안 A — {이름}**
-- *Good, because* {장점}
-- *Bad, because* {단점}
-- **기각/채택** — {근거}
-
 ### 🔀 듀얼 합성 (Claude ‖ Codex)
 (Phase 2.4 에서 채움. Codex 미사용이면 "단일 모델 — Codex 미사용" 한 줄)
 
@@ -416,6 +440,17 @@ Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
 
 ### ⚠️ 사전 리스크 (Pre-mortem)
 (Phase 3 Pre-mortem 에서 자동 채움)
+
+## 🔀 검토된 대안 (Alternatives Considered)
+
+> **이 섹션이 계획서의 최고 신호다.** 기능은 "선택안이 목표에 비추어 최선임을 명시적으로 증명"하는 것 — 저자가 해법 공간을 실제로 탐색했는지, 첫 아이디어를 그대로 적었는지가 여기서 드러난다. **Plan B 로 대체되지 않는다**: Plan B = "A가 깨지면 쓸 우회로", 검토된 대안 = "왜 B가 아니라 A를 골랐나". 성격이 다르다.
+> **최소 2개 + 각 탈락 사유** (Standard+ 필수). 되돌리기 비싼 결정은 본문에 묻지 말고 별도 기록으로 분리해 링크한다.
+> ⚠️ **반드시 `##` 레벨** — Phase 5.0 구조 게이트(`validatePlanStructure`)는 필수 섹션을 `^##` 에서만 찾는다. 이 섹션을 `## 🛠 How` 하위 `###` 로 내리면 계획서가 항상 게이트 fail 한다.
+
+**대안 A — {이름}**
+- *Good, because* {장점}
+- *Bad, because* {단점}
+- **기각/채택** — {근거}
 
 ## 💡 시사점 · ⚠️ 주의점 · 🔀 Side Effect
 
@@ -633,6 +668,13 @@ N+2. [Plan A step 2] — execution level (status: pending)
    `valid:false` 면 **Phase 2.5 로 회귀**해 `missing` 에 나온 섹션을 채운다. ⚠️ 이 검사는 **구조만** 본다 — 섹션이 존재한다는 것이지 내용이 좋다는 뜻이 아니다. **통과를 "계획이 좋다"로 보고하지 않는다.** 의미 품질은 사용자 승인과 Pre-mortem 이 담당한다.
 
 5. **내용 완전성 게이트 (v3.21+)** — Standard+ 는 🧰 실행전략(난이도·모델·병렬·스킬·자원)·💡 시사점/⚠️ 주의점/🔀 Side Effect·✅ 검증 전략(수단·범위·보고)이 실제로 채워졌는지 검사. 빈 섹션 = reject → 회귀. 계획 md 가 `/cc` 실행 Todo 보다 얕으면 reject (원칙 0). (Fast=오타·변수명만은 예외, 단 How·검증수단은 압축해도 생략 금지.)
+6. **브랜치 게이트 (v3.25+)** — frontmatter 의 `repo` / `base` / `branch` 가 채워졌는지 확인하고, **감지된 base 를 승인 화면에 그대로 표시**한다:
+
+   ```text
+   브랜치: feat/<slug>  ←  base: staging  (감지: upstream)   [레포: Returns_ERP_v20]
+   ```
+
+   표시가 게이트인 이유: 사용자가 **승인 시점에 위험한 base 를 눈으로 잡을 수 있어야** 한다. `Returns_ERP_v20` 은 base 가 `staging` 이고 **staging 머지는 곧 배포**다 — 승인 화면에 base 가 안 보이면 "계획 승인"이 "배포 경로 승인"인 줄 모른 채 지나간다. **base 판정 불가면** 추정으로 채우지 말고 `⚠️ base 판정 불가 (레포: <repo>)` 를 표시한 뒤 AskUserQuestion 으로 진행 여부를 확인한다 (조용한 추정 0건).
 
 게이트 미통과 시 사유 표시하며 Phase 0 또는 Phase 2 로 회귀.
 
@@ -812,6 +854,11 @@ original_request: {사용자 원본 요청}
 
 [GRADE] {fast|standard|deep} ({사용자 지정|자동 판정 — 사유})
 
+[BRANCH — /cc 가 이 브랜치를 만들고 그 위에서만 커밋한다]
+repo: {repo}
+base: {base} (source: config|upstream|origin-head)
+branch: {branch}
+
 [CURRENT_PATH] Plan A
 [PLAN_A_STEPS] {Plan A 체크리스트}
 [PLAN_A_FAILURE_TRIGGERS] {막힐 수 있는 지점 리스트 — Plan B 매칭 키}
@@ -820,6 +867,8 @@ original_request: {사용자 원본 요청}
 ```
 
 > **왜 이 네 블록이 필수인가 (v3.25)**: 계획서에 적어놓고 실행자에게 넘기지 않으면 그 판단은 버려진다. **DO NOT CHANGE** 가 없으면 worker 가 무관한 코드를 "개선"하고(에이전트는 건드리면 안 되는 것에 대한 맥락 판단이 없다), **비목표**가 없으면 범위를 넘고, **기각된 대안**이 없으면 **이미 버린 접근을 다시 시도**한다. 페이로드에만 싣고 worker 프롬프트에 주입하지 않으면 셋 다 무의미하다.
+
+> **왜 `[BRANCH]` 블록이 필수인가 (v3.25+)**: 같은 이유가 브랜치에도 적용된다 — 계획서에 브랜치를 적어놓고 실행자에게 넘기지 않으면 실행자는 **현재 체크아웃된 브랜치(대개 base)에서 그냥 작업한다.** 그러면 base 에 직접 커밋되거나, 작업이 끝난 뒤에 브랜치가 급조되어 계획 문서와 이어지지 않는다. `branch` 는 `/cc` 가 **만들 대상**이고 `base` 는 그 브랜치를 **어디서 끊고 어디로 PR 을 낼지**의 기준이므로, 둘 다 없으면 `/cc` 의 커밋 허용 조건(현재 브랜치 == `plan.branch`)이 판정 불가가 된다. `source` 를 함께 싣는 이유는 실행자도 `staging` 같은 위험한 base 를 알아보게 하는 것이다.
 
 ### 절대 규칙
 
@@ -1039,6 +1088,59 @@ Board 는 **항상 생성**됩니다 (opt-in 없음). PLAN/DONE 모드에서 md 
 - **"수동 확인 필요"는 완료 추정 묶음에 넣지 않음** — 파싱 불가 항목은 사용자가 눈으로 판정해야 함. 추정 분류는 신뢰도가 높은 항목만.
 - **기존 Progress 섹션 존중** — 사용자가 손으로 적어둔 "재개 포인트" / "마지막 업데이트"를 근거로 삼되, 불명확하면 수동 확인 대상으로 넘김.
 
+### Phase 1.5: git 상태 판정 (v3.25+)
+
+> **머지가 확인되지 않은 task 는 history 로 이동하지 않는다.** 문서상으로는 "완료"인데 코드가 어디 있는지 아무도 모르는 상태 — 이걸 막는 것이 이 Phase 의 존재 이유다. "폴더 = 상태"(핵심 원칙 2)는 그대로 두고, **git 이 그 상태의 증거**가 된다. 규칙 SoT: `docs/rules/branch-lifecycle.md`.
+>
+> ⚠️ **DONE 모드는 git 조작이 허용되는 예외다.** `/cp` 의 절대 규칙("계획 & 문서화만 — 문서 외 파일 수정 금지")은 **PLAN 모드**에 적용된다. DONE 모드는 작업을 *닫는* 정리 단계이므로 push·PR 생성·**병합된** 브랜치 삭제를 수행한다. 대신 **Phase 1.4 의 안전 규칙을 그대로 상속**한다 — 자동 삭제 절대 금지, 사용자 승인 필수, 추측 삭제 금지. 브랜치 **생성**은 여전히 `/cc` 의 일이고 `/cp` PLAN 모드는 이름만 정한다.
+
+Phase 1.3 에서 정리 대상으로 선택된 각 task 에 대해, 문서 frontmatter 에 `branch` 가 있으면 `lib/git-branch.js` 의 `mergedState(repoPath, branch, base)` 로 판정한다:
+
+```bash
+node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3])))" . feat/<slug> <base>
+```
+
+반환값의 `state` 가 아래 5상태이고 `reason` 이 판정 근거다. **PR 유무는 `mergedState` 가 모른다** — `gh pr list --head <branch> --json number,state` 로 따로 조회한다. `gh` 부재·인증 실패면 **조용히 넘어가지 말고** "PR 상태 조회 불가" 를 표시하고 history 이동은 보류한다(머지 미확인과 같은 취급).
+
+| 상태 | 의미 | 처리 |
+|---|---|---|
+| `unpushed` | 원격에 브랜치가 없다 | **push + PR 생성 제안** (AskUserQuestion). history 이동 보류 |
+| `unmerged` (PR 없음) | 원격에 있고 미머지, PR 도 아직 없다 | **PR 생성 제안**. history 이동 보류 |
+| `unmerged` (PR 열림) | 리뷰 대기 | **history 로 내리지 않는다** → **"In Review"** 로 보고. task 파일은 `docs/tasks/` 에 그대로 둔다 |
+| `merged` / `patch-merged` | 병합이 증명됐다 | Phase 2~3(완료 인터뷰 → history 기록) → Phase 4(브랜치 삭제)로 진행 |
+| `unknown` | 계보가 달라 **도구가 병합을 증명 못 함** | **자동 처리 금지.** 사람 확인 요청 — history 이동·브랜치 삭제 **둘 다 보류** |
+
+#### 1.5.1 이중 게이트 우선순위 — git 판정이 우선
+
+Phase 1.2 의 완료추정 로직(체크리스트 ≥80% / 검증표 통과 / 버전 출시 기록)과 이 Phase 는 **이중 게이트**가 된다. 충돌 시:
+
+- **git 판정이 이긴다.** 체크리스트가 100% 여도, 강한 완료 신호(버전 출시)가 있어도 — **미머지면 history 이동 금지**다. 체크박스는 사람이 적은 주장이고, 머지는 증거다.
+- **하위호환 (필수)**: frontmatter 에 `branch` 필드가 **없는 기존 task 문서**는 Phase 1.2 의 종전 로직 그대로 판정하고 이 Phase 를 skip 한다. 그러지 않으면 브랜치 필드가 도입되기 전에 만들어진 옛 문서가 **영구히 정리 불가**가 된다. (skip 했다는 사실은 보고에 한 줄로 남긴다 — 조용한 우회 금지.)
+
+#### 1.5.2 머지 판정에 `ahead` 커밋 수를 쓰지 않는다
+
+`ahead` 개수나 조상 관계만 보면 **rebase·squash 머지된 브랜치가 영원히 미병합으로 보인다** — 두 방식 모두 커밋을 새로 쓰기 때문이다(실측: `livevil-research` PR #4). 판정은 2단이다: ① `git merge-base --is-ancestor` 빠른 경로 → ② 실패 시 **patch-id 동등성**(`git cherry origin/<base> origin/<branch>` 에 `^+` 행이 없으면 병합됨 = `patch-merged`). 둘 다 통과 못 하면 `unknown` 이고, **`unknown` 은 절대 자동 처리하지 않는다** (리베이스 중 충돌을 손으로 해결해 patch-id 가 바뀐 경우 — 도구가 병합을 증명할 수 없다는 뜻).
+
+#### 1.5.3 `Returns_ERP_v20` 예외 — 완료 처리가 배포가 되지 않게
+
+`Returns_ERP_v20` 의 base 는 `staging` 이고 **staging 머지는 곧 배포**다. 이 레포에서는 DONE 모드가 **PR 생성까지만** 하고 **머지는 사람이 한다.** `/cp done` 이 머지를 대행하면 "완료 처리 = 배포"가 되어, 문서 정리 의도로 실행한 명령이 라이브 배포를 트리거한다. 따라서 이 레포의 task 는 `unmerged` (PR 열림) → **In Review 보고에서 멈춘다.** 이후 사람이 머지한 뒤 `/cp done` 을 다시 실행하면 `merged` 판정으로 정상 마감된다.
+
+#### 1.5.4 In Review 보고 형식
+
+```text
+In Review — history 로 내리지 않았습니다 (머지 미확인)
+
+| task | branch | base | 상태 | PR |
+|------|--------|------|------|----|
+| 2026-07-25-foo.md | feat/foo | staging | unmerged (PR 열림) | #12 |
+| 2026-07-24-bar.md | fix/bar  | master  | unpushed           | — |
+
+- feat/foo: PR #12 리뷰 대기 → 머지 후 `/cp done` 재실행하면 자동 마감됩니다.
+- fix/bar: 원격에 없습니다 → push + PR 생성할까요?
+```
+
+`unknown` 은 같은 표에 `unknown (병합 증명 불가 — 사람 확인 필요)` 로 싣고, 무엇을 확인해야 하는지(어느 브랜치의 어느 커밋인지)까지 적는다.
+
 ### Phase 2: 완료 인터뷰
 
 Task 파일의 내용을 읽은 후, 5개 질문으로 결과를 수집합니다.
@@ -1089,8 +1191,20 @@ Q5. 남은 작업이나 주의사항? (선택)
 ### Phase 4: 정리
 
 1. `docs/tasks/`에서 원본 Task 파일 **삭제**
-2. TodoWrite 항목 전부 `completed` 처리
-3. 완료 메시지 표시: 생성된 history 파일 경로 + 삭제된 task 파일
+2. **병합된 브랜치 삭제 (v3.25+)** — Phase 1.5 판정이 `merged` / `patch-merged` 이고 `lens.config.json` 의 `autoDeleteMergedBranch` 가 `true` 일 때만, 해당 task 의 `branch` 를 **로컬·원격 둘 다** 삭제한다. 브랜치를 남기면 작업은 끝났는데 브랜치만 쌓인다 — 이 개편이 없애려는 상태 그 자체다.
+
+   ```bash
+   git branch -d <branch>            # 병합 안 됐으면 git 이 스스로 거부한다 (-D 쓰지 않는다)
+   git push origin --delete <branch>
+   ```
+
+   **삭제 금지 조건 (Phase 1.4 안전 규칙 상속 — 하나라도 걸리면 삭제하지 않고 사유를 보고)**:
+   - `unknown` 상태 — **절대 자동 삭제 금지.** 도구가 병합을 증명하지 못한 브랜치를 지우면 코드가 사라진다. 추측 삭제 금지.
+   - **열린 PR 의 head 브랜치** — 삭제하면 PR 이 닫힌다. In Review 는 아직 완료가 아니다.
+   - `autoDeleteMergedBranch` 가 `false` — 삭제하지 않고 "수동 정리 대상" 으로 보고만 한다.
+   - `-D`(force) 는 쓰지 않는다. `-d` 가 거부하면 그건 삭제하면 안 된다는 신호다.
+3. TodoWrite 항목 전부 `completed` 처리
+4. 완료 메시지 표시: 생성된 history 파일 경로 + 삭제된 task 파일 + **삭제된 브랜치(로컬/원격)** 또는 삭제하지 않은 사유
 
 ---
 
@@ -1274,7 +1388,7 @@ docs/
 
 - **Goal 은 절대 양보 금지** — Phase 0 게이트 통과 못한 Goal 로 Phase 5 진입 불가, `/cc` 핸드오프 시 Goal 빈 페이로드 금지
 - **계획서 골격 (v3.21+)** — 모든 계획서(Standard+)는 🎯What(사람 언어) · ❓Why(6하원칙) · 🧰실행전략(난이도·모델·병렬·스킬·자원) · 🛠How(빌드레디, 실행 Todo보다 자세) · 💡시사점·⚠️주의점·🔀Side Effect · ✅Review(검증 수단·범위·보고)로 선다. **원칙 0: 글 길이 줄이기는 목표가 아니다 — 간결=군더더기 제거지 내용 삭제가 아니며, 충돌 시 완전성 승. 계획 md는 `/cc` 실행 Todo보다 자세해야 한다.** Why·검증수단이 비면 게이트 reject.
-- `/cp` 는 **계획 & 문서화만** — 코드 실행, 파일 수정 (문서 외) 금지
+- `/cp` 는 **계획 & 문서화만** — 코드 실행, 파일 수정 (문서 외) 금지. **PLAN 모드는 브랜치 이름만 정하고 만들지 않는다**(생성은 `/cc`). **예외: DONE 모드의 정리 단계** — 작업을 닫는 단계이므로 push·PR 생성·**병합된** 브랜치 삭제를 수행한다(Phase 1.5·4). 이 예외도 Phase 1.4 안전 규칙(자동 삭제 금지·사용자 승인 필수·`unknown` 추측 삭제 금지)을 상속한다.
 - 자동 저장 필수 — "저장할까요?" 묻지 않음
 - 사용자 언어로 응답 (한국어 우선)
 - 전문가 관점 — 주니어가 놓칠 통찰 제시
@@ -1282,5 +1396,5 @@ docs/
 - **산출물 링크는 풀 경로** — 보고/안내 시 deliverable 파일은 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로의 클릭 가능 링크로 제시 (`docs/tasks/{id}.md`, `docs/tasks/{id}.html`, `docs/board_<repo>.html`).
 - **듀얼트랙 (v3.9+)** — **Standard+ 에서 항상** Codex 와 병렬 조사(P0.5) + 합성(P2.4). **Fast 등급은 skip** (속도 등급 섹션). Codex 부재/실패는 graceful degrade (Claude 단독 + 플래그). 상세: `docs/rules/codex-integration.md`. **⚠️ 등급별로 정반대**: `deep` 등급의 S4 교차 협의는 **양보 불가 하드 게이트**라 degrade 금지·정지·보고다(Constitution 2조). Fast/Standard 의 degrade 규칙을 deep 에 적용하지 않는다.
 - **등급 분기 (v3.25)** — `/cp` 하나로 fast/standard/deep 전부 커버. 등급은 **위험도**로 정하고, 사용자가 `/cp fast|standard|deep` 로 직접 지정할 수 있다. 지정 등급과 위험도 판정이 어긋나면 **양방향 가드**가 제안한다(낮춰 지정=강한 경고 / 높여 지정=가벼운 안내). 강제 전환 없음.
-- **5분 진행보고 (v3.16+, v3.25 강화 · 공통 규칙)** — Codex 대기·fan-out 조사·**Workflow**·Task 에이전트 등 5분 이상 걸리는 구간은 침묵 금지. **5분 주기**로 세 가지를 **전부** 보고: ① **생존 확인 결과**(추측 금지 — `TaskOutput(block=false)`·산출물 mtime 으로 실제 확인. **확인 없이 "진행 중"이라 말하지 않는다**) ② 끝난 것/남은 것(N/M) ③ **부분 산출물은 대기 중이라도 먼저 낸다**(대기가 산출을 100% 막지 않게). **"아직입니다"만 적는 보고는 위반.** 유실·정지 감지 시 즉시 보고 + **복구보다 폐기·재판단 우선 검토.** 사용자 VS Code 확장엔 진행창이 없다 — 보고 책임은 전적으로 스킬에 있다. (SoT: `docs/rules/harness-rules.md` §4.4.)
+- **2분 진행보고 (v3.16+, v3.25 강화 · 공통 규칙)** — Codex 대기·fan-out 조사·**Workflow**·Task 에이전트 등 2분 이상 걸리는 구간은 침묵 금지. **2분 주기**로 세 가지를 **전부** 보고: ① **생존 확인 결과**(추측 금지 — `TaskOutput(block=false)`·산출물 mtime 으로 실제 확인. **확인 없이 "진행 중"이라 말하지 않는다**) ② 끝난 것/남은 것(N/M) ③ **부분 산출물은 대기 중이라도 먼저 낸다**(대기가 산출을 100% 막지 않게). **"아직입니다"만 적는 보고는 위반** — 세 요소가 다 없는 보고는 보고가 아니다. 유실·정지 감지 시 즉시 보고 + **복구보다 폐기·재판단 우선 검토.** 사용자 VS Code 확장엔 진행창이 없다 — 보고 책임은 전적으로 스킬에 있다. **이 주기는 훅이 강제한다** — 스킬 본문의 권고에만 의존하면 컨텍스트가 길어질 때 조용히 건너뛰어진다(실측). ⚠️ **단, Lens 대시보드·훅의 `done` / `All N agents complete` 출력을 생존확인 근거로 쓰지 마라** — 백그라운드 에이전트는 도구 호출이 즉시 반환되므로 그 신호가 **배포 직후에 거짓 완료로 나온다**(실측: 10개 배포 직후 전부 `done (132ms)`, 실제로는 최대 311초 실행 중). ①의 실측은 `TaskOutput(block=false)`·산출물 mtime 처럼 **에이전트 바깥의 증거**로 한다. (SoT: `docs/rules/harness-rules.md` §4.4.)
 - Phase 순서 (Standard 기준) — What+Why (P0) → **Codex 병렬 조사 (P0.5)** → Plan A=How (P1) → Plan B=How (P2) → **듀얼 합성·교차검증 (P2.4)** → 문서 작성 (P2.5) → **HTML 보고서+board (P2.6)** → Pre-mortem (P3) → TodoWrite (P4) → 사용자 검토 (P5) → 응답 (P6). 문서 골격은 **What→Why→How→Review** 순. **Fast 등급은 P0.5·P2·P2.4·P2.6(HTML)·P3 를 skip** 하고 What+Why→Plan A→md+board→승인 으로 직행(4주제 각 한 줄). What·Why 먼저, How·Review 는 그 다음. **완료된 Standard PLAN = {md, html, board} 원자적 3-파일 세트**, **Fast PLAN = {md, board}**.

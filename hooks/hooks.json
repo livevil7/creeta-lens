@@ -56,6 +56,15 @@
             "timeout": 3000
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-progress.js",
+            "timeout": 3000
+          }
+        ]
       }
     ],
     "Stop": [

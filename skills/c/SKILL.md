@@ -85,7 +85,7 @@ Leader · Worker · Supervisor · QA — 모든 phase가 이 4규칙을 따른�
 > 사용자가 매번 다시 지시하던 것을 **스킬 레벨 기본 동작**으로 박는다. 전역 CLAUDE.md 가 없거나 안 읽혀도(cron·타 머신) 적용. 사용자의 명시적 반대에만 양보.
 
 1. **산출물 경로 자동 보고** — 작업 종료 시 생성·변경한 파일/이미지/문서의 **풀 경로(프로젝트 루트 기준)** 를 항상 보고한다. 사용자가 "어디 저장했어?" 를 묻게 만들지 마라.
-2. **장시간 작업 진행보고** — 2분 이상 걸리면 침묵 금지, 주기적 진행 한 줄. background/long-running 은 `/loop 2m <progress check>` 또는 ScheduleWakeup 으로 자동 보고.
+2. **장시간 작업 진행보고 (2분 주기 · 훅으로 강제)** — 2분 이상 걸리면 침묵 금지, **2분 주기**로 진행 보고. 백그라운드 작업 중 120초를 넘기면 `PostToolUse` 훅(`hooks/post-tool-progress.js`)이 보고 요구를 주입한다 — 리마인더 무응답은 명백한 위반. 상세는 아래 "2분 진행보고" 절.
 3. **즉시·끝까지 실행** — "~할까요?" 헤지·옵션 나열·작업 떠넘김("직접 해주세요") 금지. 막히면 우회해서라도 직접 끝낸다.
 4. **단, 보고-먼저 예외** — 위험(대량 삭제·배포·외부 발행)·되돌리기 어려움·**시각적 변경(UI·색상·디자인)** 은 적용 *전* 1줄 보고/미리보기 후 진행. (3 과 충돌 아님 — 일반 작업은 즉시, 위험·시각만 보고-먼저.)
 5. **완료 후 자동 커밋+동기화** — Goal 게이트 통과 시 `lens.config.json` `autoCommitOnComplete`(기본 **on**) 로 commit+push. **`.gitignore` 존중(시크릿 임의 제외 금지 — 사용자는 민감파일을 의도적으로 버전관리)**·기본 브랜치 보호·diverged 보고만. 안전 규칙 상세는 `/cc` Phase 7.4 와 동일.
@@ -100,7 +100,7 @@ User Request
 Phase 1: Leader — Analyze & Plan (current model)
   - Decompose into task list
   - Match installed skills
-  - Assign model (haiku/sonnet/TOP)
+  - Assign model (4-rung ladder: haiku/sonnet/opus/TOP)
   - Read docs/rules/ constraints
   ↓
 Phase 2: Approval Request (AskUserQuestion)
@@ -109,7 +109,7 @@ Phase 2: Approval Request (AskUserQuestion)
   ↓
 Phase 3: Worker Deployment + Monitor (SEQUENTIAL — /c ONLY)
   - Create TodoWrite for all tasks
-  - Deploy Monitor agent (background, haiku, 5-min check-ins)
+  - Deploy Monitor agent (background, haiku, 2-min check-ins)
   - Execute tasks ONE BY ONE:
     - Mark task as in_progress
     - Spawn Worker with assigned model
@@ -155,10 +155,13 @@ Break into concrete sub-tasks. Each task should be:
 For each task, identify:
 - **Domain** — code, documentation, testing, deployment, research, etc.
 - **Skill match** — match to installed skills if one fits
-- **Model** — assign based on difficulty (difficulty ladder — each rung is a *relative position* that rises automatically with new model generations, v3.24+):
-  - **Easy** (file reading, search, data gathering, simple edits) → `haiku` (lightweight tier)
-  - **Medium** (code writing, analysis, debugging, content creation) → `sonnet` (mid tier)
-  - **Hard** (architecture, complex refactoring, security, planning) → **TOP** (top tier — **always assign the model explicitly**: the Task tool enum's top tier, currently `fable`, falling back to `opus` if absent. Never omit the override to inherit — see the TOP note below.)
+- **Model** — assign based on difficulty. The ladder has **4 rungs**, one per Task-tool enum tier (`haiku`/`sonnet`/`opus`/`fable`). Each rung is a *relative position*, so it rises automatically with new model generations. **One-line test: if the work involves reasoning (weighing trade-offs), it belongs on the upper tier or above; if it is formulaic repetition, the mid tier or below.**
+  - **Easy** (repetitive / lookup / mechanical — file reading, search, data gathering, simple edits; no reasoning) → `haiku` (lightweight tier)
+  - **Medium** (straightforward development — formulaic edits, minimal judgement) → `sonnet` (mid tier)
+  - **Hard** (development / review / design that involves reasoning — trade-off judgement) → `opus` (**upper tier**)
+  - **Critical** (highest difficulty — irreversible, security, core architecture) → **TOP** (top tier — **always assign the model explicitly**: the Task tool enum's top tier, currently `fable`, falling back to `opus` if absent. Never omit the override to inherit — see the TOP note below.)
+
+  The old 3-rung ladder left the `opus` rung empty, so everything needing reasoning fell to `sonnet` (user-reported). Four rungs fix that.
 
 ### 1.3 Read Project Constraints
 
@@ -194,7 +197,7 @@ Task 목록: {N}개 (순차 실행)
 └───┴──────────────────────┴────────────┴────────┴──────────┘
 
 실행 모드: 순차 (한 번에 하나)
-모니터링: 5분 주기 진행 보고
+모니터링: 2분 주기 진행 보고
 ```
 
 Options:
@@ -221,7 +224,7 @@ Create TodoWrite entries for all tasks:
 Launch a **Monitor agent** that runs continuously in the background (using `/loop` skill or background Agent):
 
 **Monitor responsibilities:**
-- Run every 5 minutes
+- Run every 2 minutes
 - Read TodoWrite current status
 - Count: completed / total tasks, identify current task
 - Report: "진행 현황: {completed}/{total} 완료. 현재: {current_task_name}"
@@ -241,7 +244,7 @@ For each task:
 
 ```
 1. Mark TodoWrite as in_progress: "진행 중: Task N"
-2. Spawn Worker agent with assigned model (haiku/sonnet/TOP)
+2. Spawn Worker agent with assigned model (haiku/sonnet/opus/TOP — always explicit)
 3. Worker prompt includes:
    - Sub-task description (from Phase 1 plan)
    - Assigned skill methodology (if any): "Follow /investigate methodology"
@@ -377,9 +380,9 @@ Skip Supervisor for simple requests (1-2 easy tasks) → go straight to Phase 6.
 
 Worker 할당 테이블을 스캔하여 `TOP` worker 존재 여부 확인:
 - 하나라도 있음 → Supervisor 모델 = `TOP` (worker 산출물 깊이를 따라잡기 위해 — 판정 절차는 1.2 참조)
-- 없음 → Supervisor 모델 = `sonnet` (기본, 비용 효율)
+- 없음 → Supervisor 모델 = **상위 티어 (현재 `opus`)** (기본)
 
-이유: Worker (Hard) 작업을 TOP이 했는데 Supervisor를 sonnet으로 두면 "주니어가 시니어 코드 리뷰"하는 역전 구조. 단순 태스크에 과잉 비용을 피하면서도 깊이 필요할 때만 승격.
+이유: 리뷰는 트레이드오프 판단이 들어가는 사고과정 작업이므로 4단 사다리 판정 한 줄에 따라 **상위 티어가 하한**이다(구 기본값 `sonnet` 은 opus 칸이 비어 있던 3단 사다리의 잔재). Worker (Critical) 작업을 TOP이 했는데 Supervisor를 그 아래로 두면 "주니어가 시니어 코드 리뷰"하는 역전 구조이므로 그때만 TOP 으로 승격.
 
 Spawn a **Supervisor agent** (model selected by 4.0 above):
 
@@ -387,7 +390,7 @@ Spawn a **Supervisor agent** (model selected by 4.0 above):
 You are the Supervisor agent for Lens v3.25.0. Review all Worker outputs.
 
 ## 당신의 모델
-당신의 모델은 {assigned_model}입니다. (TOP/sonnet)
+당신의 모델은 {assigned_model}입니다. (TOP/opus)
 TOP인 경우: 깊은 추론과 구조적 통찰에 집중. 단순 코드 스타일 체크 외에도 아키텍처 의사결정의 trade-off까지 검토.
 
 ## Original Request
@@ -622,9 +625,11 @@ Show full skill inventory (same as before):
 - Total count by type
 - Do NOT recommend or execute anything
 
-## Model Assignment Table (difficulty ladder — v3.24+)
+## Model Assignment Table (difficulty ladder — 4 rungs)
 
-> **TOP** = the top tier of the difficulty ladder. **Always assign the model explicitly** — the Task tool enum's top tier (currently `fable`, falling back to `opus` if absent). Ladder rungs are *relative positions*, so they rise automatically with new model generations via the enum.
+> **The ladder has 4 rungs**, mapped 1:1 onto the Task tool enum tiers (`haiku`/`sonnet`/`opus`/`fable`): lightweight (`haiku`) / mid (`sonnet`) / **upper (`opus`)** / **top = TOP (`fable`)**. **TOP** = the top tier. **Always assign the model explicitly** — the Task tool enum's top tier (currently `fable`, falling back to `opus` if absent). Ladder rungs are *relative positions*, so they rise automatically with new model generations via the enum.
+>
+> **One-line test: if the work involves reasoning (weighing trade-offs), it belongs on the upper tier or above; if it is formulaic repetition, the mid tier or below.** The old 3-rung ladder left the `opus` rung empty, which dumped every reasoning task onto `sonnet` (user-reported).
 >
 > **Inheritance is banned (v3.25).** Omitting the model override hides the real model from the tracking hook (`tool_input.model` is undefined), and when the session runs a top-tier model it silently promotes *every* Hard role to that tier — the measured root cause of top-tier overuse (2026-07-20). Explicit assignment is what makes usage auditable and therefore controllable.
 >
@@ -633,12 +638,15 @@ Show full skill inventory (same as before):
 | Role | Model | Reason |
 |------|-------|--------|
 | Leader (planning) | current | Best quality for task decomposition |
-| Worker (easy) | haiku (lightweight tier) | File reading, search, data gathering, simple edits |
-| Worker (medium) | sonnet (mid tier) | Code writing, analysis, debugging, content creation |
-| Worker (hard) | TOP (currently fable) | Architecture, complex refactoring, security, planning |
-| Supervisor | sonnet (default) / TOP (when any Worker uses TOP) | Quality review; upgrades to TOP when reviewing TOP worker output for parity |
+| Worker (Easy) | haiku (lightweight tier) | Repetitive / lookup / mechanical — file reading, search, data gathering, simple edits. No reasoning |
+| Worker (Medium) | sonnet (mid tier) | Straightforward development — formulaic edits, minimal judgement |
+| Worker (Hard) | opus (upper tier) | Development / review / design that involves reasoning — trade-off judgement |
+| Worker (Critical) | TOP (currently fable) | Highest difficulty — irreversible, security, core architecture |
+| Supervisor | opus (upper tier, default) / TOP (when any Worker uses TOP) | Review is reasoning work, so the upper tier is the floor; upgrades to TOP when reviewing TOP worker output for parity |
 | QA | haiku | Test execution, not deep analysis |
 | Monitor | haiku | Lightweight status checks |
+
+> **TOP budget counts the top tier only** — the upper tier (`opus`) is **not** counted against any TOP cap.
 
 ## Rules
 
@@ -660,7 +668,7 @@ Show full skill inventory (same as before):
 - Pass relevant rules to Workers in their prompts
 
 ### During Execution
-- TodoWrite tracks real-time progress (5-min Monitor check-ins)
+- TodoWrite tracks real-time progress (2-min Monitor check-ins)
 - Workers report status as they complete tasks
 
 ### After Execution
@@ -689,9 +697,9 @@ Phase 6: Final report, no Supervisor/QA needed
 User: "Refactor the auth module, update tests, and review the code"
 
 Phase 1: Leader analyzes
-  Task 1: Refactor auth module (Hard, TOP=fable, general)
-  Task 2: Update tests (Medium, sonnet, /qa)
-  Task 3: Code review (Medium, sonnet, /review)
+  Task 1: Refactor auth module (Hard → opus, general)
+  Task 2: Update tests (Medium → sonnet, /qa)
+  Task 3: Code review (Hard → opus, /review)   ← review = reasoning work
 
 Phase 2: Show approval table, user approves
 
@@ -720,21 +728,23 @@ Phase 6: Final report + docs update
 | Worker count | 1 | N (one per task) |
 | Phase 3 | Single Worker loop | All Workers spawned at once |
 | Best for | Single-focus work, sequential dependencies | Multi-domain work, independent tasks |
-| Monitoring | 5-min check-ins | 5-min check-ins |
+| Monitoring | 2-min check-ins | 2-min check-ins |
 | Iterations | Up to 5 (Supervisor/QA loop) | Up to 5 (Supervisor/QA loop) |
 | Context passing | Yes — previous task results → next task | No — tasks are independent |
 
 ## Implementation Notes
 
-### 5분 진행보고 (공통 규칙, v3.25)
+### 2분 진행보고 (공통 규칙 · 훅으로 강제)
 
-Worker 실행·codex 대기 등 백그라운드 작업이 5분 이상이면 침묵 금지. **5분 주기**로 세 가지를 **전부** 보고한다: ① **생존 확인 결과** — 추측 금지, `TaskOutput(block=false)`·산출물 mtime 으로 **실제 확인 후** 보고하며 **확인 없이 "진행 중"이라 말하지 않는다** ② 끝난 것/남은 것(N/M) ③ **부분 산출물은 대기 중이라도 먼저 낸다**. **"아직입니다"만 적는 보고는 위반.** 유실·정지 감지 시 즉시 보고하고 **복구보다 폐기·재판단을 우선 검토**한다. 사용자 VS Code 확장에는 진행창이 없어 스스로 확인할 수단이 없다 — 보고 책임은 전적으로 스킬에 있다. (SoT: `docs/rules/harness-rules.md` §4.4.)
+Worker 실행·codex 대기 등 백그라운드 작업이 2분 이상이면 침묵 금지. **2분 주기**로 세 가지를 **전부** 보고한다: ① **생존 확인 결과** — 추측 금지, `TaskOutput(block=false)`·산출물 mtime 으로 **실제 확인 후** 보고하며 **확인 없이 "진행 중"이라 말하지 않는다** ② 끝난 것/남은 것(N/M) ③ **부분 산출물은 대기 중이라도 먼저 낸다**. **"아직입니다"만 적는 보고는 위반.** 유실·정지 감지 시 즉시 보고하고 **복구보다 폐기·재판단을 우선 검토**한다. 사용자 VS Code 확장에는 진행창이 없어 스스로 확인할 수단이 없다 — 보고 책임은 전적으로 스킬에 있다. (SoT: `docs/rules/harness-rules.md` §4.4.)
+
+**산문만으로는 조용히 스킵되므로 훅이 강제한다.** `hooks/post-tool-progress.js` 가 `PostToolUse`(전 도구)에서 경과를 추적해, 백그라운드 작업이 in-flight 인 상태로 120초를 넘기면 위 세 요소를 요구하는 리마인더를 주입한다. 백그라운드 작업이 없는 짧은 턴에서는 울리지 않는다(오탐 억제). 리마인더가 떴는데 무응답이면 명백한 위반. 다만 **블로킹 도구 호출 도중에는 훅이 발생하지 않으므로**, 장시간 작업은 백그라운드 spawn + 폴링으로 돌려야 보호를 받는다.
 
 ### Using loop Skill for Monitor
 
 Monitor can be deployed with `/loop` skill:
 ```
-/loop 5m haiku-prompt "Check TodoWrite status and report"
+/loop 2m haiku-prompt "Check TodoWrite status and report"
 ```
 
 Or as a background Agent (if Agent SDK supports `run_in_background: true`).
@@ -770,8 +780,8 @@ If a Worker fails/errors:
 
 | Problem | Solution |
 |---------|----------|
-| Worker hangs | Monitor's 5-min report helps identify stuck tasks; can manually abort and re-run Phase 3 for failed task only |
-| Model too weak | User can Modify in Phase 2 to upgrade haiku → sonnet, sonnet → TOP |
+| Worker hangs | Monitor's 2-min report helps identify stuck tasks; can manually abort and re-run Phase 3 for failed task only |
+| Model too weak | User can Modify in Phase 2 to climb the ladder: haiku → sonnet → opus → TOP |
 | Task needs more context | Leader includes previous task results in Phase 1 → Worker receives context in Phase 3 |
 | Supervisor too strict | User can approve partial results and adjust next iteration's feedback |
 | Missing project rules | Leader reads docs/rules/ in Phase 1.3 and passes to Workers |

@@ -32,6 +32,11 @@ function main() {
     const dashboard = endSession(sessionStatus);
     const summary = dashboard.summary;
 
+    // Reset the 2-minute progress-report clock: the turn just ended, so the user
+    // has received a message. Re-arms on the next background spawn/poll.
+    // (See hooks/post-tool-progress.js)
+    clearProgressReportState();
+
     // Stop hook does not support hookSpecificOutput in Claude Code schema
     // Dashboard is already saved by endSession() above
     writeJson({});
@@ -40,6 +45,17 @@ function main() {
     writeJson({});
     process.exit(0);
   }
+}
+
+/**
+ * Delete the progress-report state file (fail-soft).
+ */
+function clearProgressReportState() {
+  try {
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const statePath = path.join(projectRoot, '.lens', 'progress-report-state.json');
+    if (fs.existsSync(statePath)) fs.unlinkSync(statePath);
+  } catch {}
 }
 
 /**
