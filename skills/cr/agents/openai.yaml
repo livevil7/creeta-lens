@@ -1,0 +1,6 @@
+interface:
+  display_name: "Creeta Research"
+  short_description: "Research current evidence across live source channels"
+  default_prompt: "Use $cr to research this topic from current, cited sources."
+policy:
+  allow_implicit_invocation: true

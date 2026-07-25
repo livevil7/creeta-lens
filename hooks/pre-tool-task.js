@@ -12,7 +12,7 @@
 const path = require('path');
 const fs = require('fs');
 
-const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
+const PLUGIN_ROOT = process.env.PLUGIN_ROOT || process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
 const { installFailSoftHandlers, readJsonInput, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('pre-tool-task');
 
@@ -24,7 +24,8 @@ function main() {
     // Read tool input from stdin
     const input = readJsonInput();
     const toolInput = input?.tool_input || {};
-    const description = toolInput.description || toolInput.prompt || toolInput.task || '';
+    const description = toolInput.description || toolInput.prompt || toolInput.task ||
+      toolInput.message || toolInput.task_name || '';
 
     // Register the agent in dashboard.
     // v3.25: record the spawn model so TOP-tier usage is auditable. An omitted
@@ -32,7 +33,7 @@ function main() {
     // observe — skills must therefore always specify one explicitly.
     const agent = registerAgent(description, {
       model: toolInput.model || null,
-      agentType: toolInput.subagent_type || null,
+      agentType: toolInput.subagent_type || toolInput.task_name || null,
     });
 
     // Output: allow the tool to proceed + report tracking info

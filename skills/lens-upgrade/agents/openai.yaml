@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lens Upgrade"
+  short_description: "Safely refresh Lens from its tracked Git marketplace"
+  default_prompt: "Use $lens-upgrade to upgrade Lens from the official tracked marketplace."
+policy:
+  allow_implicit_invocation: true

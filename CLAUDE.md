@@ -1,12 +1,20 @@
-# lens — Skill navigator & plan-first execution engine for Claude Code
+# lens — dual-runtime workflow engine for Claude Code and Codex
 
-Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the best match, and executes it. Plan-first execution with /cp.
+Ships 11 planning, execution, verification, research, update, and repository
+workflows through one behavioral specification with native host adapters.
 
 ## Version
 
-- Current: **v3.25.0**
-- Updated: 2026-07-20
-- Source of truth: `.claude-plugin/plugin.json`
+- Current: **v3.26.0**
+- Updated: 2026-07-25
+- Source of truth: `.claude-plugin/plugin.json` + `.codex-plugin/plugin.json`
+- v3.26.0 feat: **Codex 정식 런타임 지원.** 11개 `skills/*/SKILL.md`를
+  표준 이중 런타임 진입점으로 전환하고 기존 Claude 전문은
+  `references/claude-workflow.md`에 보존. `agents/openai.yaml` UI 메타,
+  native collaboration/update_plan/web mapping, Codex 전용 Git marketplace
+  updater, `/ci`·`/cu` Codex 상태 파서, `PLUGIN_ROOT`/`PLUGIN_DATA` 및 Windows
+  hook 경로를 추가. 설치 기본은 local path가 아닌 추적 가능한 Git
+  marketplace. 상세: `CHANGELOG.md` + `docs/rules/dual-runtime.md`.
 - v3.25.0 feat/breaking: **계획 엔진 개편**. ① **`/cpp` 폐지 → `/cp deep` 흡수** (3등급 fast/standard/deep, 트리거 22개 이관, `planner: cpp` 하위호환). ② **등급 기준 = 분량이 아니라 위험도** + `/cp fast|standard|deep` 명시 지정 + **양방향 불일치 가드**(낮춰=강한경고/높여=가벼운안내). ③ **골격 신규 필수**: 🚧비목표·🔀**검토된 대안**·🚫DO NOT CHANGE·⚠️리스크 레지스터·❓미해결 질문(차단만 0). 필수 7 + 조건부 부록. ④ **실행 진입 게이트**(`/cc`·`/c`) — 작성 시점은 우회 경로가 많아 실행 시점에 검사. 미달 시 실행 거부. ⑤ **되먹임 고리** — 핸드오프 4블록 확장 + worker 프롬프트 주입 + 편차 기록 + 실행 지표(추가 질문 수). ⑥ **모델 상속 폐기** — 모든 spawn 모델 명시, `/ccp` TOP 6→1, `/cc` 연쇄승격→위험도 기반, TOP 상한. 계측 훅 배선. ⑦ **`/cs` PR-only** — 커밋 **전** 브랜치 분기, fail-closed, base=upstream, 미병합≠동기화완료. ⑧ `validatePlanStructure` 부활(v3.4 골격에서 3세대 드리프트). ⑨ 진행보고 생존확인 의무. ⑩ codex 타임아웃 규모분기(180/300/600). 상세: `CHANGELOG.md` + `docs/tasks/2026-07-20-lens-plan-engine-overhaul.md`.
 - v3.24.0 feat: **모델 정책 전환 — 고정 모델명 폐지, 난이도 사다리 + 최신 최고 모델 자동 추종** (사용자 지시: 무차별 최고 모델 배정 금지). ① Claude 축 — Easy=경량(현재 haiku)/Medium=중간(현재 sonnet)/Hard=**TOP**(세션이 enum 최상위 이상이면 상속, 미만이면 enum 최상위 명시 — 현재 fable). 칸=상대 위치라 모델 세대와 함께 자동 상승. `/c`·`/cc` 사다리 통일(`/cc` v3.11 "전부 opus" 폐기), `/ccp`=Hard 성격→TOP, Supervisor/QA=최고 Worker 티어 동급, Monitor=haiku. ② codex 축 — `-m gpt-5.5` 폐지 → **resolver**(`~/.codex/models_cache.json` priority-1 동적 선택, 현재 gpt-5.6-sol) + `MODEL_ARG` 배열 분기(빈 `-m ""` 차단) + ⚠️ 강등 플래그 의무. ③ capability-assumptions에 모델 드리프트 감시 채널. 상세: `CHANGELOG.md` + `docs/rules/codex-integration.md` §4·§6 + `docs/rules/harness-rules.md` §4.1.
 - v3.23.0 feat: **`/cp flow` 신설 + Fable 하네스 규칙 이식**. ① FLOW 모드 — 프로젝트의 "이용자 단계별 화면 ↔ 엔진/모듈 ↔ 종속·재사용"을 한 장의 인터랙티브 플로우차트로 그려 `docs/rules/flow.md`(SoT)+`flow.html`(뷰, **05-dark-developer 토큰**) = 전체 그림 Rule. 템플릿 쌍(`templates/flow.template.md`+`flow-viewer.example.html`, livevil-boost 일반화) + CONVERT `doc_kind: flow` 가드(flow 뷰어가 task 덱으로 덮이는 사고 차단). ② 하네스 규칙 — 공개 추출본(Claude Code 2.1.172 Fable, 비공식·재서술) 기반 `docs/rules/harness-rules.md` SoT + 6개 스킬 역할별 인라인(워커 "작업 규율"·Monitor "침묵은 성공이 아니다"·/cc 오케스트레이션 규율·/ccp QA 패턴·/cp·/cpp elicitation gate·/cr 리서치 규율). **additive-only 원칙**(하네스가 이미 강제하면 재복붙 금지). 상세: `CHANGELOG.md`.
@@ -72,12 +80,17 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 ```
 lens/
 ├── .claude-plugin/
-│   ├── plugin.json            # Plugin manifest (version source of truth)
+│   ├── plugin.json            # Claude Code plugin manifest
 │   └── marketplace.json       # Marketplace registration
+├── .codex-plugin/
+│   └── plugin.json            # Codex plugin manifest
+├── .agents/plugins/
+│   └── marketplace.json       # Codex marketplace entry
 ├── skills/
-│   ├── c/SKILL.md             # /c — single skill navigator
-│   ├── cc/SKILL.md            # /cc — parallel multi-agent engine
-│   └── cp/SKILL.md            # /cp — plan-first execution
+│   └── <name>/
+│       ├── SKILL.md           # short dual-runtime entry point
+│       ├── agents/openai.yaml # Codex UI metadata
+│       └── references/claude-workflow.md # complete behavioral spec
 ├── hooks/
 │   ├── hooks.json             # Hook registration (5 hooks)
 │   ├── session-start.js       # SessionStart handler
@@ -85,7 +98,9 @@ lens/
 │   ├── post-tool-task.js      # PostToolUse (Task) handler
 │   └── stop.js                # Stop handler
 ├── scripts/
-│   └── user-prompt-handler.js # UserPromptSubmit handler
+│   ├── user-prompt-handler.js # UserPromptSubmit handler
+│   ├── upgrade.py             # Claude Code safe updater
+│   └── upgrade-codex.py       # Codex Git marketplace updater
 ├── lib/
 │   ├── skill-scanner.js       # Plugin scanner (Skills, MCP, LSP)
 │   ├── keyword-matcher.js     # Dynamic keyword matching
@@ -98,10 +113,10 @@ lens/
 │   ├── execution-result.template.md # Post-execution result structure reference
 │   └── synthesis.template.md      # /cc synthesis output structure reference
 ├── docs/
-│   ├── DOCUMENTATION-GUIDE.md # Documentation standards
-│   └── DOCUMENT-CONVENTIONS.md # Document writing conventions
+│   └── rules/dual-runtime.md  # Host/tool/path translation contract
 ├── lens.config.json          # Runtime configuration
 ├── CLAUDE.md                  # This file (AI briefing)
+├── AGENTS.md                  # Codex repository briefing
 ├── CHANGELOG.md               # Version history
 ├── README.md                  # User-facing documentation
 └── LICENSE                    # MIT
@@ -111,10 +126,9 @@ lens/
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `autoRecommend` | `true` | Suggest skills via UserPromptSubmit hook |
 | `showReport` | `true` | Show "Lens Tip" line when a skill matches |
 | `minMatchScore` | `5` | Minimum keyword match score for auto-suggestions |
-| `memoryPath` | `null` | Custom memory file path (null = `~/.claude/lens/`) |
+| `memoryPath` | `null` | Custom memory path (null = host plugin data / host home fallback) |
 | `customKeywords` | `[]` | Additional keyword-to-skill mappings |
 | `planDir` | `null` | Custom plan file directory (null = project `docs/`) |
 | `defaultPlanLanguage` | `null` | Force plan language (null = auto-detect from user) |
@@ -129,7 +143,7 @@ lens/
 
 | Type | Detection Method | Example |
 |------|-----------------|---------|
-| Skill | `skills/*/SKILL.md`, `commands/*.md` | `/commit`, `/pdca` |
+| Skill | Claude cache scan or Codex native catalog; canonical `skills/*/SKILL.md` | `/commit`, `$lens:cp` |
 | MCP | `.mcp.json` (direct + `mcpServers` wrapper) | context7, playwright |
 | LSP | `lspServers` in `plugin.json` | typescript |
 | Hybrid | Skill + MCP in same plugin | Marked with `hasMcp` flag |
@@ -139,7 +153,7 @@ lens/
 | File | Location | Purpose |
 |------|----------|---------|
 | `.lens-cache.json` | Plugin root | Scan results cache for UserPromptSubmit |
-| `.lens-memory.json` | `~/.claude/lens/` | Session memory (usage counts, history) |
+| `.lens-memory.json` | host `PLUGIN_DATA`, else `~/.claude/lens/` or `~/.codex/lens/` | Session memory |
 | `agent-dashboard.json` | `.lens/` (project root) | Agent lifecycle tracking |
 | `plan-state.json` | `.lens/` (project root) | Plan status tracking (draft→approved→completed) |
 | `*.md` plan files | `docs/` (project root) | Work plan documents (`YYYY-MM-DD-slug.md`). Config `planDir` overrides |

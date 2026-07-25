@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lens Plan"
+  short_description: "Create risk-graded plans and manage their lifecycle"
+  default_prompt: "Use $cp to create the right risk-graded plan for this work."
+policy:
+  allow_implicit_invocation: true

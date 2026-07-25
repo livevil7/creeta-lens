@@ -12,7 +12,7 @@
 const path = require('path');
 const fs = require('fs');
 
-const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
+const PLUGIN_ROOT = process.env.PLUGIN_ROOT || process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
 const { installFailSoftHandlers, readJsonInput, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('post-tool-task');
 
@@ -32,7 +32,8 @@ function main() {
     // Claude Code does not pass a hook correlation ID, so match by the Task
     // description first and fall back to the most recent running agent.
     const toolInput = input?.tool_input || {};
-    const description = toolInput.description || toolInput.prompt || toolInput.task || '';
+    const description = toolInput.description || toolInput.prompt || toolInput.task ||
+      toolInput.message || toolInput.task_name || '';
     const agent = completeAgentByDescription(description, status, errorMsg);
 
     // Build summary for context
@@ -72,6 +73,7 @@ function main() {
         },
       },
     };
+    if (process.env.PLUGIN_ROOT) response.systemMessage = additionalContext;
 
     writeJson(response);
     process.exit(0);

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lens Review"
+  short_description: "Audit Lens against current Claude and Codex features"
+  default_prompt: "Use $crv to audit Lens against current native host capabilities."
+policy:
+  allow_implicit_invocation: true

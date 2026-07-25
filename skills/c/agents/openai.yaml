@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lens Execute"
+  short_description: "Plan, execute, review, and verify sequential work"
+  default_prompt: "Use $c to execute this task sequentially with review and verification."
+policy:
+  allow_implicit_invocation: true

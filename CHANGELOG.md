@@ -1,3 +1,42 @@
+## [3.26.0] - 2026-07-25
+
+### Added (v3.26.0)
+
+- **Claude Code + Codex 이중 런타임 스킬 계층.** 11개 표준
+  `skills/*/SKILL.md`를 짧은 호스트 감지 진입점으로 전환하고, 기존 Claude
+  워크플로 전문은 각 `references/claude-workflow.md`에 보존했다. Codex에서는
+  `update_plan`·native collaboration agents·`web.run`·현재 승인 정책으로
+  번역하며, Claude에서는 기존 도구 흐름을 유지한다.
+- **Codex UI 메타데이터.** 모든 스킬에 `agents/openai.yaml`을 추가해 표시명,
+  설명, 기본 `$skill` 프롬프트, 암시적 호출 정책을 정식 규격으로 제공한다.
+- **Codex 전용 안전 업데이터.** `scripts/upgrade-codex.py`가
+  `livevil7/creeta-lens` Git marketplace 여부를 검증하고 marketplace refresh
+  → plugin add → 버전·enabled·source 검증 → receipt 저장까지 수행한다.
+
+### Changed (v3.26.0)
+
+- **공식 Git marketplace 설치가 기본.** README와 self-upgrade 흐름에서
+  local-path 설치를 개발 전용으로 명확히 분리해 이후 upgrade가 끊기지 않게
+  했다.
+- **`/ci`와 `/cu`의 Codex 런타임 지원.** `install-sync.js`는
+  `--runtime codex`와 `~/.codex/lens/manifest.json`을 지원하고,
+  `cu.py`는 Codex plugin JSON 상태와 Git marketplace 업데이트를 다룬다.
+- **훅·상태 경로 이중화.** Windows `commandWindows`, Codex
+  `PLUGIN_ROOT`/`PLUGIN_DATA`, Codex 프로젝트 경로, `.codex-plugin`
+  capability-audit 감지를 추가했다. Codex에서는 Claude slash-command
+  강제 주입을 비활성화한다.
+- **릴리스 배선 통합.** `bump-version.sh`가 Claude와 Codex 매니페스트,
+  이중 런타임 진입점, 보존된 Claude 레퍼런스를 한 버전으로 갱신한다.
+
+### Fixed (v3.26.0)
+
+- **Codex에서 깨지던 Claude 전용 호출 제거.** 일반 스킬 실행 중 존재하지 않는
+  `CLAUDE_PLUGIN_ROOT`, `Task`, `TaskOutput`, `TodoWrite`,
+  `AskUserQuestion`, `EnterPlanMode`, `Skill` 호출을 Codex-native 동작으로
+  치환했다.
+- **Codex Desktop 실행 파일 탐색.** WindowsApps alias가 직접 실행을 거부하는
+  환경에서 `CODEX_CLI_PATH`와 `~/.codex/config.toml`의 번들 CLI 경로를 우선
+  사용한다.
 ## [3.25.0] - 2026-07-20
 
 계획 엔진 개편 — 기획서 품질 게이트 · 모델 배분 통제 · /cs PR 전환 · /cpp 정리.

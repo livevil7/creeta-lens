@@ -17,6 +17,14 @@ installFailSoftHandlers('user-prompt-handler');
 
 const config = safeReadJson(path.join(PLUGIN_ROOT, 'lens.config.json'), {}) || {};
 
+// Codex has native plugin-qualified skill discovery and invocation (`$lens:c`).
+// Reusing Claude's slash-command override would inject nonexistent Skill and
+// AskUserQuestion tool names, so the Codex hook intentionally stays quiet.
+if (process.env.PLUGIN_ROOT) {
+  writeJson({ systemMessage: '' });
+  process.exit(0);
+}
+
 if (config.autoRecommend === false) {
   writeJson({ systemMessage: '' });
   process.exit(0);

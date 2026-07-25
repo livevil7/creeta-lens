@@ -1,7 +1,7 @@
 {
   "name": "lens",
-  "version": "3.24.0",
-  "description": "Skill navigator, planning, parallel execution, research, review, and multi-repo sync workflows.",
+  "version": "3.26.0",
+  "description": "Dual-runtime Lens workflows for skill navigation, planning, native Codex multi-agent execution, verification, research, updates, and repository synchronization.",
   "author": {
     "name": "Lens",
     "email": "livevil7@gmail.com",
@@ -16,13 +16,15 @@
     "planning",
     "parallel-execution",
     "research",
-    "git-sync"
+    "git-sync",
+    "codex",
+    "multi-agent"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Lens",
-    "shortDescription": "Planning and execution workflows",
-    "longDescription": "Provides the complete Lens workflow suite for planning, parallel execution, research, review, documentation, installation, and repository synchronization.",
+    "shortDescription": "Native planning, execution, and verification",
+    "longDescription": "Provides 11 Codex-native Lens skills for planning, sequential and parallel execution, adversarial verification, research, documentation, plugin updates, and repository synchronization while preserving Claude Code compatibility.",
     "developerName": "Lens",
     "category": "Productivity",
     "capabilities": [
@@ -33,7 +35,7 @@
     "defaultPrompt": [
       "Use Lens to plan this task.",
       "Use Lens to execute this work.",
-      "Use Lens to research this topic."
+      "Use Lens to verify or research this work."
     ]
   }
 }

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lens Update"
+  short_description: "Scan and selectively update installed CLIs and plugins"
+  default_prompt: "Use $cu to scan this machine and update only the items I select."
+policy:
+  allow_implicit_invocation: true

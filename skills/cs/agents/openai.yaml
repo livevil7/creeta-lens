@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lens Sync"
+  short_description: "Synchronize repositories through guarded Git and PR flows"
+  default_prompt: "Use $cs to synchronize the repositories in this workspace safely."
+policy:
+  allow_implicit_invocation: true

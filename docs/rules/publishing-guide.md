@@ -1,6 +1,6 @@
 # Lens Publishing Guide
 
-플러그인 배포 및 등록 가이드.
+Claude Code와 Codex용 플러그인 배포 및 등록 가이드.
 
 ## 1. Anthropic 공식 디렉토리
 
@@ -36,23 +36,31 @@
 - [lens](https://github.com/CreetaCorp/lens) - Skill navigator for Claude Code. Scans all plugins, recommends the best match, and executes — single (/c), parallel (/cc), or plan-first (/cp). 8 languages.
 ```
 
-## 3. 독립 마켓플레이스 (현재 방식)
+## 3. 독립 Git 마켓플레이스 (현재 방식)
 
-유저가 직접 레포를 마켓플레이스로 추가:
+두 호스트 모두 같은 공식 Git repository를 추적한다. normal install을
+local path로 바꾸지 않는다.
 
 ```bash
-# 마켓플레이스 추가
-/plugin marketplace add CreetaCorp/lens
+# Claude Code
+claude plugin marketplace add livevil7/creeta-lens
+claude plugin install lens@CreetaCorp
 
-# 플러그인 설치
-/plugin install lens@CreetaCorp
+# Codex
+codex plugin marketplace add livevil7/creeta-lens
+codex plugin add lens@CreetaCorp
 ```
+
+Codex marketplace entry는 `.agents/plugins/marketplace.json`, plugin
+manifest는 `.codex-plugin/plugin.json`이다. Claude Code는
+`.claude-plugin/marketplace.json`과 `.claude-plugin/plugin.json`을 사용한다.
 
 ## 4. --plugin-dir (개발용)
 
 ```bash
-git clone https://github.com/CreetaCorp/lens.git
+git clone https://github.com/livevil7/creeta-lens.git
 claude --plugin-dir ./lens
 ```
 
-캐시 없이 디렉토리에서 직접 로드. 개발/테스트 전용.
+캐시 없이 디렉토리에서 직접 로드. 개발/테스트 전용이며 이후
+marketplace upgrade 경로로 취급하지 않는다.

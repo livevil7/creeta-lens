@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lens Start"
+  short_description: "Generate a reliable repository first-read guide"
+  default_prompt: "Use $cps to derive docs/START_HERE.md from this repository."
+policy:
+  allow_implicit_invocation: true

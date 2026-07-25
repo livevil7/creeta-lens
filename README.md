@@ -1,8 +1,11 @@
-# Lens v3.25.0
+# Lens v3.26.0
 
 **Never wonder which plugin to use again.**
 
-Lens is a skill navigator and multi-agent orchestrator for Claude Code. It scans your installed plugins, finds the best skill for your task, and runs it — all from a single command.
+Lens is a skill navigator, planner, verifier, updater, and multi-agent
+orchestrator for **Claude Code and Codex**. The same 11 skills keep one
+behavioral specification while translating orchestration, planning, web,
+plugin, and approval operations to each host's native tools.
 
 Works with **any** combination of plugins. No hardcoded dependencies.
 
@@ -13,7 +16,8 @@ You installed 10+ plugins. That's 50+ slash commands, MCP tools, and LSP servers
 ## The Solution
 
 ```
-You: /c build a dashboard with auth
+Claude Code: /c build a dashboard with auth
+Codex:       $lens:c build a dashboard with auth
 
 Lens — Skill Scan
 | #  | Name          | Type  | Plugin    | Domain   |
@@ -40,35 +44,53 @@ Select a skill and Lens runs it immediately.
 
 ## Installation
 
-### Option 1: Load directly from GitHub (Recommended)
+Install from the tracked Git marketplace for normal use. A local-path install
+is development-only and does not provide the normal marketplace upgrade path.
 
-Clone the repo and load it with `--plugin-dir`:
+### Codex
+
+```bash
+codex plugin marketplace add livevil7/creeta-lens
+codex plugin add lens@CreetaCorp
+```
+
+Start a new Codex task, then invoke Lens with `$lens:c`, `$lens:cc`,
+`$lens:cp`, and the other plugin-qualified skill names.
+
+Upgrade later with `$lens:lens-upgrade`, which refreshes the same Git
+marketplace and verifies the installed source and version.
+
+### Claude Code
+
+```bash
+claude plugin marketplace add livevil7/creeta-lens
+claude plugin install lens@CreetaCorp
+```
+
+Restart Claude Code, then use `/lens:c` or the shorter registered command such
+as `/c`.
+
+### Local development only
 
 ```bash
 git clone https://github.com/livevil7/creeta-lens.git
 claude --plugin-dir ./creeta-lens
 ```
 
-Then use `/lens:c` inside Claude Code.
+Use this mode to edit or test a clone, not as the upgrade-tracked installation.
 
-### Option 2: Copy to your commands (Quick setup)
+## Invocation by host
 
-Copy the skill file to your user-level commands for a shorter `/c` command:
+| Workflow | Claude Code | Codex |
+| --- | --- | --- |
+| Sequential execution | `/c` | `$lens:c` |
+| Parallel execution | `/cc` | `$lens:cc` |
+| Plan-first | `/cp` | `$lens:cp` |
+| Power verification | `/ccp` | `$lens:ccp` |
+| Self-upgrade | `/lens-upgrade` | `$lens:lens-upgrade` |
 
-```bash
-mkdir -p ~/.claude/commands
-curl -o ~/.claude/commands/c.md https://raw.githubusercontent.com/livevil7/creeta-lens/main/skills/c/SKILL.md
-```
-
-Restart Claude Code, then use `/c` directly.
-
-### Option 3: Load as a local plugin
-
-If you already cloned the repo:
-
-```bash
-claude --plugin-dir /path/to/lens
-```
+The usage sections below use the shorter Claude Code spelling. On Codex,
+replace `/name` with `$lens:name`.
 
 ## Usage
 

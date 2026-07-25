@@ -1,5 +1,5 @@
 {
-  "description": "Lens v3.25.0 by Creeta - Task Execution Engine + Documentation Management + Multi-Repo Sync for Claude Code",
+  "description": "Lens v3.26.0 by Creeta - dual-runtime workflows for Claude Code and Codex",
   "hooks": {
     "SessionStart": [
       {
@@ -8,6 +8,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.js",
+            "commandWindows": "node \"$env:CLAUDE_PLUGIN_ROOT\\hooks\\session-start.js\"",
             "timeout": 5000
           }
         ]
@@ -18,6 +19,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sync-pull.js",
+            "commandWindows": "node \"$env:CLAUDE_PLUGIN_ROOT\\hooks\\sync-pull.js\"",
             "timeout": 90000
           }
         ]
@@ -29,6 +31,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/user-prompt-handler.js",
+            "commandWindows": "node \"$env:CLAUDE_PLUGIN_ROOT\\scripts\\user-prompt-handler.js\"",
             "timeout": 3000
           }
         ]
@@ -41,6 +44,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-task.js",
+            "commandWindows": "node \"$env:CLAUDE_PLUGIN_ROOT\\hooks\\pre-tool-task.js\"",
             "timeout": 3000
           }
         ]
@@ -53,6 +57,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-task.js",
+            "commandWindows": "node \"$env:CLAUDE_PLUGIN_ROOT\\hooks\\post-tool-task.js\"",
             "timeout": 3000
           }
         ]
@@ -64,6 +69,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/stop.js",
+            "commandWindows": "node \"$env:CLAUDE_PLUGIN_ROOT\\hooks\\stop.js\"",
             "timeout": 5000
           }
         ]

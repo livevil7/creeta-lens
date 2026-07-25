@@ -8,7 +8,13 @@ const fs = require('fs');
 
 // Resolve plugin root (hooks/ is one level deep)
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
-const { installFailSoftHandlers, safeEnsureDir, safeReadJson, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
+const {
+  installFailSoftHandlers,
+  readJsonInput,
+  safeEnsureDir,
+  safeReadJson,
+  writeJson,
+} = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('session-start');
 
 // Load modules
@@ -21,11 +27,15 @@ const { formatAuditNudge } = require(path.join(PLUGIN_ROOT, 'lib', 'capability-a
 
 // Load config
 const config = safeReadJson(path.join(PLUGIN_ROOT, 'lens.config.json'), {}) || {};
+const IS_CODEX = Boolean(process.env.PLUGIN_ROOT);
 
 // ── Main ──────────────────────────────────────────────────
 
 function main() {
   try {
+    const hookInput = readJsonInput();
+    const projectRoot = hookInput?.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+
     // 0. Initialize agent dashboard + plans + results directories for this session
     const dashboard = initSession();
     ensurePlansDir(config.planDir || null);
@@ -33,13 +43,16 @@ function main() {
     if (config.saveSynthesisResults) {
       const resultsDir = config.resultsDir
         ? path.resolve(config.resultsDir)
-        : path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.lens', 'results');
+        : path.join(projectRoot, '.lens', 'results');
       safeEnsureDir(resultsDir);
     }
 
     // 1. Scan installed skills and cache for UserPromptSubmit hook
-    const skills = scanInstalledSkills();
-    saveScanCache(skills);
+    // Codex already injects its active skill catalog into the agent. Its cache
+    // layout is not the Claude plugin registry, so scan only this plugin's
+    // canonical skills and let `$lens:c` use the native catalog for routing.
+    const skills = IS_CODEX ? scanBundledCodexSkills() : scanInstalledSkills();
+    if (!IS_CODEX) saveScanCache(skills);
     const skillTable = formatSkillTable(skills);
 
     // 2. Load and update memory
@@ -50,30 +63,34 @@ function main() {
     const memorySummary = formatMemorySummary(memory);
 
     // 3. Build keyword table from scan results (dynamic, not hardcoded)
-    const keywordTable = formatKeywordTable(skills);
+    const keywordTable = IS_CODEX ? '' : formatKeywordTable(skills);
 
     // 4. Build plan history for context
     const planSummary = formatPlanSummary(config.planDir || null);
 
     // 4b. /crv capability-audit staleness nudge — Lens repo only, NO network.
-    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
     const auditNudge = formatAuditNudge({ root: projectRoot, config });
 
     // 5. Build additional context
-    const additionalContext = buildAdditionalContext({
-      skillTable,
-      memorySummary,
-      keywordTable,
-      planSummary,
-      auditNudge,
-      skillCount: skills.length,
-      pluginCount: [...new Set(skills.map(s => s.plugin))].length,
-      config,
-    });
+    const pluginCount = [...new Set(skills.map(s => s.plugin))].length;
+    const additionalContext = IS_CODEX
+      ? buildCodexContext({ memorySummary, planSummary, auditNudge, skillCount: skills.length })
+      : buildAdditionalContext({
+          skillTable,
+          memorySummary,
+          keywordTable,
+          planSummary,
+          auditNudge,
+          skillCount: skills.length,
+          pluginCount,
+          config,
+        });
 
     // 6. Output response
     const response = {
-      systemMessage: `Lens v3.25.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready`,
+      systemMessage: IS_CODEX
+        ? `Lens v3.26.0 for Codex activated - ${skills.length} native skills ready. Invoke with $lens:c, $lens:cc, or $lens:cp.`
+        : `Lens v3.26.0 activated - ${skills.length} skills from ${pluginCount} plugins detected | Agent Dashboard + Plan System ready`,
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         skillCount: skills.length,
@@ -92,7 +109,9 @@ function main() {
   } catch (err) {
     // Fail gracefully - don't break the session
     const fallback = {
-      systemMessage: 'Lens v3.25.0 activated (scan skipped)',
+      systemMessage: IS_CODEX
+        ? 'Lens v3.26.0 for Codex activated (startup context skipped)'
+        : 'Lens v3.26.0 activated (scan skipped)',
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         error: err.message,
@@ -104,6 +123,29 @@ function main() {
   }
 }
 
+function scanBundledCodexSkills() {
+  const root = path.join(PLUGIN_ROOT, 'skills');
+  if (!fs.existsSync(root)) return [];
+  const entries = fs.readdirSync(root, { withFileTypes: true });
+  const skills = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('_')) continue;
+    const skillPath = path.join(root, entry.name, 'SKILL.md');
+    if (!fs.existsSync(skillPath)) continue;
+    const content = fs.readFileSync(skillPath, 'utf8');
+    const description = content.match(/^description:\s*["']?(.+?)["']?\s*$/m)?.[1] || '';
+    skills.push({
+      name: entry.name,
+      plugin: 'lens',
+      description: description.replace(/^["']|["']$/g, '').substring(0, 160),
+      triggers: [],
+      domain: 'Lens',
+      type: 'skill',
+    });
+  }
+  return skills;
+}
+
 // ── Context Builder ───────────────────────────────────────
 
 function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planSummary, auditNudge, skillCount, pluginCount, config: cfg }) {
@@ -113,7 +155,7 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planS
   let ctx = '';
 
   // Header
-  ctx += `# Lens v3.25.0 - Session Startup\n\n`;
+  ctx += `# Lens v3.26.0 - Session Startup\n\n`;
 
   // /crv capability-audit nudge (Lens repo only; muted single line)
   if (auditNudge) {
@@ -177,8 +219,25 @@ function buildAdditionalContext({ skillTable, memorySummary, keywordTable, planS
   return ctx;
 }
 
+function buildCodexContext({ memorySummary, planSummary, auditNudge, skillCount }) {
+  let ctx = `# Lens v3.26.0 for Codex\n\n`;
+  ctx += `${skillCount} dual-runtime Lens skills are installed. Codex invocation uses `;
+  ctx += '`$lens:c`, `$lens:cc`, `$lens:cp`, and the other plugin-qualified names.\n\n';
+  ctx += 'Use the active Codex skill catalog for discovery; do not scan `~/.claude`.\n\n';
+  if (auditNudge) ctx += `> ${auditNudge.replace(/`\/crv`/g, '`$lens:crv`')}\n\n`;
+  if (memorySummary) ctx += `## Lens session state\n\n${memorySummary}\n\n`;
+  if (planSummary) ctx += `## Recent Lens plans\n\n${planSummary}\n\n`;
+  return ctx;
+}
+
 function buildFallbackContext() {
-  return `# Lens v3.25.0 - Session Startup
+  if (IS_CODEX) {
+    return `# Lens v3.26.0 for Codex
+
+The startup scan was skipped. Invoke a native skill such as \`$lens:c\`.
+`;
+  }
+  return `# Lens v3.26.0 - Session Startup
 
 Skill scan was skipped (no plugins cache found or scan error).
 Use \`/c <request>\` to manually scan and get recommendations.

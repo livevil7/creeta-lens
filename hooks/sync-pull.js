@@ -34,7 +34,7 @@ if (optIn !== "1" && optIn !== "true") {
   process.exit(0);
 }
 
-const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, "..");
+const pluginRoot = process.env.PLUGIN_ROOT || process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, "..");
 const script = path.join(pluginRoot, "scripts", "git-sync-all.sh");
 
 if (!fs.existsSync(script)) {

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Creeta Install"
+  short_description: "Safely sync installed plugins to a manifest"
+  default_prompt: "Use $ci to preview and synchronize my managed plugin manifest."
+policy:
+  allow_implicit_invocation: true

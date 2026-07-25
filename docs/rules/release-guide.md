@@ -20,24 +20,25 @@
 - CHANGELOG에 "Added" 섹션이 있으면 → MINOR 이상
 - CHANGELOG에 "Fixed"/"Changed"만 있으면 → PATCH
 
-## 2. 버전이 기록된 파일 (13곳 — `scripts/bump-version.sh` 가 일괄 처리)
+## 2. 버전이 기록된 파일 (`scripts/bump-version.sh` 일괄 처리)
 
-**모든 파일을 동시에 같은 버전으로 업데이트해야 한다.** 수동 대신 **`bash scripts/bump-version.sh <X.Y.Z>`** 를 쓰면 아래 13파일을 자동 범프하고 stale 검증까지 한다.
+**두 호스트의 매니페스트와 현재 배너를 동시에 같은 버전으로
+업데이트해야 한다.** 수동 대신
+**`bash scripts/bump-version.sh <X.Y.Z>`** 를 사용한다.
 
 | # | 파일 | 위치 | 형식 |
 |---|------|------|------|
 | 1 | `.claude-plugin/plugin.json` | `"version": "X.Y.Z"` | JSON value |
-| 2 | `.claude-plugin/marketplace.json` | `"version": "X.Y.Z"` + `"ref": "vX.Y.Z"` | JSON value (2곳) |
-| 3 | `hooks/hooks.json` | `"description": "Lens vX.Y.Z — ..."` | 문자열 내 버전 |
-| 4 | `hooks/session-start.js` | `Lens vX.Y.Z activated` (4곳) | 문자열 리터럴 |
-| 5 | `skills/c/SKILL.md` | `Lens vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 6 | `skills/cc/SKILL.md` | `Lens Multi vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 7 | `skills/cp/SKILL.md` | `Lens Plan vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 9 | `skills/ccp/SKILL.md` | `Lens Power Verify vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 10 | `skills/cs/SKILL.md` | `Lens Sync vX.Y.Z` + `currently X.Y.Z` | YAML + Markdown |
-| 11 | `CLAUDE.md` | `Current: **vX.Y.Z**` + `Updated: YYYY-MM-DD` + Recent Changes | Markdown |
-| 12 | `README.md` | `# Lens vX.Y.Z` (title) | Markdown |
-| 13 | `CHANGELOG.md` | `## [X.Y.Z] - YYYY-MM-DD` 섹션 추가 | Markdown |
+| 2 | `.codex-plugin/plugin.json` | `"version": "X.Y.Z"` | JSON value |
+| 3 | `.claude-plugin/marketplace.json` | `"version": "X.Y.Z"` + `"ref": "vX.Y.Z"` | JSON value |
+| 4 | `hooks/hooks.json` | `"description": "Lens vX.Y.Z ..."` | 문자열 |
+| 5 | `hooks/session-start.js` | `Lens vX.Y.Z` | 문자열 |
+| 6 | `skills/*/SKILL.md` | canonical dual-runtime entry version | YAML/Markdown |
+| 7 | selected `references/claude-workflow.md` | Claude current banners | Markdown |
+| 8 | `CLAUDE.md` | `Current: **vX.Y.Z**` + date | Markdown |
+| 9 | `AGENTS.md` | `Current release: **vX.Y.Z**` | Markdown |
+| 10 | `README.md` | `# Lens vX.Y.Z` | Markdown |
+| 11 | `CHANGELOG.md` | newest release section | Markdown |
 
 ### 검색 명령어 (빠뜨린 곳 확인)
 
@@ -45,8 +46,8 @@
 # 현재 버전 문자열이 모든 파일에 있는지 확인
 grep -rn "v1.7.1" --include="*.json" --include="*.js" --include="*.md" .
 
-# 이전 버전이 남아있는지 확인 (0건이어야 정상)
-grep -rn "v1.7.0" --include="*.json" --include="*.js" --include="*.md" . | grep -v CHANGELOG | grep -v "Recent Changes" | grep -v docs/
+# 매니페스트 버전 일치
+grep -n '"version"' .claude-plugin/plugin.json .codex-plugin/plugin.json
 ```
 
 ## 3. 릴리스 절차 (Step by Step)
@@ -86,15 +87,15 @@ git commit -m "fix: updatePlanStatus regex safety"
 - Added/Changed/Fixed/Removed 순서
 - 해당 없는 섹션은 생략
 
-### Step 3: 13곳 버전 범프 (자동 권장)
+### Step 3: 이중 런타임 버전 범프 (자동 권장)
 
-`bash scripts/bump-version.sh <X.Y.Z>` 로 위 표의 13개 파일을 일괄 업데이트한다(수동 시 누락 위험).
+`bash scripts/bump-version.sh <X.Y.Z>` 로 위 표를 일괄 업데이트한다.
 
 **주의사항**:
 - `marketplace.json`은 `version`과 `source.ref` 2곳 모두 변경
 - `session-start.js`는 4곳 (`activated` 메시지 2개 + `Session Startup` 제목 2개)
-- 각 SKILL.md는 YAML description + table description 2곳
-- `CLAUDE.md`는 Version 섹션 + Recent Changes 섹션
+- canonical SKILL과 보존된 Claude reference 배너를 함께 갱신
+- `CLAUDE.md`와 `AGENTS.md`의 현재 버전을 함께 갱신
 
 ### Step 4: 버전 범프 커밋
 
@@ -159,12 +160,17 @@ EOF
 
 ## 5. 캐시 관련 주의사항
 
-Claude Code는 **버전 번호**로 플러그인 캐시를 관리한다.
+Claude Code와 Codex는 **버전 번호**로 플러그인 캐시를 관리한다.
 
 - 코드를 변경했지만 버전을 안 올리면 → 기존 유저는 **변경사항을 못 봄**
 - 캐시 경로: `~/.claude/plugins/cache/CreetaCorp/lens/{version}/`
+- Codex 캐시 경로: `~/.codex/plugins/cache/CreetaCorp/lens/{version}/`
 - 수동 캐시 삭제: `rm -rf ~/.claude/plugins/cache/CreetaCorp/lens/`
 - 개발 중에는 `claude --plugin-dir ./lens`으로 캐시 우회
+
+Codex의 normal install은 local path가 아니라 Git marketplace여야 한다.
+릴리스 후 `codex plugin marketplace upgrade CreetaCorp`와
+`codex plugin add lens@CreetaCorp`로 검증한다.
 
 ## 6. 버전 검증 체크리스트
 
@@ -183,6 +189,12 @@ gh release list | head -5
 # 4. origin과 동기화 확인
 git status
 
-# 5. 구버전 잔존 확인 (CHANGELOG/docs 제외, 0건이어야 함)
-grep -rn "vOLD_VERSION" --include="*.json" --include="*.js" skills/ hooks/ .claude-plugin/ | grep -v node_modules
+# 5. Codex marketplace + install source/version 확인
+codex plugin marketplace upgrade CreetaCorp --json
+codex plugin add lens@CreetaCorp --json
+codex plugin list --json
+
+# 6. 두 host manifest 검증
+claude plugin validate .claude-plugin/plugin.json
+python ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
 ```

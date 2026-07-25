@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lens Multi"
+  short_description: "Coordinate parallel workers, review, and QA"
+  default_prompt: "Use $cc to execute this task with parallel workers, supervision, and QA."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lens Power Verify"
+  short_description: "Adversarially test, repair, and prove existing work"
+  default_prompt: "Use $ccp to prove this existing work functions and repair reproduced failures."
+policy:
+  allow_implicit_invocation: true
