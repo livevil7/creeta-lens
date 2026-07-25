@@ -20,6 +20,12 @@
  * nothing running at all. A short chat turn with no background work never arms the
  * state, so it stays silent.
  *
+ * Suppression must not become evasion: a signal arriving LATER than ARM_TTL_MS no
+ * longer wipes the state and restarts the report clock (polling slower than the TTL
+ * used to dodge the 2-minute rule indefinitely — Codex 7차 리뷰 P2). The elapsed
+ * report time survives; only the decision to fire waits for proof that the signals
+ * are still coming. See decide().
+ *
  * Why NOT .lens/agent-dashboard.json as the in-flight signal: it cannot be trusted
  * for this. PostToolUse fires ~130ms after an async spawn, so the tracker used to
  * flip every background agent straight to 'done' (실측 2026-07-25 — 10 agents all
@@ -53,10 +59,15 @@ installFailSoftHandlers('post-tool-progress');
 
 // SoT: docs/rules/harness-rules.md §4.4 (2 minutes).
 const REPORT_INTERVAL_MS = 120000;
-// Disarm window. Deliberately just longer than the report interval: an agent that
-// obeys the rule keeps polling and stays armed, while work that actually finished
-// disarms after at most one extra reminder.
+// Dormancy window. Deliberately just longer than the report interval: an agent that
+// obeys the rule keeps polling and stays live, while work that actually finished
+// goes dormant after at most one extra reminder. Dormant ≠ deleted (see decide()).
 const ARM_TTL_MS = 180000;
+// How late a signal may be and still count as the SAME polling loop. A gap this
+// size means the loop has already blown up to three report windows — slow, but
+// unmistakably a loop, so it is judged on the spot. A longer gap is ambiguous
+// (see decide()) and needs a second signal before anything fires.
+const CONTINUITY_MS = REPORT_INTERVAL_MS * 3;
 
 // Tools that CAN spawn background work. Membership alone proves nothing — an async
 // launch has to be evidenced per call (see isBackgroundSignal).
@@ -158,10 +169,7 @@ function main() {
   const nowIso = new Date(now).toISOString();
 
   const decide = () => {
-    let state = safeReadJson(statePath, null);
-
-    // Stale armed state = background work finished a while ago → drop it.
-    if (state && now - toMs(state.lastSignalAt) > ARM_TTL_MS) state = null;
+    const state = safeReadJson(statePath, null);
 
     // Not armed and nothing background about this call → silent (false-positive guard).
     if (!state) {
@@ -172,7 +180,47 @@ function main() {
       return null;
     }
 
-    if (signal) state.lastSignalAt = nowIso;
+    // Dormant = no background signal for longer than the TTL, so the work most
+    // likely ended. The state is NOT discarded here. Discarding it and re-arming
+    // with lastReportAt = now was an unlimited escape hatch: an agent polling
+    // slower than ARM_TTL_MS reset its own report clock on every poll, so the
+    // reminder never fired and breaking the rule bought silence (Codex 7차 P2).
+    // The clock is kept; only the decision to fire is deferred.
+    const sinceSignalMs = now - toMs(state.lastSignalAt);
+    const dormant = sinceSignalMs > ARM_TTL_MS;
+
+    if (dormant) {
+      // An ordinary tool never sees a dormant state — that is exactly what the
+      // TTL is for, and it is why a plain Read long after the work ended is silent.
+      if (!signal) return null;
+
+      // "Still polling, just slowly" vs "one call out of the blue" are identical
+      // in the tool stream at this instant (the final collect-the-output call on
+      // finished work looks exactly like a slow poll), and the sources that could
+      // separate them are off limits: poll-response shapes are unmeasured (§4.5)
+      // and agent-dashboard.json is untrustworthy (see header). So continuity is
+      // judged by what the stream does over time — a live job keeps emitting
+      // signals, a finished one emits one and stops.
+      const continuing = sinceSignalMs <= CONTINUITY_MS || !!state.lateSignalAt;
+      if (!continuing) {
+        // Stay silent this once and remember it. lastSignalAt is deliberately NOT
+        // refreshed: the state stays dormant, so an ordinary tool right after this
+        // stray call still cannot fire. Only a second signal revives it — and
+        // lastReportAt is untouched, so that second signal is judged on the real
+        // elapsed time, not on a clock this call reset.
+        state.lateSignalAt = nowIso;
+        safeWriteJson(statePath, state);
+        return null;
+      }
+    }
+
+    if (signal) {
+      state.lastSignalAt = nowIso;
+      // Marker means "the last signal was a late one". A signal at a healthy
+      // cadence clears it, so a stray call after a healthy episode is treated as
+      // the first ambiguous one again (silent) rather than inheriting old lateness.
+      state.lateSignalAt = dormant ? nowIso : null;
+    }
 
     const sinceReportMs = now - toMs(state.lastReportAt);
     if (sinceReportMs < REPORT_INTERVAL_MS) {

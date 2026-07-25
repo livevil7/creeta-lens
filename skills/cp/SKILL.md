@@ -1109,7 +1109,20 @@ Phase 1.3 에서 정리 대상으로 선택된 각 task 에 대해, 문서 front
 node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3],{fetch:true})))" . feat/<slug> <base>
 ```
 
-반환값의 `state` 가 아래 6상태이고 `reason` 이 판정 근거다. **PR 유무는 `mergedState` 가 모른다** — `gh pr list --head <branch> --json number,state` 로 따로 조회한다. `gh` 부재·인증 실패면 **조용히 넘어가지 말고** "PR 상태 조회 불가" 를 표시하고 history 이동은 보류한다(머지 미확인과 같은 취급).
+반환값의 `state` 가 아래 6상태이고 `reason` 이 판정 근거다. **PR 유무는 `mergedState` 가 모른다** — 따로 조회한다. `gh` 부재·인증 실패면 **조용히 넘어가지 말고** "PR 상태 조회 불가" 를 표시하고 history 이동은 보류한다(머지 미확인과 같은 취급).
+
+```bash
+# ⚠️ --state all 이다. 열린 PR 만 조회하면 "머지된 PR" 을 못 본다.
+gh pr list --head <branch> --state all --json number,state,mergedAt --limit 50
+```
+
+**`unknown` 이 나왔고 그 PR 이 MERGED 면 재판정한다** — GitHub 이 머지 후 head 를 자동 삭제하고 로컬 브랜치까지 정리된 상태에서는 원격·로컬 ref 가 둘 다 없어 `mergedState` 가 내용을 증명할 방법이 없다(→ `unknown`). 그건 **정상 완료 흐름**인데, 그대로 두면 **그 task 는 영원히 history 로 못 간다.** PR 이 실제로 머지됐음을 확인했으면 그 사실을 판정에 되먹인다:
+
+```bash
+node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3],{fetch:true,prMerged:true})))" . feat/<slug> <base>
+```
+
+`prMerged: true` 는 **로컬·원격 ref 가 둘 다 없을 때만** 참조된다(내용 증거가 있으면 그쪽이 우선). 지울 ref 가 없으므로 이 경로의 오판이 삭제로 이어지지 않는다. ⚠️ PR 상태를 **확인하지 않은 채** `prMerged: true` 를 주지 마라 — 그건 증명이 아니라 가정이다.
 
 | 상태 | 의미 | 처리 | 판정에 쓴 SHA 기록 |
 |---|---|---|---|

@@ -632,17 +632,40 @@ def _render(report: list[dict], remote: str | None, base_ref: str) -> str:
     archive = [item for item in report if item["verdict"] == "archive"]
     if archive:
         lines.append("")
-        lines.append("아카이브는 삭제하지 않는다. 태그를 먼저 밀어 커밋을 보존한 뒤 브랜치를 지운다.")
-        # 태그 대상과 lease 기대값은 둘 다 판정 시점 tip(item["sha"])이다. ref
-        # 이름을 태그하면 실행 시점의 tip 이 잡혀 판정 안 된 커밋이 보존 대상인
-        # 척하게 되고, lease 없는 --delete 는 분류 후 진전된 원격 커밋을 지운다
-        # (branch-lifecycle.md §7.1 — lease 없는 삭제 금지, 아카이브도 예외 아님).
-        lines.append(
-            "태그·lease 의 SHA 는 판정 시점 tip 이다 — 그 뒤 원격이 진전됐다면 태그는 최신 커밋을 보존하지 않으며, lease 가 삭제를 거부한다(fetch 후 재판정)."
-        )
-        lines.append(
-            "각 줄은 태그 생성 && 태그 push && 브랜치 삭제를 && 로 묶은 하나의 명령이다 — 태그가 원격에 올라가야만 삭제가 실행된다. 줄을 쪼개 실행하지 말 것:"
-        )
+        if remote:
+            lines.append("아카이브는 삭제하지 않는다. 태그를 먼저 밀어 커밋을 보존한 뒤 브랜치를 지운다.")
+            # 태그 대상과 lease 기대값은 둘 다 판정 시점 tip(item["sha"])이다. ref
+            # 이름을 태그하면 실행 시점의 tip 이 잡혀 판정 안 된 커밋이 보존 대상인
+            # 척하게 되고, lease 없는 --delete 는 분류 후 진전된 원격 커밋을 지운다
+            # (branch-lifecycle.md §7.1 — lease 없는 삭제 금지, 아카이브도 예외 아님).
+            lines.append(
+                "태그·lease 의 SHA 는 판정 시점 tip 이다 — 그 뒤 원격이 진전됐다면 태그는 최신 커밋을 보존하지 않으며, lease 가 삭제를 거부한다(fetch 후 재판정)."
+            )
+            lines.append(
+                "각 줄은 태그 생성 && 태그 push && 브랜치 삭제를 && 로 묶은 하나의 명령이다 — 태그가 원격에 올라가야만 삭제가 실행된다. 줄을 쪼개 실행하지 말 것:"
+            )
+        else:
+            # --remote 없음 = 판정도 --apply 도 로컬 refs/heads 만 대상이다.
+            # 여기서 origin 을 박은 원격 삭제를 안내하면, 로컬만 정리하려던
+            # 사용자가 이 블록을 복사해 실행하는 순간 같은 이름의 *원격*
+            # 브랜치가 예고 없이 사라진다. 로컬 모드의 안내는 prune() 과 같은
+            # 원자적 로컬 삭제(update-ref -d <ref> <판정SHA>)만 내보내고,
+            # 원격 쓰기는 태그 push 까지 포함해 일절 하지 않는다 — 로컬 태그만
+            # 으로도 GC 로부터 tip 이 보존되고(아카이브의 목적), 원격을 만지는
+            # 결정은 --remote 를 명시한 실행의 몫이다.
+            lines.append("아카이브는 삭제하지 않는다. 태그를 먼저 만들어 커밋을 보존한 뒤 브랜치를 지운다.")
+            lines.append(
+                "로컬 모드(--remote 없음) — 아래는 로컬 브랜치만 지운다. 태그도 로컬에만 만들며 원격에는 아무것도 쓰지 않는다. 원격 정리는 --remote 로 재판정하라."
+            )
+            lines.append(
+                "태그·삭제 기대값의 SHA 는 판정 시점 tip 이다 — 그 뒤 로컬이 진전됐다면 update-ref 가 삭제를 거부한다(재판정 필요)."
+            )
+            lines.append(
+                "각 줄은 태그 생성 && 브랜치 삭제를 && 로 묶은 하나의 명령이다 — 태그가 만들어져야만 삭제가 실행된다. 줄을 쪼개 실행하지 말 것:"
+            )
+            lines.append(
+                "체크아웃된 브랜치에 update-ref -d 를 쓰면 HEAD 가 깨진다 — 그 브랜치는 다른 브랜치로 이동한 뒤 실행할 것."
+            )
         for item in archive:
             # 태그 이름 = archive/<전체 브랜치 경로>-<판정 SHA 12자리>. 첫 경로
             # 요소를 버리면 backup/foo 와 legacy/foo 가 같은 archive/foo 로
@@ -650,27 +673,38 @@ def _render(report: list[dict], remote: str | None, base_ref: str) -> str:
             # 채 삭제만 성공해 그 tip 이 어디에도 보존되지 않는다. SHA 접미사는
             # 같은 브랜치를 tip 이 진전된 뒤 다시 아카이브할 때의 재충돌까지
             # 막고, 이름 자체가 어느 tip 을 보존했는지 남긴다(§6 의 archive/
-            # 네임스페이스는 유지). 세 명령은 && 로 묶는다 — 태그 생성과 push
-            # 가 성공해야만 삭제가 실행된다. 보존 없는 삭제 경로를 만들지
-            # 않는다. 동적 값은 전부 셸 인용한다: git 은 브랜치 이름에 ;·$()·
-            # 백틱을 허용하므로, 인용 없이 보간하면 이 블록을 복사해 실행하는
-            # 순간 임의 셸 코드가 된다 (shlex.quote 는 안전한 이름은 그대로
-            # 두므로 평범한 이름의 출력은 달라지지 않는다).
+            # 네임스페이스는 유지). 명령은 && 로 묶는다 — 태그 보존이 성공해야
+            # 만 삭제가 실행된다. 보존 없는 삭제 경로를 만들지 않는다. 동적
+            # 값은 전부 셸 인용한다: git 은 브랜치 이름에 ;·$()·백틱을
+            # 허용하므로, 인용 없이 보간하면 이 블록을 복사해 실행하는 순간
+            # 임의 셸 코드가 된다 (shlex.quote 는 안전한 이름은 그대로 두므로
+            # 평범한 이름의 출력은 달라지지 않는다).
             tag = "archive/%s-%s" % (item["branch"], item["sha"][:12])
-            lines.append(
-                "  git tag -a %s %s -m '<보존 이유>' && git push %s %s && git push %s %s %s"
-                % (
-                    shlex.quote(tag),
-                    shlex.quote(item["sha"]),
-                    shlex.quote(remote or "origin"),
-                    shlex.quote(tag),
-                    shlex.quote(
-                        "--force-with-lease=refs/heads/%s:%s" % (item["branch"], item["sha"])
-                    ),
-                    shlex.quote(remote or "origin"),
-                    shlex.quote(":refs/heads/%s" % item["branch"]),
+            if remote:
+                lines.append(
+                    "  git tag -a %s %s -m '<보존 이유>' && git push %s %s && git push %s %s %s"
+                    % (
+                        shlex.quote(tag),
+                        shlex.quote(item["sha"]),
+                        shlex.quote(remote),
+                        shlex.quote(tag),
+                        shlex.quote(
+                            "--force-with-lease=refs/heads/%s:%s" % (item["branch"], item["sha"])
+                        ),
+                        shlex.quote(remote),
+                        shlex.quote(":refs/heads/%s" % item["branch"]),
+                    )
                 )
-            )
+            else:
+                lines.append(
+                    "  git tag -a %s %s -m '<보존 이유>' && git update-ref -d %s %s"
+                    % (
+                        shlex.quote(tag),
+                        shlex.quote(item["sha"]),
+                        shlex.quote("refs/heads/%s" % item["branch"]),
+                        shlex.quote(item["sha"]),
+                    )
+                )
 
     review = [item for item in report if item["verdict"] == "archive_review"]
     if review:
