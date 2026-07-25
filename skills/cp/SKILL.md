@@ -1103,7 +1103,10 @@ Phase 1.3 에서 정리 대상으로 선택된 각 task 에 대해, 문서 front
 - 같은 원칙("판정 직전 refresh + SHA lease")이 배치 정리 도구 `scripts/prune_branches.py` 에도 적용된다. 두 경로의 판정 원칙은 항상 같아야 한다 (SoT: `docs/rules/branch-lifecycle.md`).
 
 ```bash
-node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3])))" . feat/<slug> <base>
+# 4번째 인자 {fetch:true} 가 필수다 — 이게 없으면 판정 직전 refresh 가 돌지 않는다.
+# 낡은 tracking ref 로 "머지됨" 을 판정하면 task 를 history 로 내린 뒤에야
+# 삭제 lease 가 거부되고, 문서와 git 상태가 어긋난 채 남는다.
+node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3],{fetch:true})))" . feat/<slug> <base>
 ```
 
 반환값의 `state` 가 아래 6상태이고 `reason` 이 판정 근거다. **PR 유무는 `mergedState` 가 모른다** — `gh pr list --head <branch> --json number,state` 로 따로 조회한다. `gh` 부재·인증 실패면 **조용히 넘어가지 말고** "PR 상태 조회 불가" 를 표시하고 history 이동은 보류한다(머지 미확인과 같은 취급).
@@ -1208,8 +1211,11 @@ Q5. 남은 작업이나 주의사항? (선택)
    # 원격 — 기대 SHA(Phase 1.5 판정 SHA)를 삭제 명령에 실은 lease 삭제
    git push --force-with-lease=refs/heads/<branch>:<판정SHA> origin :refs/heads/<branch>
 
-   # 로컬 — 아래 "로컬 삭제" 두 조건을 만족할 때만
-   git branch -D <branch>
+   # 로컬 — 아래 "로컬 삭제" 두 조건을 만족할 때만. 원격과 같은 이유로 원자적이어야 한다
+   # (비교-후-삭제 사이에 다른 프로세스가 진전시키면 판정 안 된 커밋이 지워진다).
+   # ⚠️ 체크아웃된 브랜치는 건너뛴다 — update-ref -d 는 branch -D 와 달리
+   #    현재 브랜치도 말없이 지워 HEAD 를 깨뜨린다(git 2.53 실측).
+   git update-ref -d refs/heads/<branch> <판정SHA>
    ```
 
    lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "원격이 진전됨 — fetch 후 재판정 필요" 로 보고하고 멈춘다. 기록된 SHA 가 없으면 lease 를 걸 수 없으므로 삭제하지 않는다.
@@ -1217,9 +1223,9 @@ Q5. 남은 작업이나 주의사항? (선택)
    **`merged-deleted` 는 원격 삭제를 건너뛴다** — 그 상태는 원격 ref 가 이미 없다는 뜻이다(머지 직후 head 삭제 = 정상 흐름). 지울 원격 ref 가 없으므로 lease 삭제를 시도하지 않고, `branchSha` 가 `null` 이라 위의 "기록된 SHA 없으면 삭제 안 함" 규칙이 자동으로 막는다. **로컬 브랜치만** 삭제하고, 그때의 lease 는 `localSha` 다(로컬 tip 이 그 값과 같을 때만). 이 형태는 배치 정리 도구 `scripts/prune_branches.py` 가 실제로 쓰는 것과 **같아야 한다** — 두 경로가 다른 삭제 방식을 쓰면 한쪽에만 경쟁 상태가 남는다 (SoT: `docs/rules/branch-lifecycle.md`).
 
    **로컬 삭제 — 증명이 끝난 뒤에는 조상 검사를 반복하지 않는다** — `git branch -d` 가 보는 것은 "브랜치 tip 이 base 의 조상인가" 하나뿐이다. 그런데 `patch-merged` 는 **정의상 조상이 아니다** — squash·rebase 머지가 커밋을 새로 썼기 때문이고, 그건 사고가 아니라 의도된 결과다. 그래서 Phase 1.5 가 patch-id 동등성으로 "모든 내용이 base 에 들어갔다" 를 증명해도 `-d` 는 매번 거부하고, **그런 완료마다 로컬 브랜치가 계속 남는다.** 이미 더 강한 증명이 끝났는데 더 약한 검사가 결과를 뒤집는 셈이다. 따라서:
-   - **다음 두 조건을 모두 만족할 때만** 조상 검사를 우회하는 삭제(`git branch -D`)를 허용한다.
-     1. Phase 1.5 판정이 `merged` 또는 `patch-merged` — 도구가 병합을 **증명**했다(내용 증명).
-     2. 로컬 브랜치 tip 이 Phase 1.5 의 **판정 SHA 와 같다** — 판정에 들어가지 않은 로컬 커밋이 없다(SHA 증명).
+   - **다음 두 조건을 모두 만족할 때만** 조상 검사를 우회하는 삭제(`git update-ref -d`)를 허용한다.
+     1. Phase 1.5 판정이 `merged` · `patch-merged` · **`merged-deleted`** — 도구가 병합을 **증명**했다(내용 증명). `merged-deleted` 는 원격이 이미 없으니 **로컬만** 지운다.
+     2. 로컬 브랜치 tip 이 Phase 1.5 의 **판정 SHA 와 같다** — 판정에 들어가지 않은 로컬 커밋이 없다(SHA 증명). `merged-deleted` 는 원격 ref 가 없으므로 그 비교 기준이 `branchSha` 가 아니라 **`localSha`** 다.
    - 로컬 tip 이 판정 SHA 와 다르면 push 안 된 로컬 커밋이 있다는 뜻이다 → 지우지 않고 "로컬에 미푸시 커밋 있음 — 삭제 보류" 로 보고한다.
    - 그 외 모든 경우(`unknown`·`unmerged`·판정 SHA 없음·증명 없음)에는 **`-D` 금지가 그대로다.** 여기서 열리는 것은 "**증명이 끝난** 브랜치의 중복 조상 검사 우회" 하나뿐이고, "증명 없는 강제 삭제" 는 열리지 않는다.
 

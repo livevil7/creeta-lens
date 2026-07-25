@@ -93,7 +93,9 @@ git -C <repo> ls-remote --heads origin | wc -l
 Any repo with **more than 5** remote branches gets a warning line, because `sync/` and task branches accumulate silently and stale branches make it unclear which one is live:
 
 ```
-⚠️ 브랜치 과다: <repo> (원격 N개 > 5) — 정리: python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py"
+⚠️ 브랜치 과다: <repo> (원격 N개 > 5) — 정리:
+   git -C <repo> fetch origin --prune
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py" --repo <repo> --remote origin
 ```
 
 Report only. `/cs` never deletes branches itself — pruning is `scripts/prune_branches.py`'s job and it asks before removing anything.

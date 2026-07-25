@@ -61,6 +61,12 @@ function responseText(input) {
  */
 function isAsyncLaunch(input) {
   if (input?.tool_input?.run_in_background === true) return true;
+  // 전경 선언은 조기 거부한다. 텍스트 매칭보다 먼저 와야 한다 — 전경 Task 가
+  // 보고문에 "working in the background" 를 인용하면(비동기 동작을 주제로 일하는
+  // 에이전트에서 실제로 일어난다) 이미 끝난 Task 가 'launched' 로 찍히고,
+  // 그 레코드는 영영 done 이 되지 않아 대시보드가 미해결로 남는다.
+  // post-tool-progress.js 의 무장 조건과 같은 순서다 (harness-rules §4.4·§4.5).
+  if (input?.tool_input?.run_in_background === false) return false;
   const text = responseText(input);
   if (/Async agent launched/i.test(text)) return true;
   if (/working in the background/i.test(text)) return true;
