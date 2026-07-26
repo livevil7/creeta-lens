@@ -69,9 +69,14 @@ Four further guards back `--apply`, all fail-closed:
   can look merged and would be removed unseen.
   The query is capped (OPEN_PR_LIMIT); a reply that reaches the cap may be
   truncated, so it is treated exactly like a failed check — warning plus
-  blocked `--apply` — never accepted as complete. `--delete-without-pr-check`
-  is the explicit override for when the PR list has been verified by hand.
-  Same posture as /cs (skills/cs/SKILL.md): no gh, no silent bypass.
+  blocked `--apply` — never accepted as complete. And it is bounded and
+  non-interactive (GH_PR_LIST_TIMEOUT_SECONDS, stdin closed) for the same
+  reason ls-remote below is: a gh stuck on network or auth I/O would stall
+  the whole workspace sweep instead of degrading to this warn-and-continue
+  path — a timeout is treated exactly like a failed check.
+  `--delete-without-pr-check` is the explicit override for when the PR list
+  has been verified by hand. Same posture as /cs (skills/cs/SKILL.md): no
+  gh, no silent bypass.
 * The protected default branch is read from the *selected* remote (local mode
   uses origin as the proxy) — not hard-wired to origin/HEAD, which under
   `--remote upstream` could be absent or point at a different branch while
@@ -117,17 +122,30 @@ Four further guards back `--apply`, all fail-closed:
   override at all; the remedy is remote configuration (unset the pushurl,
   or give the push target its own remote and judge *that* with --remote),
   not a flag.
-* Remote deletion is leased to the judged SHA. Verdicts are computed from the
-  local tracking ref, which another machine may have outrun since the last
-  fetch; a plain `push --delete` would then remove commits this run never
-  examined. So the delete pushes `--force-with-lease=refs/heads/<branch>:<sha>`
-  and a moved remote tip rejects it, reported as "원격이 진전됨 — fetch 후
-  재판정". The tool never fetches on its own: judgment stays read-only
-  (branch-lifecycle.md prescribes `git fetch --prune` before running), and a
-  stale judgment is safe because the lease turns it into a refusal, not a
-  deletion. Local deletion carries the same expectation — `update-ref -d`
-  with the judged SHA — so a branch another process advanced after the
-  judgment is refused ("로컬이 진전됨"), never deleted. See prune().
+* Remote deletion is leased to the judged SHAs — the branch's *and* the
+  base's. Verdicts are computed from local tracking refs, which another
+  machine may have outrun since the last fetch; a plain `push --delete`
+  would then remove commits this run never examined, so the delete pushes
+  `--force-with-lease=refs/heads/<branch>:<sha>` and a moved remote tip
+  rejects it, reported as "원격이 진전됨 — fetch 후 재판정". The branch
+  lease alone is not enough: a `delete` verdict's only justification is
+  "the patch is already in the base", and a base force-pushed or reset
+  after the judgment removes that justification while the branch tip — and
+  therefore its lease — is untouched, so the deletion would still succeed
+  and erase the last remote ref carrying those commits (reproduced in a
+  scratch remote). So the delete is one `--atomic` push that also no-op
+  updates the base to its judged SHA under its own lease: an unmoved base
+  is "up to date" (nothing written), a moved base fails its lease and the
+  whole push — deletion included — is rejected, reported as "base 가
+  진전됨 — fetch 후 재판정" (the lease also keeps the refspec from
+  force-restoring a reset base; measured). The tool never fetches on its
+  own: judgment stays read-only (branch-lifecycle.md prescribes `git fetch
+  --prune` before running), and a stale judgment is safe because the lease
+  turns it into a refusal, not a deletion. Local deletion carries the same
+  expectations in one `update-ref --stdin` transaction — `verify` of the
+  base at its judged SHA plus `delete` of the branch at its judged SHA —
+  so a branch advanced or a base moved after the judgment is refused
+  ("로컬이 진전됨"/"base 가 진전됨"), never deleted. See prune().
 
 The base and the remote's HEAD are not the only refs off limits. namane-cms
 carries a residual `origin/main` whose base resolves to `master` and whose
@@ -184,6 +202,12 @@ OPEN_PR_LIMIT = 200
 # 하나가 순회 전체를 멈추게 두지 않는다. 시간 초과는 조회 실패와 같으므로
 # 이미 fail-closed 다(--apply 차단).
 LS_REMOTE_TIMEOUT_SECONDS = 20
+
+# 열린 PR 조회(gh pr list)의 상한. ls-remote 와 같은 이유다: 레포당 한 번
+# 도는 바깥 방향 호출이 네트워크·인증 I/O 에서 멈추면(재현: PATH 앞의 멈춘
+# gh 로 순회가 무한 정지) 순회 전체가 멈춘다. 시간 초과는 gh 실패와 같은
+# 경로로 떨어진다 — 경고 + --apply fail-closed 차단, 판정 전용 실행은 완주.
+GH_PR_LIST_TIMEOUT_SECONDS = 20
 
 # lens.config.json sits next to the executing code (parent of scripts/), the
 # same convention lib/git-branch.js uses for PLUGIN_ROOT.
@@ -517,9 +541,10 @@ def _push_target_mismatch(repo: Path, remote: str) -> str | None:
 def _open_pr_heads(repo: Path, remote: str | None) -> tuple[dict[str, int], str | None]:
     """Head branches of open PRs, which must never be deleted.
 
-    Returns (head -> PR number, warning). A missing or failing `gh` yields an
-    empty map and a warning: the protection is unavailable and the caller has
-    to know that rather than assume it held. A reply whose item count reaches
+    Returns (head -> PR number, warning). A missing, failing, or hanging
+    (GH_PR_LIST_TIMEOUT_SECONDS) `gh` yields an empty map and a warning: the
+    protection is unavailable and the caller has to know that rather than
+    assume it held. A reply whose item count reaches
     OPEN_PR_LIMIT may be truncated by gh — the missing open PRs' heads would
     go unprotected — so it carries the same warning (the known heads are
     still protected, but the check is incomplete). main() fails closed on the
@@ -546,6 +571,12 @@ def _open_pr_heads(repo: Path, remote: str | None) -> tuple[dict[str, int], str 
         raw = _gh_pr_list(repo, repo_id)
     except FileNotFoundError:
         return {}, "gh 없음 — 열린 PR head 보호 검사를 못 했다. --apply 전에 PR 목록을 직접 확인하라."
+    except subprocess.TimeoutExpired:
+        # 멈춘 gh(네트워크·인증 대기)는 실패한 gh 와 같다 — 순회를 세우지
+        # 않고 같은 fail-closed 경로(경고 + --apply 차단)로 합류한다.
+        return {}, "gh pr list 가 %d초 안에 응답하지 않았다 — 열린 PR head 보호 검사를 못 했다." % (
+            GH_PR_LIST_TIMEOUT_SECONDS
+        )
     except subprocess.CalledProcessError as exc:
         detail = (exc.stderr or "").strip().splitlines()
         return {}, "gh pr list 실패(%s) — 열린 PR head 보호 검사를 못 했다." % (
@@ -572,6 +603,9 @@ def _gh_pr_list(repo: Path, repo_id: str) -> str:
     # 레포의 PR 목록이 성공으로 돌아올 수 있다 — 그 목록으로는 이 remote 의
     # 열린 PR head 를 보호하지 못한다. repo_id 는 _remote_github_repo() 가
     # 선택한 remote 의 URL 에서 해석한 값.
+    # ls-remote 가드와 같은 이유로 유한·비대화형이다: stdin 이 열려 있으면
+    # 인증 프롬프트가 영원히 기다릴 수 있고, timeout 이 없으면 멈춘 gh 하나가
+    # 순회 전체를 세운다. 둘 다 평범한 검사 실패(fail-closed)로 강등된다.
     return subprocess.run(
         ["gh", "pr", "list", "--repo", repo_id, "--state", "open", "--limit", str(OPEN_PR_LIMIT), "--json", "number,headRefName"],
         cwd=repo,
@@ -580,6 +614,8 @@ def _gh_pr_list(repo: Path, repo_id: str) -> str:
         text=True,
         encoding="utf-8",
         errors="replace",
+        stdin=subprocess.DEVNULL,
+        timeout=GH_PR_LIST_TIMEOUT_SECONDS,
     ).stdout.strip()
 
 
@@ -951,31 +987,50 @@ def _render(report: list[dict], remote: str | None, base_ref: str) -> str:
     return "\n".join(lines)
 
 
-def prune(repo: Path, report: list[dict], *, remote: str | None) -> tuple[list[str], list[str]]:
+def prune(
+    repo: Path, report: list[dict], *, remote: str | None, base: str, base_sha: str | None
+) -> tuple[list[str], list[str]]:
     """Delete only the `delete` verdicts. Returns (deleted, skipped-with-reason).
 
     Per-item guards and per-item error capture: one unusable ref must not abort
     the run and leave every other merged branch behind.
 
-    Remote deletion is leased to the SHA the verdict was computed from
-    (item["sha"], captured by the same for-each-ref the judgment read). The
-    tracking ref can be stale — another machine may have pushed since the last
-    fetch — and an unleased `push --delete` would remove the *current* remote
-    tip, commits this run never examined. With the lease the remote rejects
-    the delete when its tip moved ("stale info"); that is reported as a
-    refusal to re-judge, never retried with force.
+    Every deletion re-verifies the *base* inside the deleting transaction. A
+    `delete` verdict's only justification is "this patch is already in the
+    base", proven against ``base_sha`` — a base force-pushed or reset after
+    the judgment takes that justification away while leaving the branch tip
+    (and therefore its lease) untouched, so the old branch-only lease passed
+    and the deletion removed the last ref carrying those commits (reproduced
+    in a scratch remote). A separate re-check before deleting would reopen
+    the check-then-delete window §7.1 forbids, so the base expectation rides
+    inside the deleting command itself, exactly like the branch lease.
 
-    Local deletion carries the same expected value: `update-ref -d <ref>
-    <judged sha>` (branch-lifecycle.md §7.1 — 로컬 tip = 판정 SHA 일 때만).
-    Even within this one process another process can advance the branch
-    between the listing and the delete, and an unconditional `branch -D`
-    would then remove commits this run never judged. Putting the expectation
-    inside the delete itself is atomic — a compare-then-delete would leave
-    the same window open, just smaller. A moved tip makes git refuse ("but
-    expected"), reported as "로컬이 진전됨 — 재판정 필요", never retried.
-    One guard `branch -D` had for free must be explicit now: `update-ref -d`
-    deletes the checked-out branch without complaint and leaves HEAD dangling
-    (probed on git 2.53), so the current branch is skipped, never deleted.
+    Remote deletion is one atomic push: the branch delete leased to the SHA
+    the verdict was computed from (item["sha"], captured by the same
+    for-each-ref the judgment read) plus a no-op update of the base to
+    ``base_sha`` under its own lease, bound by `--atomic`. The tracking refs
+    can be stale — another machine may have pushed since the last fetch — and
+    an unleased `push --delete` would remove the *current* remote tip,
+    commits this run never examined. The base refspec never writes anything:
+    an unmoved base is "up to date", a moved base fails its lease ("stale
+    info") and `--atomic` rejects the branch delete with it (measured; the
+    lease also keeps the refspec from force-restoring a reset base, and
+    without `--atomic` the delete would sail through alone). A moved branch
+    tip rejects exactly as before. Either refusal is reported to re-judge
+    after fetch, never retried with force.
+
+    Local deletion carries the same expectations in one `update-ref --stdin`
+    transaction: `verify refs/heads/<base> <base_sha>` plus `delete
+    refs/heads/<branch> <judged sha>` (branch-lifecycle.md §7.1 — 로컬 tip =
+    판정 SHA 일 때만). Even within this one process another process can
+    advance the branch — or move the base — between the listing and the
+    delete, and an unconditional `branch -D` would then remove commits this
+    run never judged. All locks are taken together, so either moved ref makes
+    git refuse the whole transaction ("cannot lock"/"but expected"), reported
+    for re-judgment, never retried. One guard `branch -D` had for free must
+    be explicit now: the transactional delete removes the checked-out branch
+    without complaint and leaves HEAD dangling (probed on git 2.53 with
+    `update-ref -d`), so the current branch is skipped, never deleted.
     """
     deleted: list[str] = []
     skipped: list[str] = []
@@ -1000,34 +1055,77 @@ def prune(repo: Path, report: list[dict], *, remote: str | None) -> tuple[list[s
         if not sha:
             skipped.append("%s: 판정 시점 SHA 없음 — 판정 근거 없이는 삭제하지 않는다, 건너뜀" % name)
             continue
+        if not base_sha:
+            # base 재검증 기대값이 없으면 "패치가 base 에 있다"는 삭제 근거를
+            # 삭제 시점에 다시 증명할 수 없다 — 판정 SHA 부재와 같은 fail-closed.
+            skipped.append(
+                "%s: base %s 의 판정 시점 SHA 없음 — base 재검증 없이는 삭제하지 않는다, 건너뜀" % (name, base)
+            )
+            continue
         try:
             if remote:
+                # 브랜치 삭제(lease=판정 SHA)와 base no-op 업데이트(lease=판정
+                # base SHA)를 --atomic 으로 묶은 하나의 push. base 가 판정 이후
+                # 움직였으면(force-push·reset — 삭제 근거인 "base 에 패치 존재"
+                # 가 무효) push 전체가 거부돼 삭제도 함께 막힌다. base 쪽
+                # refspec 은 아무것도 쓰지 않는다: 안 움직였으면 up to date,
+                # 움직였으면 lease 거부(reset 된 base 를 되밀지도 않는다 — 실측).
                 _git(
                     repo,
                     "push",
+                    "--atomic",
+                    "--force-with-lease=refs/heads/%s:%s" % (base, base_sha),
                     "--force-with-lease=refs/heads/%s:%s" % (name, sha),
                     remote,
+                    "%s:refs/heads/%s" % (base_sha, base),
                     ":refs/heads/%s" % name,
                 )
             else:
                 if _git_maybe(repo, "symbolic-ref", "--quiet", "HEAD") == "refs/heads/%s" % name:
-                    # update-ref -d 는 branch -D 와 달리 체크아웃된 브랜치도
-                    # 지워 HEAD 를 깨뜨린다(실측). 현재 브랜치는 삭제하지 않는다.
+                    # 트랜잭션 삭제는 branch -D 와 달리 체크아웃된 브랜치도
+                    # 지워 HEAD 를 깨뜨린다(update-ref -d 로 실측). 현재
+                    # 브랜치는 삭제하지 않는다.
                     skipped.append(
                         "%s: 현재 체크아웃된 브랜치 — 삭제하면 HEAD 가 깨진다. 건너뜀, 다른 브랜치로 이동 후 재실행" % name
                     )
                     continue
-                # 판정 SHA 를 기대값으로 실은 원자적 삭제(branch-lifecycle.md §7.1).
-                # 판정과 삭제 사이에 다른 프로세스가 이 브랜치를 진전시켰으면
-                # git 이 거부한다 — 비교-후-삭제는 그 사이 창이 남으므로 안 쓴다.
-                _git(repo, "update-ref", "-d", "refs/heads/%s" % name, sha)
+                # 판정 SHA(브랜치)와 판정 base SHA(verify)를 한 트랜잭션에 실은
+                # 원자적 삭제(branch-lifecycle.md §7.1). 판정과 삭제 사이에 다른
+                # 프로세스가 브랜치를 진전시켰든 base 를 움직였든 git 이 전체를
+                # 거부한다 — 비교-후-삭제는 그 사이 창이 남으므로 안 쓴다.
+                # -z(NUL 종단) 형식인 이유: Windows 의 text 모드 subprocess 는
+                # input 의 \n 을 \r\n 으로 번역해 LF 종단 형식이 "extra input"
+                # 으로 깨진다(실측). NUL 은 번역되지 않는다.
+                subprocess.run(
+                    ["git", "update-ref", "-z", "--stdin"],
+                    cwd=repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    input="verify refs/heads/%s\0%s\0delete refs/heads/%s\0%s\0"
+                    % (base, base_sha, name, sha),
+                )
             deleted.append(name)
         except (subprocess.CalledProcessError, OSError) as exc:
             stderr = getattr(exc, "stderr", "") or str(exc)
-            if remote and "stale info" in stderr:
+            if remote and "-> %s (stale info)" % base in stderr:
+                skipped.append(
+                    "%s: base %s 가 진전됨 — 판정 base SHA %s 가 더는 원격 tip 이 아니다. "
+                    "삭제 근거(base 에 패치 존재)가 무효일 수 있어 push 전체 거부, fetch 후 재판정 필요"
+                    % (name, base, base_sha[:12])
+                )
+            elif remote and "stale info" in stderr:
                 skipped.append(
                     "%s: 원격이 진전됨 — 판정 SHA %s 가 더는 원격 tip 이 아니다. 삭제 거부, fetch 후 재판정 필요"
                     % (name, sha[:12])
+                )
+            elif not remote and "refs/heads/%s'" % base in stderr and "but expected" in stderr:
+                skipped.append(
+                    "%s: base %s 가 진전됨 — 판정 base SHA %s 가 더는 로컬 base tip 이 아니다. "
+                    "삭제 근거(base 에 패치 존재)가 무효일 수 있어 트랜잭션 전체 거부, 재판정 필요"
+                    % (name, base, base_sha[:12])
                 )
             elif not remote and "but expected" in stderr:
                 skipped.append(
@@ -1066,6 +1164,7 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
         "base": resolved["base"],
         "base_source": resolved["source"],
         "base_reason": resolved["reason"],
+        "base_sha": None,
         "remote": remote,
         "skipped": None,
         "warnings": [],
@@ -1080,9 +1179,15 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
         return result
 
     base_ref = "%s/%s" % (remote, resolved["base"]) if remote else resolved["base"]
-    if not _git_ok(repo, "rev-parse", "--verify", "--quiet", base_ref):
+    # 판정 근거가 되는 base tip. prune() 은 이 SHA 를 삭제 트랜잭션의 base
+    # 재검증 기대값으로 싣는다 — "패치가 base 에 있다"는 삭제 근거는 이 시점
+    # 의 base 에 대한 증명이고, 그 뒤 base 가 force-push·reset 으로 움직이면
+    # 브랜치 tip lease 만으로는 그 무효화를 감지하지 못한다.
+    base_sha = _git_maybe(repo, "rev-parse", "--verify", "--quiet", base_ref)
+    if not base_sha:
         result["skipped"] = "base ref %s 가 없다 (fetch 안 됨 / 이름 불일치) — 판정 불가" % base_ref
         return result
+    result["base_sha"] = base_sha
 
     if remote:
         # 삭제(push)가 판정이 본 곳(fetch URL)과 같은 곳으로 나가는지 증명한다.
@@ -1307,7 +1412,13 @@ def main(argv: list[str] | None = None) -> int:
                         "대체하지 않는다 — 그 값은 fetch 로 갱신되지 않는다. 삭제 실행 안 함." % remote
                     )
                     continue
-                deleted, skipped = prune(Path(result["path"]), result["branches"], remote=remote)
+                deleted, skipped = prune(
+                    Path(result["path"]),
+                    result["branches"],
+                    remote=remote,
+                    base=result["base"],
+                    base_sha=result.get("base_sha"),
+                )
                 if deleted or skipped:
                     lines.append("%s: 삭제 %s" % (result["repo"], ", ".join(deleted) if deleted else "없음"))
                     lines.extend("  %s" % note for note in skipped)
@@ -1371,7 +1482,9 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
-        deleted, skipped = prune(repo, report, remote=args.remote)
+        deleted, skipped = prune(
+            repo, report, remote=args.remote, base=result["base"], base_sha=result.get("base_sha")
+        )
         if not args.json:
             print("")
             print("삭제 완료: %s" % (", ".join(deleted) if deleted else "없음"))

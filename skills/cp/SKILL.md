@@ -1200,16 +1200,27 @@ Q5. 남은 작업이나 주의사항? (선택)
 **원격 삭제는 원자적 lease 삭제로만 한다 (필수) — check-then-delete 금지** — "현재 원격 tip 을 읽어 판정 SHA 와 같은지 **확인한 뒤** 지운다"는 순서는 **금지**다. 확인과 삭제는 별개의 두 명령이고, 그 사이에 다른 머신(Mac Mini 등)이 push 하면 방금 확인한 값은 이미 낡은 값이다 — 그 새 커밋이 그대로 지워진다. 확인은 원자적이지 않으므로 **확인으로는 이 경쟁 상태를 막을 수 없다.** 대신 **기대 SHA 를 삭제 명령 자체에 실어 보내고, 원격 tip 이 그와 다르면 git 이 서버 단계에서 삭제를 거부**하게 한다. 판정과 삭제 사이의 원자성은 우리가 비교해서 얻는 것이 아니라 git 이 보장하는 것이다.
 
 ```bash
-# 원격 — 기대 SHA(Phase 1.5 판정 SHA)를 삭제 명령에 실은 lease 삭제
-git push --force-with-lease=refs/heads/<branch>:<판정SHA> origin :refs/heads/<branch>
+# 원격 — 브랜치 tip 과 base tip 두 기대값을 한 atomic push 에 실는다.
+# base 쪽 refspec 은 아무것도 쓰지 않는다(움직였으면 lease 가 push 전체를 거부).
+git push --atomic \
+  --force-with-lease=refs/heads/<base>:<판정baseSHA> \
+  --force-with-lease=refs/heads/<branch>:<판정SHA> \
+  origin <판정baseSHA>:refs/heads/<base> :refs/heads/<branch>
 
 # 로컬 — 아래 "로컬 삭제" 두 조건을 만족할 때만. 원격과 같은 이유로 원자적이어야 한다
 # (비교-후-삭제 사이에 다른 프로세스가 진전시키면 판정 안 된 커밋이 지워진다).
+# base 기대값도 같은 트랜잭션에 싣는다 — update-ref --stdin 은 열거된 ref 를
+# 동시에 잠그고 all-or-nothing 으로 처리한다.
 # ⚠️ 체크아웃된 브랜치 위에서 실행 금지 — update-ref -d 는 branch -D 와 달리
 #    현재 브랜치도 말없이 지워 HEAD 를 깨뜨린다(git 2.53 실측). 이 가드는 유지하되
 #    해법은 skip 이 아니라 "base 로 이동 후 삭제"다 (아래 별도 절).
-git update-ref -d refs/heads/<branch> <판정SHA>
+# ⚠️ NUL 종단(-z) 필수 — Windows text 모드 subprocess 가 \n 을 \r\n 으로 번역해
+#    LF 종단 --stdin 형식을 fatal: extra input 으로 깨뜨린다(실측).
+printf 'verify\0refs/heads/<base>\0<판정baseSHA>\0delete\0refs/heads/<branch>\0<판정SHA>\0' \
+  | git update-ref -z --stdin
 ```
+
+**삭제 근거는 두 개다 (v3.26+)** — "브랜치 tip 이 판정 그대로" **그리고 "그 패치가 base 에 있다"**. 브랜치 lease 만 걸면 판정 이후 base 가 force-push·reset 됐을 때 브랜치 tip 은 그대로라 lease 가 통과하고, **그 커밋을 담은 마지막 원격 ref 가 삭제된다**(실제 파괴 재현됨). base 가 어느 방향으로든 움직였으면 `base 가 진전됨 — fetch 후 재판정` 으로 멈춘다. force 전환 금지.
 
 lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "원격이 진전됨 — fetch 후 재판정 필요" 로 보고하고 멈춘다. 기록된 SHA 가 없으면 lease 를 걸 수 없으므로 삭제하지 않는다. 이 거부는 아래 **진행 게이트**의 실패다 — 이 task 는 Phase 3(history)·Phase 4(task 삭제)로 진행하지 않는다.
 

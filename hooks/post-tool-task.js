@@ -43,6 +43,15 @@ function responseText(input) {
   const raw = input?.tool_response ?? input?.tool_output ?? input?.tool_result ?? input?.response;
   if (!raw) return '';
   if (typeof raw === 'string') return raw;
+  // A content-block array carries its payload in .text — flatten it instead of
+  // escaping it. JSON.stringify turns every newline into the two characters `\`
+  // and `n`, putting a WORD character immediately before `agentId:` and breaking
+  // the \b in isAsyncLaunchEnvelope(). 실측: 배열형에서 문장은 맞는데 식별자가
+  // 안 잡혀 봉투가 깨지고, 백그라운드 런치가 그대로 done 으로 기록된다.
+  if (Array.isArray(raw)) {
+    const flat = raw.map((b) => (typeof b === 'string' ? b : b?.text || '')).join('\n');
+    if (flat.trim()) return flat;
+  }
   try {
     return JSON.stringify(raw);
   } catch {
@@ -84,8 +93,15 @@ function isAsyncLaunch(input) {
  */
 function isAsyncLaunchEnvelope(text) {
   if (!text) return false;
-  const sentence = /Async agent launched|working in the background/i.test(text);
-  const identifier = /\bagentId:\s*\S/i.test(text) || /\boutput_file:\s*\S/i.test(text);
+  // 두 철자를 모두 받는다 — 같은 런치가 산문 봉투로도, 구조화 결과로도 온다.
+  // 실측 2026-07-26: 한 세션의 async Agent 런치 41건 전부가 toolUseResult
+  // `{status:'async_launched', isAsync:true, agentId, outputFile, …}` 였다. 산문
+  // 철자만 요구하면 그 payload 에는 문장이 없어 봉투가 성립하지 않고, 백그라운드
+  // 런치가 'launched' 가 아니라 'done' 으로 기록된다 — 이 훅이 막으려던 그 결함.
+  const sentence = /Async agent launched|working in the background|"status"\s*:\s*"async_launched"/i.test(text);
+  const identifier = /\bagentId:\s*\S/i.test(text)
+    || /\boutput_file:\s*\S/i.test(text)
+    || /"(?:agentId|outputFile|output_file)"\s*:\s*"\S/i.test(text);
   return sentence && identifier;
 }
 

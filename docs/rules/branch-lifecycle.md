@@ -395,7 +395,8 @@ backup/macmini-preIA-20260723  아카이브 검토 — 자동커밋 누적 의�
 
 - `--apply` 가 지우는 것은 §5 표의 두 `merged` 판정뿐이다. `계보 다름`(→ 태그 아카이브), `아카이브 검토`(§6.1), `유지`, `판정 불가` 는 지우지 않는다.
 - **`--apply` 를 막는 fail-closed 사유 5가지** (판정 전용 실행은 경고만 내고 완주한다 — 아무것도 지우지 않으므로):
-  1. **PR 보호 검사 불가** — `gh` 부재·미인증·일시 실패. 열린 PR 의 head 가 병합처럼 보이면 지워진다.
+  1. **PR 보호 검사 불가** — `gh` 부재·미인증·일시 실패·**응답 없음**. 열린 PR 의 head 가 병합처럼 보이면 지워진다.
+     - gh 조회는 **유한·비대화형**이다(`GH_PR_LIST_TIMEOUT_SECONDS` = 20초, stdin 차단 — `ls-remote` 가드와 같은 근거). timeout·stdin 이 없으면 멈춘 gh(네트워크·인증 대기)가 **워크스페이스 전수 순회 전체를 무기한 정지**시킨다(실측: 300초 sleep 하는 가짜 `gh` 로 재현, 외부 kill 로만 종료). 멈춘 gh 는 순회를 세우지 않고 **검사 실패와 같은 경로**로 떨어진다 — 판정 전용은 경고 내고 완주, `--apply` 는 이 사유로 차단.
   2. **PR 목록이 한도에 도달** — 잘려 나간 head 는 본 적이 없으므로 검사가 불완전한 것이다.
   3. **PR 조회 대상 레포 미해석** — 선택한 remote 의 URL 에서 GitHub 레포를 못 뽑으면(비 GitHub 호스트 포함) **어느 레포의 PR 을 확인하는지 모른다.** ⚠️ 이건 gh 호출 자체의 가드가 **못 잡는** 종류다 — 레포를 고정하지 않으면 gh 가 제 기본 레포를 골라 **다른 레포의 PR 목록을 "성공" 으로 반환**한다(실측: 원격 2개 + `gh repo set-default` 상태에서 엉뚱한 레포의 PR 55개를 받아왔고, 이 레포의 열린 PR head 는 보호 목록에 없었다). 그래서 조회는 `--repo OWNER/REPO` 로 **못 박는다**.
   4. **원격의 현재 기본 브랜치 조회 실패** — 네트워크·인증·remote 부재·symref 미광고. 복구는 캐시를 고치는 게 아니라 **원격 접근을 복구**하는 것이다.
@@ -414,12 +415,21 @@ backup/macmini-preIA-20260723  아카이브 검토 — 자동커밋 누적 의�
 
 `tip 을 비교한 뒤 삭제` 는 이 문제를 막지 못한다 — 비교와 삭제 사이에 창이 남는다. **기대 SHA 를 삭제 명령 자체에 실어 보낸다.**
 
+**삭제 근거는 두 개다** — "브랜치 tip 이 판정한 그대로다" **그리고 "그 패치가 base 에 있다"**. 브랜치 lease 만 걸면 판정 이후 base 가 force-push·reset 됐을 때 브랜치 tip 은 그대로라 lease 가 통과하고, **그 커밋을 담은 마지막 원격 ref 가 삭제된다**(throwaway 원격에서 재현: base 를 머지 이전으로 되돌린 뒤 stale 판정으로 `--apply` → `삭제 완료`, 이후 `git branch --contains <B>` 출력 없음). 그래서 두 기대값을 모두 실은 **하나의 atomic push** 를 쓴다.
+
 ```sh
-# 원격 삭제 — 판정에 쓴 SHA 를 lease 로 실어 보낸다
-git push --force-with-lease=refs/heads/<branch>:<판정SHA> origin :refs/heads/<branch>
+# 원격 삭제 — 브랜치 tip 과 base tip 두 기대값을 한 push 에 실는다
+git push --atomic \
+  --force-with-lease=refs/heads/<base>:<판정baseSHA> \
+  --force-with-lease=refs/heads/<branch>:<판정SHA> \
+  origin <판정baseSHA>:refs/heads/<base> :refs/heads/<branch>
 ```
 
+- base 쪽 refspec 은 **아무것도 쓰지 않는다**: base 가 안 움직였으면 "up to date"(no-op), 움직였으면 lease 가 push 전체(삭제 포함)를 거부한다. ⚠️ **lease 를 빼고 refspec 만 넣으면 안 된다** — 그러면 reset 된 base 를 fast-forward 로 **되미는 write** 가 실제로 나간다. lease 가 그것까지 막는 것을 실측했다.
+- base 가 **어느 방향으로든** 움직였으면(전진 포함) `base 가 진전됨 — fetch 후 재판정` 으로 멈춘다. force 전환·재시도 금지.
 - 원격 tip 이 판정 SHA 와 다르면 git 이 `stale info` 로 **거부**한다. 그때는 **재시도하거나 force 로 전환하지 않는다** — `원격이 진전됨 — fetch 후 재판정` 으로 보고하고 멈춘다.
+- **잔여 한계(정직하게)**: base 검증은 같은 push 커넥션의 **ref advertisement 시점**에 클라이언트가 수행한다(base 쪽은 실제 커맨드가 전송되지 않는 no-op 이라 서버측 CAS 는 브랜치 삭제에만 걸린다). 창이 "판정↔삭제 사이(수 분~무기한)"에서 "단일 push RPC 내부(밀리초)"로 줄어드는 것이지 0 은 아니다 — 브랜치 lease 자체의 한계와 같은 수준이다.
+- **§6 태그 아카이브 경로는 base lease 가 필요 없다** — 태그 push 성공이 삭제에 선행하므로 base 가 무엇을 하든 tip 은 이미 보존돼 있다.
 - `git push origin --delete <branch>` 는 lease 가 없으므로 **쓰지 않는다.** (§6 의 태그 아카이브 예시도 같은 이유로 lease 형태를 쓰는 것이 안전하다 — 아카이브 태그를 밀어둔 뒤라 손실 위험은 낮지만, 두 경로가 다른 문법을 쓰면 다음 구현자가 어느 쪽을 표준으로 볼지 모른다.)
 - 이 규칙은 `scripts/prune_branches.py` 와 `/cp done` 의 Phase 4 **양쪽에 동일하게** 적용된다. 한쪽만 원자적이면 다른 쪽이 사고 경로로 남는다.
 
@@ -427,11 +437,17 @@ git push --force-with-lease=refs/heads/<branch>:<판정SHA> origin :refs/heads/<
 
 - **로컬 삭제도 원자적으로 한다** — 원격과 같은 이유다. 판정과 삭제 사이에 다른 프로세스가 로컬 브랜치를 진전시키면 비교-후-삭제는 그 커밋을 지운다.
 
+  원격과 마찬가지로 **base 기대값도 같은 트랜잭션에 싣는다.** `update-ref --stdin` 은 열거된 ref 를 **동시에 잠그고 all-or-nothing** 으로 처리한다.
+
   ```sh
-  git update-ref -d refs/heads/<branch> <판정SHA>
+  # NUL 종단(-z) 으로 verify + delete 를 한 트랜잭션에 싣는다
+  printf 'verify\0refs/heads/<base>\0<판정baseSHA>\0delete\0refs/heads/<branch>\0<판정SHA>\0' \
+    | git update-ref -z --stdin
   ```
 
-  기대값이 현재 값과 다르면 git 이 `is at <실제> but expected <기대>` 로 **거부**한다 → "로컬이 진전됨 — 재판정 필요" 로 보고하고 멈춘다.
+  기대값이 현재 값과 다르면 git 이 `is at <실제> but expected <기대>` 로 **거부**한다 → "로컬이 진전됨 — 재판정 필요" / "base 가 진전됨 — 트랜잭션 전체 거부" 로 보고하고 멈춘다.
+
+  ⚠️ **Windows 함정**: text 모드 subprocess 는 입력의 `\n` 을 `\r\n` 으로 번역해 LF 종단 `--stdin` 형식을 `fatal: … extra input` 으로 깨뜨린다(실측). **NUL 종단(`-z`)을 쓴다.**
 - **삭제 조건은 그대로 둘 다 참일 때만**: ① `mergedState` 가 `merged`/`patch-merged`/`merged-deleted` (내용 증명) ② 로컬 tip = 판정 SHA (SHA 증명). `unknown`·`unmerged`·판정 SHA 없음은 전부 금지다. `git branch -d` 는 patch 머지를 판정할 능력이 없으므로 이 자리에서 쓰지 않는다.
 - ⚠️ **체크아웃된 브랜치는 건너뛰는 게 아니라 먼저 벗어난다.** `update-ref -d` 는 `git branch -D` 와 달리 현재 체크아웃된 브랜치도 **말없이 지워 HEAD 를 깨뜨린다**(git 2.53 실측) — 그건 사실이므로 가드는 유지한다. 그런데 **건너뛰면 더 나쁜 일이 생긴다**: `/cc` 직후 `/cp done` 은 **최빈 경로**이고 그때 task 브랜치는 당연히 체크아웃 상태다. 건너뛰면 이후 완료 기록(history 작성·task 삭제)이 **이미 머지됐고 원격 ref 도 지워진 그 브랜치 위에서** 커밋되어 **base 에 영영 도달하지 못한 채 고립된다.**
   - 순서: **① dirty 검사**(비어 있지 않으면 멈춘다 — 변경을 base 로 끌고 가지 않는다) → **② base 로 checkout** → ③ 원격 lease 삭제 → ④ 로컬 삭제.

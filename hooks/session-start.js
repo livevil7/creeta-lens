@@ -8,7 +8,7 @@ const fs = require('fs');
 
 // Resolve plugin root (hooks/ is one level deep)
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
-const { installFailSoftHandlers, safeEnsureDir, safeReadJson, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
+const { installFailSoftHandlers, readJsonInput, safeEnsureDir, safeReadJson, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('session-start');
 
 // Load modules
@@ -26,6 +26,10 @@ const config = safeReadJson(path.join(PLUGIN_ROOT, 'lens.config.json'), {}) || {
 
 function main() {
   try {
+    // 0a. Drop the previous session's progress-report clock. Done before anything
+    //     else so that a failure further down still leaves an honest clock.
+    clearPreviousSessionProgressClock();
+
     // 0. Initialize agent dashboard + plans + results directories for this session
     const dashboard = initSession();
     ensurePlansDir(config.planDir || null);
@@ -101,6 +105,58 @@ function main() {
     };
     writeJson(fallback);
     process.exit(0);
+  }
+}
+
+/**
+ * Delete the previous session's 2-minute progress-report clock (fail-soft).
+ *
+ * hooks/stop.js deliberately STAMPS that state instead of deleting it, because a
+ * turn boundary is not a work boundary: deleting there lets a later poll re-create
+ * the state with `lastReportAt = now` and buy another two minutes of silence — an
+ * evasion the agent itself controls (docs/rules/harness-rules.md §4.4). A session
+ * boundary differs on both counts:
+ *
+ *  - It is the user's action (launching / resuming / clearing a conversation), not
+ *    a cadence the agent can trigger, so it is no evasion vector.
+ *  - The state holds clocks only (`armedAt` / `lastSignalAt` / `lastReportAt` /
+ *    `reminders`) — never a job identity. So there is no still-running work being
+ *    "forgotten" by deleting it. A background job left over from a previous session
+ *    cannot reach this hook anyway: every arming signal is a handle owned by the CLI
+ *    process (run_in_background, TaskOutput/BashOutput/…), and a new process holds
+ *    none of the old ones. Whatever this session does start re-arms with honest
+ *    timestamps on its first signal.
+ *
+ * Kept, those stale clocks make the new session's first poll fire immediately and
+ * report a nonsense elapsed time (실측: "마지막 보고 기점 이후 7201초 경과, 백그라운드
+ * 작업 대기 7201초째" — from a session seconds old). Absent state is precisely how
+ * this hook says "nothing is known to be in flight", which is the truth at startup.
+ *
+ * Only the sources that mean "a new conversation begins here" reset it. The
+ * SessionStart source enum is startup|resume|clear|compact|fork (실측: strings in
+ * the claude binary); `compact` and `fork` fire MID-conversation with the parent's
+ * background work still in flight, and neither needs the user — auto-compact lands
+ * during exactly the long waits this rule exists for, and a fork can be agent-
+ * spawned. Resetting there would be the stop.js failure mode itself. An allowlist,
+ * not a denylist: an unknown (or unreadable) source keeps the old clock, which at
+ * worst makes the hook noisy, whereas wiping a live clock buys silence.
+ *
+ * NOTE: the `once: true` in hooks/hooks.json does NOT make this a startup-only
+ * hook — the harness schema puts `once` on a hook entry, not on the matcher group
+ * where this repo has it (실측), so it is ignored and this hook runs on EVERY
+ * SessionStart event. The source check is load-bearing.
+ */
+const NEW_CONVERSATION_SOURCES = new Set(['startup', 'resume', 'clear']);
+
+function clearPreviousSessionProgressClock() {
+  try {
+    if (!NEW_CONVERSATION_SOURCES.has(readJsonInput()?.source)) return;
+    // Same resolution as hooks/stop.js and hooks/post-tool-progress.js — diverging
+    // here would point the hooks at different files.
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    fs.unlinkSync(path.join(projectRoot, '.lens', 'progress-report-state.json'));
+  } catch {
+    // No state file (the normal case) or an unreadable one — nothing to reset.
   }
 }
 

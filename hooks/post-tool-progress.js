@@ -80,10 +80,30 @@ const SPAWN_TOOLS = new Set(['Task', 'Agent']);
 // 문구 하나로는 부족하다 — 임의의 결과 텍스트가 인용할 수 있다. 실제 async 반환은
 // 문장과 함께 `agentId:` / `output_file:` 를 항상 싣는다(실측). 둘 다 요구한다.
 // post-tool-task.js 의 isAsyncLaunchEnvelope() 와 같은 모양이다.
-const ASYNC_LAUNCH_SENTENCE_RE = /Async agent launched|working in the background/i;
-const ASYNC_LAUNCH_ID_RE = /\bagentId:\s*\S|\boutput_file:\s*\S/i;
+// ⚠️ 두 철자를 모두 받는다. 같은 async 런치가 **산문 봉투**로도, **구조화 결과**로도
+// 온다(실측 2026-07-26: 이 세션의 async Agent 런치 41건 전부가 toolUseResult
+// `{status:'async_launched', isAsync:true, agentId, outputFile, …}`). 산문 철자만
+// 요구하면 구조화 payload 에서는 문장이 아예 없어 봉투가 영영 성립하지 않고,
+// 백그라운드 런치가 조용히 done 으로 기록된다 — §4.4 강제가 통째로 죽는 경로다.
+const ASYNC_LAUNCH_SENTENCE_RE = /Async agent launched|working in the background|"status"\s*:\s*"async_launched"/i;
+const ASYNC_LAUNCH_ID_RE = /\bagentId:\s*\S|\boutput_file:\s*\S|"(?:agentId|outputFile|output_file)"\s*:\s*"\S/i;
 function isAsyncLaunchEnvelope(text) {
   return !!text && ASYNC_LAUNCH_SENTENCE_RE.test(text) && ASYNC_LAUNCH_ID_RE.test(text);
+}
+// Workflow runs in the background and notifies on completion — exactly the workload
+// §4.4 exists for — but it never arms above: it carries no run_in_background field,
+// and its return uses none of the agent wording, so the agent envelope cannot match.
+// Its own envelope (실측 2026-07-25, 24/25 launches across 4 sessions) is either the
+// launch text "Workflow launched in background. Task ID: <id> … Run ID: wf_<id>" or the
+// structured result { status: 'async_launched', taskId, runId, taskType }. Both
+// spellings are accepted because which of the two reaches tool_response is not settled.
+// 여기서도 문구 하나로는 부족하다 — 마커와 식별자를 함께 요구한다. 산문 인용은 식별자를
+// 갖추지 못하고, 실제로 관측된 실패 반환(권한 거부로 아예 뜨지 못한 런치 1건)도 마커·식별자
+// 어느 쪽도 싣지 않아 통과하지 못한다.
+const WORKFLOW_LAUNCH_RE = /Workflow launched in background|"status"\s*:\s*"async_launched"/i;
+const WORKFLOW_ID_RE = /\b(?:Task|Run) ID:\s*\S|"(?:taskId|runId)"\s*:\s*"\S/i;
+function isWorkflowLaunchEnvelope(text) {
+  return !!text && WORKFLOW_LAUNCH_RE.test(text) && WORKFLOW_ID_RE.test(text);
 }
 // Calling these means the agent is checking on background work right now.
 const POLL_TOOLS = new Set([
@@ -106,6 +126,15 @@ function responseText(input) {
   const raw = input?.tool_response ?? input?.tool_output ?? input?.tool_result ?? input?.response;
   if (!raw) return '';
   if (typeof raw === 'string') return raw;
+  // A content-block array carries its payload in .text — flatten it instead of
+  // escaping it. JSON.stringify turns every newline into the two characters
+  // `\` and `n`, which puts a WORD character immediately before `agentId:` and
+  // breaks the \b in ASYNC_LAUNCH_ID_RE. 실측: 배열형 payload 에서 sentence=true
+  // 인데 id=false 라 봉투가 성립하지 않고, 진짜 백그라운드 런치가 done 으로 샌다.
+  if (Array.isArray(raw)) {
+    const flat = raw.map((b) => (typeof b === 'string' ? b : b?.text || '')).join('\n');
+    if (flat.trim()) return flat;
+  }
   try {
     return JSON.stringify(raw);
   } catch {
@@ -136,6 +165,10 @@ function isBackgroundSignal(toolName, toolInput, input) {
     // (docs/rules/harness-rules.md §4.5 does), and reading a file must not arm.
     return isAsyncLaunchEnvelope(responseText(input));
   }
+
+  // Name-gated for the same reason as the spawn block: only a Workflow call may
+  // present the Workflow envelope, so a doc or report that quotes it cannot arm.
+  if (toolName === 'Workflow') return isWorkflowLaunchEnvelope(responseText(input));
 
   // 2. A poll is a deliberate act of checking work the agent believes is running.
   //    Unlike a spawn name it is not systematically stale; its worst case is the
