@@ -72,15 +72,32 @@ Three further guards back `--apply`, all fail-closed:
   blocked `--apply` — never accepted as complete. `--delete-without-pr-check`
   is the explicit override for when the PR list has been verified by hand.
   Same posture as /cs (skills/cs/SKILL.md): no gh, no silent bypass.
-* The protected default branch is read from the *selected* remote's HEAD
-  (`refs/remotes/<remote>/HEAD`; local mode uses origin as the proxy) — not
-  hard-wired to origin/HEAD, which under `--remote upstream` could be absent
-  or point at a different branch while upstream's own default judges
-  `delete` (a base like staging has main as an ancestor). When that HEAD
-  cannot be resolved the tool does not know which branch the remote
-  considers default, so `--apply` is blocked for that repo
-  (`git remote set-head <remote> --auto`, then rerun). Judgment-only runs
-  warn and continue — they delete nothing.
+* The protected default branch is read from the *selected* remote (local mode
+  uses origin as the proxy) — not hard-wired to origin/HEAD, which under
+  `--remote upstream` could be absent or point at a different branch while
+  upstream's own default judges `delete` (a base like staging has main as an
+  ancestor). It is read *live*, with `git ls-remote --symref <remote> HEAD`,
+  because the local `refs/remotes/<remote>/HEAD` is a clone-time cache that
+  no ordinary fetch updates — that symbolic ref moves only on `git remote
+  set-head`. A default renamed on the server therefore leaves the cache on
+  the *old* branch, and reading it made this guard report success while
+  protecting the wrong ref: the branch the remote actually calls default
+  reached the deletion list whenever its name was non-standard and the base
+  had absorbed it. `ls-remote` is a query, not a fetch — it writes no ref, no
+  object, no config — so judgment stays read-only and stale tracking refs
+  stay stale (the push lease, not this guard, is what makes a stale judgment
+  safe). It does use the network, but judgment already does so once per repo
+  for the open-PR guard (`gh pr list`), and the two fail identically: when
+  the live default cannot be read (network, auth, missing remote) the tool
+  does not know which branch the remote considers default, so `--apply` is
+  blocked for that repo. The cached value is never substituted — that
+  substitution is the defect. Judgment-only runs warn and continue — they
+  delete nothing. A cache that disagrees with the live value is reported
+  along with `git remote set-head <remote> --auto`; the script never rewrites
+  that ref itself, the user's local state is theirs to change. While they
+  disagree *both* names are protected: the live one because it is the
+  default, the cached one because a branch that was this repo's default until
+  moments ago is the same "repo owner's call" state as §4.2's residual main.
 * Remote deletion is leased to the judged SHA. Verdicts are computed from the
   local tracking ref, which another machine may have outrun since the last
   fetch; a plain `push --delete` would then remove commits this run never
@@ -122,6 +139,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -141,6 +159,12 @@ GIT_DEFAULT_BRANCH_NAMES = frozenset({"main", "master"})
 # 잘려 나간 열린 PR 의 head 는 보호받지 못한 채 삭제될 수 있으므로, 한도
 # 도달은 "보호 검사 불완전"으로 취급해 --apply 를 fail-closed 로 차단한다.
 OPEN_PR_LIMIT = 200
+
+# 원격 기본 브랜치 라이브 조회(git ls-remote)의 상한. 이 도구의 유일한 바깥
+# 방향 git 호출이고 27레포 순회에서 레포당 한 번 돈다 — 응답 없는 호스트
+# 하나가 순회 전체를 멈추게 두지 않는다. 시간 초과는 조회 실패와 같으므로
+# 이미 fail-closed 다(--apply 차단).
+LS_REMOTE_TIMEOUT_SECONDS = 20
 
 # lens.config.json sits next to the executing code (parent of scripts/), the
 # same convention lib/git-branch.js uses for PLUGIN_ROOT.
@@ -367,6 +391,71 @@ def _remote_github_repo(repo: Path, remote: str) -> tuple[str | None, str | None
     if len(parts) != 2 or not all(parts):
         return None, "remote %s 의 URL(%s)에서 OWNER/REPO 를 해석하지 못했다" % (remote, url)
     return "/".join(parts), None
+
+
+def _live_default_branch(repo: Path, remote: str) -> tuple[str | None, str | None]:
+    """The branch ``remote`` calls its default *right now*. (name, why-not).
+
+    Asked over the wire (`git ls-remote --symref <remote> HEAD`) because the
+    local answer is stale by design: `refs/remotes/<remote>/HEAD` is written at
+    clone time and no ordinary fetch touches it — only `git remote set-head`
+    moves that symbolic ref. When the default is renamed on the server the
+    cache keeps pointing at the *old* branch, so a guard reading it protects a
+    branch that is no longer default while the real one falls through to the
+    deletion list — and ``default_guard_ok`` reports success the whole time.
+
+    A query, not a fetch: nothing is written (no ref, no object, no config), so
+    judgment stays read-only and stale tracking refs stay stale — the push
+    lease, not this guard, is what makes a stale judgment safe.
+
+    Failure — network, auth, a remote that does not exist, a server that does
+    not advertise the symref — returns None, and the caller fails closed
+    exactly as it did when the local HEAD was unresolvable. The cached value is
+    never used as a fallback: that fallback is the defect.
+
+    Bounded and non-interactive on purpose. Without GIT_TERMINAL_PROMPT=0 and a
+    closed stdin a private repo's credential prompt would wait forever, and
+    without the timeout an unreachable host would stall a whole 27-repo sweep;
+    both instead become an ordinary failed query, which is already fail-closed.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "ls-remote", "--symref", remote, "HEAD"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+            timeout=LS_REMOTE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "git ls-remote %s HEAD 가 %d초 안에 응답하지 않았다" % (remote, LS_REMOTE_TIMEOUT_SECONDS)
+    except OSError as exc:
+        return None, "git ls-remote 실행 실패(%s)" % type(exc).__name__
+    if proc.returncode != 0:
+        # git 의 원격 실패는 여러 줄이고 마지막 줄은 "and the repository exists."
+        # 같은 안내문 꼬리다 — 사용자가 --apply 차단 사유로 읽을 문장은 첫
+        # fatal:/error: 줄이므로 그것을 고른다.
+        detail = [line.strip() for line in (proc.stderr or "").splitlines() if line.strip()]
+        cause = next(
+            (line for line in detail if line.startswith(("fatal:", "error:"))),
+            detail[0] if detail else "원인 불명",
+        )
+        return None, "git ls-remote %s 실패(%s)" % (remote, cause)
+    for line in proc.stdout.splitlines():
+        # 형식: "ref: refs/heads/<name>\tHEAD" (그 뒤 줄은 "<sha>\tHEAD").
+        if not line.startswith("ref: ") or not line.rstrip().endswith("\tHEAD"):
+            continue
+        ref = line[len("ref: ") :].split("\t", 1)[0].strip()
+        if ref.startswith("refs/heads/"):
+            name = ref[len("refs/heads/") :]
+            if name:
+                return name, None
+    return None, (
+        "원격 %s 가 HEAD 의 symref 를 알리지 않았다 — 기본 브랜치 이름을 알 수 없다(빈 레포/구형 서버)" % remote
+    )
 
 
 def _open_pr_heads(repo: Path, remote: str | None) -> tuple[dict[str, int], str | None]:
@@ -603,6 +692,7 @@ def classify(
     remote: str | None,
     open_prs: dict[str, int] | None = None,
     default_branch: str | None = None,
+    former_default_branch: str | None = None,
 ) -> list[dict]:
     base_ref = "%s/%s" % (remote, base) if remote else base
     open_prs = open_prs or {}
@@ -629,6 +719,15 @@ def classify(
             # 기본·운영 브랜치다. 병합 증명 여부와 무관하게 지우지 않는다.
             item["verdict"] = "keep"
             item["reason"] = "default_branch"
+        if name == former_default_branch and item["verdict"] == "delete":
+            # 라이브 default 와 로컬 캐시(refs/remotes/<remote>/HEAD)가 어긋난
+            # 창 — clone 이후 원격에서 기본 브랜치를 개명한 상태다. 캐시가
+            # 가리키는 이름은 방금 전까지 이 레포의 기본 브랜치였고, 그 삭제는
+            # §4.2 의 잔여 origin/main 과 같은 레포 소유자의 판단이다. 라이브
+            # 값만 보호하면 옛 코드가 갖고 있던 보호가 사라지므로(보호 축소),
+            # 사용자가 set-head 로 불일치를 해소할 때까지 둘 다 유지한다.
+            item["verdict"] = "keep"
+            item["reason"] = "stale_default_branch"
         if name in protected_names and item["verdict"] == "delete":
             # namane-cms: base 와 remote HEAD 가 둘 다 master 라 잔여 origin/main 은
             # 어느 보호에도 안 걸린 채 조상으로 증명돼 delete 가 된다. 그러나
@@ -671,6 +770,8 @@ def _detail(item: dict) -> str:
         return "열린 PR #%d head — 유지 (병합 증명돼도 삭제 안 함)" % item["open_pr"]
     if item["reason"] == "default_branch":
         return "레포 기본 브랜치 — 유지 (병합 증명돼도 삭제 안 함)"
+    if item["reason"] == "stale_default_branch":
+        return "직전 기본 브랜치(로컬 캐시 HEAD가 가리키는 이름 — 원격 default 개명 반영 전) — 유지, 삭제는 레포 소유자 판단"
     if item["reason"] == "protected_name":
         return "보호 브랜치(base 아닌 통합 브랜치 이름/명시 보호 목록) — 유지, 삭제는 레포 소유자 판단"
     if item["reason"] == "merge_commit_content":
@@ -929,30 +1030,55 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
     result["pr_guard_ok"] = warning is None
     if warning:
         result["warnings"].append(warning)
-    # 보호할 기본 브랜치는 *선택한 remote* 의 HEAD 에서 읽는다. origin/HEAD 를
-    # 고정으로 보면 --remote upstream 일 때 upstream 의 default(예: main)가
-    # base(예: staging)의 조상이라는 이유로 삭제 대상으로 분류된다. 해석 불가면
-    # 어느 브랜치가 default 인지 모르는 상태 — --apply 는 fail-closed 로 차단.
+    # 보호할 기본 브랜치는 *선택한 remote* 에게 직접 묻는다(로컬 모드는 origin
+    # 이 proxy). origin/HEAD 를 고정으로 보면 --remote upstream 일 때 upstream 의
+    # default(예: main)가 base(예: staging)의 조상이라는 이유로 삭제 대상이 된다.
+    # 그리고 *로컬* refs/remotes/<remote>/HEAD 는 clone 시점 캐시라 평범한 fetch
+    # 로 갱신되지 않는다 — 원격에서 기본 브랜치를 개명하면 캐시는 옛 이름에
+    # 남고, 그걸 읽으면 가드가 '성공'을 보고하면서 옛 default 를 지키고 진짜
+    # default 를 삭제 목록에 올린다. 그래서 라이브 조회(ls-remote)를 쓴다.
+    # 조회 실패 = 어느 브랜치가 default 인지 모르는 상태 — --apply 는 fail-closed
+    # 로 차단하고, 캐시 값으로 대체하지 않는다(그 대체가 결함 그 자체다).
     head_remote = remote or "origin"
-    remote_head = _git_maybe(repo, "symbolic-ref", "refs/remotes/%s/HEAD" % head_remote)
-    default_branch = None
-    if remote_head:
-        stripped = remote_head.replace("refs/remotes/%s/" % head_remote, "", 1)
-        if stripped and stripped != remote_head:
-            default_branch = stripped
+    cached_default = None
+    cached_head = _git_maybe(repo, "symbolic-ref", "refs/remotes/%s/HEAD" % head_remote)
+    if cached_head:
+        stripped = cached_head.replace("refs/remotes/%s/" % head_remote, "", 1)
+        if stripped and stripped != cached_head:
+            cached_default = stripped
+    default_branch, why = _live_default_branch(repo, head_remote)
+    former_default_branch = None
     result["default_branch"] = default_branch
+    result["cached_default_branch"] = cached_default
     result["default_guard_ok"] = default_branch is not None
+    result["default_guard_reason"] = why
     if default_branch is None:
         result["warnings"].append(
-            "refs/remotes/%s/HEAD 미해석 — 이 remote 의 기본 브랜치를 알 수 없어 기본 브랜치 보호가 불가하다. "
-            "--apply 는 차단된다 (git remote set-head %s --auto 후 재실행)." % (head_remote, head_remote)
+            "원격 %s 의 현재 기본 브랜치를 조회하지 못했다(%s) — 어느 브랜치가 default 인지 알 수 없어 기본 브랜치 "
+            "보호가 불가하다. --apply 는 차단된다. 로컬 캐시 refs/remotes/%s/HEAD(=%s)로 대체하지 않는다: 그 값은 "
+            "fetch 로 갱신되지 않아 옛 default 를 가리킬 수 있다." % (head_remote, why, head_remote, cached_default or "미설정")
         )
+    elif cached_default is None:
+        result["warnings"].append(
+            "로컬 refs/remotes/%s/HEAD 미설정 — 원격에 직접 물어 기본 브랜치(%s)를 보호했다. base 해석이 origin/HEAD 로 "
+            "떨어지는 경우를 위해 git remote set-head %s --auto 로 로컬 캐시도 맞춰 두라." % (head_remote, default_branch, head_remote)
+        )
+    elif cached_default != default_branch:
+        former_default_branch = cached_default
+        result["warnings"].append(
+            "기본 브랜치 불일치 — 원격 %s 의 현재 default 는 %s 인데 로컬 캐시 refs/remotes/%s/HEAD 는 %s 를 가리킨다"
+            "(평범한 fetch 로는 갱신되지 않는 값이다). 이번 판정은 라이브 값 %s 를 보호했고, 직전 default 인 %s 도 함께 "
+            "유지했다. 로컬 상태는 이 스크립트가 건드리지 않는다 — git remote set-head %s --auto 로 직접 갱신하라."
+            % (head_remote, default_branch, head_remote, cached_default, default_branch, cached_default, head_remote)
+        )
+    result["former_default_branch"] = former_default_branch
     result["branches"] = classify(
         repo,
         base=resolved["base"],
         remote=remote,
         open_prs=open_prs,
         default_branch=default_branch,
+        former_default_branch=former_default_branch,
     )
     return result
 
@@ -1080,10 +1206,13 @@ def main(argv: list[str] | None = None) -> int:
                     # fail-closed: 기본 브랜치가 무엇인지 모르는 상태로 삭제하지 않는다.
                     blocked = True
                     lines.append(
-                        "%s: --apply 차단 (fail-closed) — refs/remotes/%s/HEAD 미해석, 기본 브랜치 보호 불가"
-                        % (result["repo"], remote)
+                        "%s: --apply 차단 (fail-closed) — 원격 %s 의 현재 기본 브랜치 조회 실패, 기본 브랜치 보호 불가: %s"
+                        % (result["repo"], remote, result.get("default_guard_reason") or "원인 불명")
                     )
-                    lines.append("  git remote set-head %s --auto 로 HEAD 를 설정한 뒤 재실행하라. 삭제 실행 안 함." % remote)
+                    lines.append(
+                        "  원격 접근(네트워크·인증·remote URL)을 복구한 뒤 재실행하라. 로컬 캐시 refs/remotes/%s/HEAD 로 "
+                        "대체하지 않는다 — 그 값은 fetch 로 갱신되지 않는다. 삭제 실행 안 함." % remote
+                    )
                     continue
                 deleted, skipped = prune(Path(result["path"]), result["branches"], remote=remote)
                 if deleted or skipped:
@@ -1123,11 +1252,15 @@ def main(argv: list[str] | None = None) -> int:
         if not result["default_guard_ok"]:
             # fail-closed: 기본 브랜치가 무엇인지 모르는 상태로 삭제하지 않는다.
             print(
-                "--apply 차단 (fail-closed): refs/remotes/%s/HEAD 를 해석하지 못해 기본 브랜치 보호가 불가하다 — 아무것도 삭제하지 않았다."
+                "--apply 차단 (fail-closed): 원격 %s 의 현재 기본 브랜치를 조회하지 못해 기본 브랜치 보호가 불가하다 — 아무것도 삭제하지 않았다. (%s)"
+                % (args.remote or "origin", result.get("default_guard_reason") or "원인 불명"),
+                file=sys.stderr,
+            )
+            print(
+                "원격 접근(네트워크·인증·remote URL)을 복구한 뒤 재실행하라. 로컬 캐시 refs/remotes/%s/HEAD 로 대체하지 않는다 — 그 값은 fetch 로 갱신되지 않는다."
                 % (args.remote or "origin"),
                 file=sys.stderr,
             )
-            print("git remote set-head %s --auto 로 HEAD 를 설정한 뒤 재실행하라." % (args.remote or "origin"), file=sys.stderr)
             return 1
         deleted, skipped = prune(repo, report, remote=args.remote)
         if not args.json:

@@ -1111,9 +1111,14 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(
 
 반환값의 `state` 가 아래 6상태이고 `reason` 이 판정 근거다. **PR 유무는 `mergedState` 가 모른다** — 따로 조회한다. `gh` 부재·인증 실패면 **조용히 넘어가지 말고** "PR 상태 조회 불가" 를 표시하고 history 이동은 보류한다(머지 미확인과 같은 취급).
 
+**조회 레포를 `--repo` 로 못 박는다 (필수)** — 못 박지 않은 `gh pr list` 는 gh 가 자체 규칙(`gh repo set-default` / 다중 remote 해석)으로 고른 base 레포를 조회하고, 원격이 여럿이거나 set-default 가 걸려 있으면 그것이 **다른 레포**다 — 그리고 그 조회는 *성공*으로 돌아오므로 gh-실패 가드로는 잡히지 않는다. 다른 레포에 동명 브랜치의 머지된 PR 이 있으면 그것이 **거짓 `prMerged:true` 증거**가 되어 미머지 task 를 history 로 보내고, 반대로 매칭이 없으면 **진짜 머지된 task 가 막힌다.** `OWNER/REPO` 는 판정에 쓴 remote 의 URL(`git remote get-url <remote>`)에서 해석한다 — `scripts/prune_branches.py` 의 `_remote_github_repo()` 가 쓰는 규칙과 같아야 한다(두 경로의 판정 원칙은 항상 같다. SoT: `docs/rules/branch-lifecycle.md`). **해석 불가**(URL 미해석·github.com 이 아닌 호스트)면 어느 레포의 PR 을 보는지 모르는 상태다 — "PR 상태 조회 불가" 와 **같은 취급으로 fail-closed**: 조회를 실행하지 않고 history 이동을 보류한다.
+
 ```bash
 # ⚠️ --state all 이다. 열린 PR 만 조회하면 "머지된 PR" 을 못 본다.
-gh pr list --head <branch> --state all --json number,state,mergedAt --limit 50
+# ⚠️ --repo 필수 — OWNER/REPO 는 판정에 쓴 remote 의 URL 에서 해석한 값
+#    (scripts/prune_branches.py _remote_github_repo() 와 같은 규칙).
+#    해석 실패면 이 조회를 실행하지 않는다 = "PR 상태 조회 불가" (fail-closed).
+gh pr list --repo <OWNER/REPO> --head <branch> --state all --json number,state,mergedAt --limit 50
 ```
 
 **`unknown` 이 나왔고 그 PR 이 MERGED 면 재판정한다** — GitHub 이 머지 후 head 를 자동 삭제하고 로컬 브랜치까지 정리된 상태에서는 원격·로컬 ref 가 둘 다 없어 `mergedState` 가 내용을 증명할 방법이 없다(→ `unknown`). 그건 **정상 완료 흐름**인데, 그대로 두면 **그 task 는 영원히 history 로 못 간다.** PR 이 실제로 머지됐음을 확인했으면 그 사실을 판정에 되먹인다:
@@ -1193,8 +1198,9 @@ git push --force-with-lease=refs/heads/<branch>:<판정SHA> origin :refs/heads/<
 
 # 로컬 — 아래 "로컬 삭제" 두 조건을 만족할 때만. 원격과 같은 이유로 원자적이어야 한다
 # (비교-후-삭제 사이에 다른 프로세스가 진전시키면 판정 안 된 커밋이 지워진다).
-# ⚠️ 체크아웃된 브랜치는 건너뛴다 — update-ref -d 는 branch -D 와 달리
-#    현재 브랜치도 말없이 지워 HEAD 를 깨뜨린다(git 2.53 실측).
+# ⚠️ 체크아웃된 브랜치 위에서 실행 금지 — update-ref -d 는 branch -D 와 달리
+#    현재 브랜치도 말없이 지워 HEAD 를 깨뜨린다(git 2.53 실측). 이 가드는 유지하되
+#    해법은 skip 이 아니라 "base 로 이동 후 삭제"다 (아래 별도 절).
 git update-ref -d refs/heads/<branch> <판정SHA>
 ```
 
@@ -1205,9 +1211,20 @@ lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "
 **로컬 삭제 — 증명이 끝난 뒤에는 조상 검사를 반복하지 않는다** — `git branch -d` 가 보는 것은 "브랜치 tip 이 base 의 조상인가" 하나뿐이다. 그런데 `patch-merged` 는 **정의상 조상이 아니다** — squash·rebase 머지가 커밋을 새로 썼기 때문이고, 그건 사고가 아니라 의도된 결과다. 그래서 Phase 1.5 가 patch-id 동등성으로 "모든 내용이 base 에 들어갔다" 를 증명해도 `-d` 는 매번 거부하고, **그런 완료마다 로컬 브랜치가 계속 남는다.** 이미 더 강한 증명이 끝났는데 더 약한 검사가 결과를 뒤집는 셈이다. 따라서:
 - **다음 두 조건을 모두 만족할 때만** 조상 검사를 우회하는 삭제(`git update-ref -d`)를 허용한다.
   1. Phase 1.5 판정이 `merged` · `patch-merged` · **`merged-deleted`** — 도구가 병합을 **증명**했다(내용 증명). `merged-deleted` 는 원격이 이미 없으니 **로컬만** 지운다.
-  2. 로컬 브랜치 tip 이 Phase 1.5 의 **판정 SHA 와 같다** — 판정에 들어가지 않은 로컬 커밋이 없다(SHA 증명). `merged-deleted` 는 원격 ref 가 없으므로 그 비교 기준이 `branchSha` 가 아니라 **`localSha`** 다.
-- 로컬 tip 이 판정 SHA 와 다르면 push 안 된 로컬 커밋이 있다는 뜻이다 → 지우지 않고 "로컬에 미푸시 커밋 있음 — 삭제 보류" 로 보고한다.
+  2. 로컬 브랜치 tip 이 Phase 1.5 의 **판정 SHA 와 같다** — 판정에 들어가지 않은 로컬 커밋이 없다(SHA 증명). `merged-deleted` 는 원격 ref 가 없으므로 그 비교 기준이 `branchSha` 가 아니라 **`localSha`** 다. (이 조건은 **ref 가 존재할 때**의 조건이다 — 부재면 아래 "이미 정리됨".)
+- **로컬 ref 부재는 "이미 정리됨"이다 — 미푸시 커밋이 아니다.** 다른 머신에서 작업·완료한 task 는 이 머신에 `refs/heads/<branch>` 가 아예 없는 것이 정상이다. 없는 로컬 tip 은 판정 SHA 와 "같을" 수가 없으므로, 이 상태에 "tip ≠ SHA = 미푸시 커밋" 규칙을 적용하면 **존재하지 않는 미푸시 커밋을 사유로 멈춘다** — 그리고 원격만 지운 채 멈추면 재실행 시 양쪽 ref 가 다 없어 또 막힌다. 지울 로컬 ref 가 없으면 로컬 삭제는 **성공(이미 정리됨)** 으로 처리하고 진행한다.
+- 로컬 ref 가 **존재하는데** tip 이 판정 SHA 와 다르면 — 그것이 진짜 push 안 된 로컬 커밋이다 → 지우지 않고 "로컬에 미푸시 커밋 있음 — 삭제 보류" 로 보고한다.
 - 그 외 모든 경우(`unknown`·`unmerged`·판정 SHA 없음·증명 없음)에는 **`-D` 금지가 그대로다.** 여기서 열리는 것은 "**증명이 끝난** 브랜치의 중복 조상 검사 우회" 하나뿐이고, "증명 없는 강제 삭제" 는 열리지 않는다.
+
+**체크아웃된 브랜치 — skip 이 아니라 base 로 이동 후 삭제** — `/cc` 가 task 브랜치를 만들어 그 위에서 작업을 끝내고 곧바로 `/cp done` 을 실행하는 것이 **가장 흔한 사용 경로**이고, 그 시점에 삭제 대상 task 브랜치가 체크아웃돼 있는 것은 **정상 상태**다. 여기서 로컬 삭제를 "체크아웃 중"이라고 건너뛰고 아카이브로 진행하면, Phase 3(history 작성)·Phase 4(task 삭제)의 문서 변경이 **이미 머지됐고 원격 ref 도 지워진 그 브랜치 위에서** 커밋된다 — 완료 기록이 base 에 영영 도달하지 못하고 고립된다. 아카이브는 **정리가 지속될 브랜치 위에서** 실행돼야 한다. 따라서 삭제 대상 `branch` 가 현재 체크아웃돼 있으면:
+
+1. 이 검사·이동은 이 task 브랜치 정리의 **첫 단계**다 — 원격 lease 삭제보다도 먼저 실행한다. 이동에서 멈출 때 "원격만 지워진" 어중간한 상태를 만들지 않기 위해서다.
+2. **dirty 검사** — `git status --porcelain` 이 비어 있지 않으면 **이동하지 않는다.** 완료 인터뷰까지 온 시점이면 작업 커밋은 끝났어야 하고, 미커밋 변경을 안고 checkout 하면 실패하거나 변경이 base 로 딸려 간다. "미커밋 변경 있음 — commit/stash 후 `/cp done` 재실행" 으로 보고하고 **이 task 는 여기서 멈춘다**(삭제·아카이브 미진입).
+3. 해석된 **base 로 checkout** 한다 (`git checkout <base>` — base 는 `resolveBase()` 로 해석한 값, 추정 금지). 이후 Phase 3·4 의 문서 변경은 base 위에서 일어나 정상적으로 남는다.
+4. 이동 성공 후 원격 lease 삭제 → 위의 원자적 로컬 삭제(`git update-ref -d refs/heads/<branch> <판정SHA>`) 순으로 진행한다 — 이제 체크아웃 가드에 걸리지 않는다. ⚠️ **가드 자체는 유지된다** — 체크아웃된 브랜치를 `update-ref -d` 로 지우면 HEAD 가 깨진다는 사실은 변하지 않는다. 바뀐 것은 대응이다: skip 이 아니라 **먼저 이동**.
+5. **이동 실패는 fail-closed** — checkout 이 어떤 이유로든 실패하면 삭제도 아카이브도 진행하지 않는다. 고립된 완료 기록을 만드는 것이 이 결함의 본질이므로 "이동 못 함 = 아카이브 못 함"이다. 사유 + "`/cp done` 재실행 시 재판정" 안내를 보고하고 멈춘다.
+
+이 경로는 아래 진행 게이트의 "시도하지 않은 삭제"도 "시도했다 거부·실패한 삭제"도 아니다 — **이동 후 삭제**라는 별도의 정상 경로이고, 이동+삭제가 모두 성공했을 때만 "삭제 성공"이다.
 
 **삭제 금지 조건 (Phase 1.4 안전 규칙 상속 — 하나라도 걸리면 삭제하지 않고 사유를 보고)**:
 - `unknown` 상태 — **절대 자동 삭제 금지.** 도구가 병합을 증명하지 못한 브랜치를 지우면 코드가 사라진다. 추측 삭제 금지.
@@ -1221,9 +1238,9 @@ lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "
 
 | 이 Phase 의 결과 | 해당 경우 | Phase 3(history)·Phase 4(task 삭제) 진행? |
 |---|---|---|
-| **삭제 성공** | 원격 lease 삭제 + 로컬 `update-ref -d` 성공 | ✅ 진행 |
-| **삭제를 시도하지 않음 (정당한 skip)** | `autoDeleteMergedBranch: false` / `merged-deleted` 의 원격 삭제 skip(지울 원격 ref 없음 — 로컬 삭제 결과만 따진다) / 체크아웃된 브랜치의 로컬 삭제 skip(**로컬 tip = 판정 SHA 인 경우만** — 증명은 유효, ref 는 수동 정리 대상) / frontmatter 에 `branch` 없음(1.5.1 하위호환 — Phase 1.5 자체를 skip) | ✅ 진행 — skip 사유를 완료 메시지에 남긴다 |
-| **삭제를 시도했는데 거부/실패** | lease `stale info` 거부(원격 진전) / `update-ref -d` 거부(로컬 진전) / 로컬 tip ≠ 판정 SHA(미푸시 커밋) / 판정 SHA 부재(Phase 1.5 필수 기록 누락 — 재판정 필요) | ❌ **이 task 의 완료 처리를 여기서 멈춘다** — history 를 쓰지 않고 task 파일도 지우지 않는다(아카이브 미진입). 사유 + "`/cp done` 재실행 시 재판정" 안내를 보고한다 |
+| **삭제 성공** | 원격 lease 삭제 + 로컬 `update-ref -d` 성공 / 체크아웃돼 있던 브랜치의 **base 이동 후 삭제** 성공(위 별도 절 — 이동+삭제 둘 다 성공해야 이 행이다) | ✅ 진행 |
+| **삭제를 시도하지 않음 (정당한 skip)** | `autoDeleteMergedBranch: false` / `merged-deleted` 의 원격 삭제 skip(지울 원격 ref 없음 — 로컬 삭제 결과만 따진다) / **로컬 ref 부재 — 이미 정리됨**(다른 머신에서 완료한 task, 지울 로컬 ref 없음 = 성공과 동치) / frontmatter 에 `branch` 없음(1.5.1 하위호환 — Phase 1.5 자체를 skip) | ✅ 진행 — skip 사유를 완료 메시지에 남긴다 |
+| **삭제를 시도했는데 거부/실패** | lease `stale info` 거부(원격 진전) / `update-ref -d` 거부(로컬 진전) / 로컬 ref 가 **존재하는데** tip ≠ 판정 SHA(진짜 미푸시 커밋) / 판정 SHA 부재(Phase 1.5 필수 기록 누락 — 재판정 필요) / 체크아웃 브랜치의 **base 이동 실패**(dirty 미커밋 변경·checkout 실패 — 위 별도 절, fail-closed) | ❌ **이 task 의 완료 처리를 여기서 멈춘다** — history 를 쓰지 않고 task 파일도 지우지 않는다(아카이브 미진입). 사유 + "`/cp done` 재실행 시 재판정" 안내를 보고한다 |
 
 - 원격 lease 삭제는 성공했는데 로컬 쪽이 거부·실패한 경우도 **멈춘다**(아카이브 미진입). 원격 브랜치는 머지 증명이 끝난 것이라 지워도 잃는 것이 없고, 로컬의 미푸시 커밋은 재실행 시 Phase 1.5 가 로컬 ref 기준으로 재판정한다(내용이 base 에 없음이 증명되면 `unpushed` → push+PR 제안 경로). "원격 삭제됨 / 로컬 보류 / 아카이브 보류" 를 함께 보고한다.
 - `unknown`·열린 PR·`unmerged`·fetch 실패는 애초에 Phase 1.5 게이트가 Phase 2 진입 자체를 막으므로 여기 오지 않는다. 위 삭제 금지 조건에 남아 있는 해당 항목들은 **방어선**이다 — 어떤 경로로든 도달했다면 삭제도 아카이브도 하지 않는다.
