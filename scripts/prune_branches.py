@@ -52,7 +52,7 @@ orphaned state is never removed without one. `--apply` only ever removes the
 two `delete` verdicts; `archive`, `archive_review`, `keep`, `unknown` and the
 head branch of any open PR are never touched. See docs/rules/branch-hygiene.md.
 
-Three further guards back `--apply`, all fail-closed:
+Four further guards back `--apply`, all fail-closed:
 
 * The open-PR check runs through `gh`, pinned to the repo the *selected*
   remote's URL resolves to (`--repo OWNER/REPO`; local mode proxies through
@@ -98,6 +98,25 @@ Three further guards back `--apply`, all fail-closed:
   disagree *both* names are protected: the live one because it is the
   default, the cached one because a branch that was this repo's default until
   moments ago is the same "repo owner's call" state as §4.2's residual main.
+* Deletion must go where judgment looked. A remote's push URL can differ from
+  its fetch URL (`git remote set-url --push`, config `pushurl` /
+  `pushInsteadOf`), and everything this tool proves — verdicts from tracking
+  refs, the open-PR check, the default-branch guard, the lease's expected
+  SHA — is proven against the repo the *fetch* URL points at, while the
+  deleting `git push` goes to the *push* URL. In a common upstream/fork
+  setup the fork's same-named, same-SHA branch passes the lease and dies
+  without ever being examined. So when the effective URLs differ
+  (`git remote get-url` vs `get-url --push --all` — measured to surface
+  pushurl, pushInsteadOf rewrites, and multi-push-URL configs alike;
+  compared verbatim, because equivalence across scheme variants cannot be
+  proven and unproven means blocked) a judgment-only run warns and
+  completes, and `--apply` is refused for that repo.
+  `--delete-without-pr-check` does NOT bypass this block: that override
+  attests a hand-verified PR list, which cannot make the judged repo and
+  the deletion target the same repo — no hand check can. There is no
+  override at all; the remedy is remote configuration (unset the pushurl,
+  or give the push target its own remote and judge *that* with --remote),
+  not a flag.
 * Remote deletion is leased to the judged SHA. Verdicts are computed from the
   local tracking ref, which another machine may have outrun since the last
   fetch; a plain `push --delete` would then remove commits this run never
@@ -456,6 +475,43 @@ def _live_default_branch(repo: Path, remote: str) -> tuple[str | None, str | Non
     return None, (
         "원격 %s 가 HEAD 의 symref 를 알리지 않았다 — 기본 브랜치 이름을 알 수 없다(빈 레포/구형 서버)" % remote
     )
+
+
+def _push_target_mismatch(repo: Path, remote: str) -> str | None:
+    """``remote`` 의 삭제(push)가 판정이 본 곳과 다른 곳으로 나가면 그 사유.
+
+    git remote 는 fetch URL 과 push URL 을 따로 가질 수 있다(`git remote
+    set-url --push`, 설정의 `pushurl`·`pushInsteadOf`). 이 도구가 증명하는
+    모든 것 — 판정(tracking ref)·열린 PR 보호(레포 해석)·기본 브랜치
+    가드(ls-remote)·삭제 lease 의 기대 SHA — 은 *fetch* URL 이 가리키는
+    레포를 근거로 하는데, 삭제하는 `git push` 는 *push* URL 로 나간다.
+    흔한 upstream/fork 구성에서 fork 의 같은 이름·같은 SHA 브랜치는 lease
+    까지 통과해, 한 번도 검사되지 않은 채 삭제된다(scratchpad 재현 실측).
+    그래서 두 URL 이 다르면 --apply 는 fail-closed 로 차단된다.
+
+    비교는 `git remote get-url` 의 실효값 그대로다: get-url 은 insteadOf/
+    pushInsteadOf 재작성이 적용된 URL 을 돌려주므로(실측) 설정 어디에서
+    갈라졌든 여기서 드러나고, push URL 은 여러 개일 수 있으므로
+    (`set-url --add --push`) 전부(--all) 읽어 하나라도 fetch URL 과 다르면
+    사유가 된다. scheme 만 다른 같은 레포(https vs ssh)를 정규화로 동일
+    취급하지는 않는다 — 리다이렉트·별칭까지 같은 곳임을 일반적으로 증명할
+    수 없고, 증명 못 하면 차단이 이 도구의 자세다. URL 을 읽지 못하는
+    것도 같은 이유로 사유다: 같음을 증명하지 못한 채 삭제하지 않는다.
+
+    None = fetch 와 push 가 같은 곳 — 판정 근거와 삭제 대상이 일치한다.
+    """
+    fetch_url = _git_maybe(repo, "remote", "get-url", remote)
+    if not fetch_url:
+        return "remote %s 의 fetch URL 을 읽지 못했다" % remote
+    push_urls_raw = _git_maybe(repo, "remote", "get-url", "--push", "--all", remote)
+    if not push_urls_raw:
+        return "remote %s 의 push URL 을 읽지 못했다" % remote
+    mismatched = [
+        url for url in (line.strip() for line in push_urls_raw.splitlines()) if url and url != fetch_url
+    ]
+    if mismatched:
+        return "fetch URL(%s)과 push URL(%s)이 다르다" % (fetch_url, ", ".join(mismatched))
+    return None
 
 
 def _open_pr_heads(repo: Path, remote: str | None) -> tuple[dict[str, int], str | None]:
@@ -1015,6 +1071,8 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
         "warnings": [],
         "pr_guard_ok": None,
         "default_guard_ok": None,
+        "push_target_ok": None,
+        "push_target_reason": None,
         "branches": [],
     }
     if not resolved["base"]:
@@ -1025,6 +1083,24 @@ def _judge_repo(repo: Path, *, base: str | None, remote: str | None) -> dict:
     if not _git_ok(repo, "rev-parse", "--verify", "--quiet", base_ref):
         result["skipped"] = "base ref %s 가 없다 (fetch 안 됨 / 이름 불일치) — 판정 불가" % base_ref
         return result
+
+    if remote:
+        # 삭제(push)가 판정이 본 곳(fetch URL)과 같은 곳으로 나가는지 증명한다.
+        # 다르면 판정·PR 보호·기본 브랜치 가드·lease 전부가 삭제 대상이 아닌
+        # 레포를 근거로 한 셈이 된다 — --apply 는 fail-closed 로 차단된다.
+        # 로컬 모드(remote=None)는 push 자체가 없으므로 해당 없음(None 유지).
+        mismatch = _push_target_mismatch(repo, remote)
+        result["push_target_ok"] = mismatch is None
+        result["push_target_reason"] = mismatch
+        if mismatch:
+            result["warnings"].append(
+                "remote %s 의 fetch/push 대상 분리 — %s. 판정(tracking ref)·열린 PR 보호·기본 브랜치 가드·lease SHA 는 "
+                "전부 fetch URL 쪽 레포 기준인데, 삭제(git push)와 아카이브 안내의 push 는 push URL 로 나간다 — push URL "
+                "쪽에 같은 이름·같은 SHA 의 브랜치가 있으면 검사된 적 없이 삭제된다. --apply 는 차단된다"
+                "(--delete-without-pr-check 로도 우회 불가 — PR 보호와 무관한 차단이다). git remote set-url --push %s "
+                "<fetch URL> 로 pushurl 을 해제하거나, push 대상을 별도 remote 로 두고 그쪽을 --remote 로 재판정하라."
+                % (remote, mismatch, remote)
+            )
 
     open_prs, warning = _open_pr_heads(repo, remote)
     result["pr_guard_ok"] = warning is None
@@ -1193,6 +1269,23 @@ def main(argv: list[str] | None = None) -> int:
             for result in results:
                 if result["skipped"]:
                     continue
+                if not result["push_target_ok"]:
+                    # fail-closed: 판정은 fetch URL 기준인데 삭제는 push URL 로
+                    # 나간다 — 검사된 적 없는 레포의 브랜치를 지울 수 있다.
+                    # --delete-without-pr-check 는 손으로 확인한 PR 목록을 증명하는
+                    # override 라 여기 적용되지 않는다: PR 목록을 아무리 확인해도
+                    # 판정 근거 레포와 삭제 대상 레포가 같아지지는 않는다.
+                    blocked = True
+                    lines.append(
+                        "%s: --apply 차단 (fail-closed) — remote %s 의 fetch/push 대상이 다르다: %s"
+                        % (result["repo"], remote, result.get("push_target_reason") or "원인 불명")
+                    )
+                    lines.append(
+                        "  판정·보호·lease 는 fetch URL 기준, 삭제는 push URL 로 나간다. git remote set-url --push %s "
+                        "<fetch URL> 로 pushurl 을 해제하거나 push 대상을 별도 remote 로 분리한 뒤 재실행하라. "
+                        "--delete-without-pr-check 로는 우회되지 않는다(PR 보호와 무관한 차단). 삭제 실행 안 함." % remote
+                    )
+                    continue
                 if not result["pr_guard_ok"] and not args.delete_without_pr_check:
                     # fail-closed: 열린 PR head 보호를 증명하지 못한 레포에서는 지우지 않는다.
                     blocked = True
@@ -1241,6 +1334,22 @@ def main(argv: list[str] | None = None) -> int:
         print(_render(report, args.remote, base_ref))
 
     if args.apply:
+        if result["push_target_ok"] is False:
+            # fail-closed: 판정은 fetch URL 기준인데 삭제는 push URL 로 나간다.
+            # 로컬 모드(--remote 없음)는 push 가 없어 push_target_ok 가 None —
+            # 이 차단의 대상이 아니다. --delete-without-pr-check 는 PR 보호
+            # 전용 override 라 여기 적용되지 않는다.
+            print(
+                "--apply 차단 (fail-closed): remote %s 의 fetch/push 대상이 다르다 — 판정·보호·lease 는 fetch URL 기준인데 삭제는 push URL 로 나간다. 아무것도 삭제하지 않았다. (%s)"
+                % (args.remote, result.get("push_target_reason") or "원인 불명"),
+                file=sys.stderr,
+            )
+            print(
+                "git remote set-url --push %s <fetch URL> 로 pushurl 을 해제하거나 push 대상을 별도 remote 로 분리한 뒤 재실행하라. --delete-without-pr-check 로는 우회되지 않는다 — PR 보호와 무관한 차단이다."
+                % args.remote,
+                file=sys.stderr,
+            )
+            return 1
         if not result["pr_guard_ok"] and not args.delete_without_pr_check:
             # fail-closed: 열린 PR 의 head 가 병합된 것처럼 보이면 그대로 지워질 수 있다.
             print(

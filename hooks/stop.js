@@ -39,10 +39,11 @@ function main() {
     const dashboard = endSession(sessionStatus);
     const summary = dashboard.summary;
 
-    // Reset the 2-minute progress-report clock: the turn just ended, so the user
-    // has received a message. Re-arms on the next background spawn/poll.
+    // Stamp the 2-minute progress-report clock: the turn just ended, so the user
+    // has received a message. The state itself is kept — deleting it would let a
+    // later poll re-arm with a fresh clock and postpone the reminder.
     // (See hooks/post-tool-progress.js)
-    clearProgressReportState();
+    resetProgressReportClock();
 
     // Stop hook does not support hookSpecificOutput in Claude Code schema
     // Dashboard is already saved by endSession() above
@@ -55,14 +56,36 @@ function main() {
 }
 
 /**
- * Delete the progress-report state file (fail-soft).
+ * Reset the report clock without discarding the state (fail-soft).
+ *
+ * Deleting the file loses the timestamp of the message that just reached the
+ * user. If background work is still running and the next poll lands more than
+ * 120s later, that poll creates fresh state with `lastReportAt = now` and the
+ * reminder is pushed out another two minutes — the same "late signal resets the
+ * clock" evasion that post-tool-progress.js was fixed to close (harness-rules
+ * §4.4). So stamp the report time instead: the turn just ended, so the user
+ * *has* been told something, and the 2-minute window starts from here.
+ *
+ * The arming fields are left alone. If work is still in flight the next signal
+ * finds a live state and measures against this stamp; if nothing is in flight
+ * the TTL lets it go dormant on its own.
  */
-function clearProgressReportState() {
+function resetProgressReportClock() {
   try {
     const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
     const statePath = path.join(projectRoot, '.lens', 'progress-report-state.json');
-    if (fs.existsSync(statePath)) fs.unlinkSync(statePath);
-  } catch {}
+    if (!fs.existsSync(statePath)) return;
+    const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    state.lastReportAt = new Date().toISOString();
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+  } catch {
+    // Unreadable/corrupt state: fall back to removing it rather than leaving a
+    // broken file that the next hook cannot parse.
+    try {
+      const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      fs.unlinkSync(path.join(projectRoot, '.lens', 'progress-report-state.json'));
+    } catch {}
+  }
 }
 
 /**

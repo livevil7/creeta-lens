@@ -337,19 +337,19 @@ Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude �
 | 필드 | 값 | 채우는 주체 |
 |---|---|---|
 | `repo` | 레포 디렉토리명 | `/cp` (Phase 2.5) |
-| `base` | `resolveBase()` 로 **감지한** 값 | `/cp` (Phase 2.5) |
+| `base` | `resolveBase()` 로 **감지**하고 **원격 ref 실존 확인**(`preflight`)을 통과한 값 | `/cp` (Phase 2.5) |
 | `branch` | `feat/<slug>` — 접두사는 `feat/` `fix/` `ops/` `docs/` **4종만** | `/cp` 가 **이름만** 정함 |
 | `pr` | `null` (계획 시점엔 PR 이 없다) | DONE 모드가 채움 |
 
 - **`/cp` 는 브랜치를 만들지 않는다** — 이름만 정해 문서에 적는다. 실제 생성·체크아웃은 `/cc` 가 실행 진입 시 한다. (`/cp` 는 계획·문서화 전용이라는 절대 규칙 그대로.)
 - **이름에 날짜를 넣지 않는다** — 커밋이 이미 날짜를 갖고 있다. 도구 이름 접두사(`lens/…`)도 금지.
-- **base 는 감지한다 — `main`|`master` 로 문자 추정 금지.** 레포마다 다르다 (워크스페이스 27개 레포 실측: `master` 만 11 / `main` 만 13 / 둘 다 1 / `main`+`staging` 1 / 원격에 둘 다 없음 1 — 수치의 SoT 는 `docs/rules/branch-lifecycle.md`). 감지 우선순위는 ① `lens.config.json` 의 `baseBranch.<repo>` 명시값 → ② 현재 브랜치의 upstream → ③ `origin/HEAD` 이며, `lib/git-branch.js` 의 `resolveBase(repoPath)` 가 그 판정을 갖고 있다:
+- **base 는 감지한다 — `main`|`master` 로 문자 추정 금지.** 레포마다 다르다 (워크스페이스 27개 레포 실측: `master` 만 11 / `main` 만 13 / 둘 다 1 / `main`+`staging` 1 / 원격에 둘 다 없음 1 — 수치의 SoT 는 `docs/rules/branch-lifecycle.md`). 감지 우선순위는 ① `lens.config.json` 의 `baseBranch.<repo>` 명시값 → ② 현재 브랜치의 upstream → ③ `origin/HEAD` 이며, `lib/git-branch.js` 의 `resolveBase(repoPath)` 가 그 판정을 갖고 있다. **단, 이름 판정만으로 frontmatter 를 채우지 않는다** — `resolveBase` 는 **이름만** 해석한다. upstream 이 stale 이면(원격에 없는 `origin/main` 을 tracking — `docs` 레포 실측: 원격이 비어 있는데 이름은 `main` 이 나온다) **원격에 존재하지 않는 base** 가 그대로 문서에 박히고, `/cc` 가 실행 진입에서 실패하거나 degrade 한다. 그래서 `preflight(repoPath)` 를 함께 호출한다 — `preflight` 의 `base` 는 이름 판정에 **base 실존 확인**(원격 ref `refs/remotes/origin/<base>` 검증 — `docs/rules/branch-lifecycle.md` §4.3)을 더한 값이라, 원격에 없으면 `null` 로 떨어진다:
 
   ```bash
-  node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.resolveBase(process.argv[1])))" .
+  node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');const r=g.resolveBase(process.argv[1]),p=g.preflight(process.argv[1]);console.log(JSON.stringify({resolved:r,base:p.base,issues:p.issues}))" .
   ```
 
-  반환값의 `base` 를 frontmatter 에 그대로 쓰고, 판정 출처(`config`|`upstream`|`origin-head`)는 Phase 5.0 승인 화면과 핸드오프 `[BRANCH]` 블록에 표시한다. **판정 불가면 추정으로 채우지 않는다** — `base:` 를 비우고 "base 판정 불가" 를 Phase 5.0 게이트에 표시해 사용자에게 진행 여부를 확인한다.
+  frontmatter 에 쓰는 값은 **`preflight` 의 `base`** 다(이름 판정 + 원격 ref 실존). 판정 출처(`config`|`upstream`|`origin-head`)는 `resolved` 에서 읽어 Phase 5.0 승인 화면과 핸드오프 `[BRANCH]` 블록에 표시한다. **판정 불가면 추정으로 채우지 않는다** — `resolveBase` 가 이름을 못 냈든, **이름은 냈는데 원격 ref 가 없든**(`base: null` + `issues` 에 "원격 ref 부재") 똑같이 `base:` 를 비우고 "base 판정 불가 (사유)" 를 Phase 5.0 게이트에 표시해 사용자에게 진행 여부를 확인한다.
 
 ```markdown
 ---
@@ -359,7 +359,7 @@ grade: fast|standard|deep
 created: YYYY-MM-DD
 status: planned
 repo: <레포 디렉토리명>
-base: <resolveBase 로 감지한 값>
+base: <감지 + 원격 ref 실존 확인을 통과한 값>
 branch: feat/<slug>
 pr: null
 refs: []
@@ -674,7 +674,7 @@ N+2. [Plan A step 2] — execution level (status: pending)
    브랜치: feat/<slug>  ←  base: staging  (감지: upstream)   [레포: Returns_ERP_v20]
    ```
 
-   표시가 게이트인 이유: 사용자가 **승인 시점에 위험한 base 를 눈으로 잡을 수 있어야** 한다. `Returns_ERP_v20` 은 base 가 `staging` 이고 **staging 머지는 곧 배포**다 — 승인 화면에 base 가 안 보이면 "계획 승인"이 "배포 경로 승인"인 줄 모른 채 지나간다. **base 판정 불가면** 추정으로 채우지 말고 `⚠️ base 판정 불가 (레포: <repo>)` 를 표시한 뒤 AskUserQuestion 으로 진행 여부를 확인한다 (조용한 추정 0건).
+   표시가 게이트인 이유: 사용자가 **승인 시점에 위험한 base 를 눈으로 잡을 수 있어야** 한다. `Returns_ERP_v20` 은 base 가 `staging` 이고 **staging 머지는 곧 배포**다 — 승인 화면에 base 가 안 보이면 "계획 승인"이 "배포 경로 승인"인 줄 모른 채 지나간다. **base 판정 불가면** 추정으로 채우지 말고 `⚠️ base 판정 불가 (레포: <repo>)` 를 표시한 뒤 AskUserQuestion 으로 진행 여부를 확인한다 (조용한 추정 0건). **이름은 해석됐지만 원격 ref 가 없는 경우도 같은 취급**이다 — Phase 2.5 의 `preflight` 검사가 `base: null` 을 낸 것(예: 빈 원격을 tracking 하는 `docs` 레포)이고, 존재하지 않는 base 를 frontmatter 에 쓰면 `/cc` 가 나중에 실패한다.
 
 게이트 미통과 시 사유 표시하며 Phase 0 또는 Phase 2 로 회귀.
 
@@ -1118,16 +1118,23 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(
 # ⚠️ --repo 필수 — OWNER/REPO 는 판정에 쓴 remote 의 URL 에서 해석한 값
 #    (scripts/prune_branches.py _remote_github_repo() 와 같은 규칙).
 #    해석 실패면 이 조회를 실행하지 않는다 = "PR 상태 조회 불가" (fail-closed).
-gh pr list --repo <OWNER/REPO> --head <branch> --state all --json number,state,mergedAt --limit 50
+# ⚠️ baseRefName 필수 — MERGED 라는 상태만으로는 증거가 아니다 (아래 base 자격 검사).
+gh pr list --repo <OWNER/REPO> --head <branch> --state all --json number,state,baseRefName,mergedAt --limit 50
 ```
 
-**`unknown` 이 나왔고 그 PR 이 MERGED 면 재판정한다** — GitHub 이 머지 후 head 를 자동 삭제하고 로컬 브랜치까지 정리된 상태에서는 원격·로컬 ref 가 둘 다 없어 `mergedState` 가 내용을 증명할 방법이 없다(→ `unknown`). 그건 **정상 완료 흐름**인데, 그대로 두면 **그 task 는 영원히 history 로 못 간다.** PR 이 실제로 머지됐음을 확인했으면 그 사실을 판정에 되먹인다:
+**base 자격 검사 — MERGED 상태만으로는 증거가 아니다 (필수)** — 조회 결과에서 완료 증거로 인정하는 PR 은 **`state: MERGED` 이고 `baseRefName` 이 이 task 문서 frontmatter 의 `base` 와 같은 것**뿐이다. 브랜치 이름 일치 + MERGED 만 보면 **stacked PR** 이 통과한다 — head 가 그 레포의 base 가 아니라 **다른 작업 브랜치**를 base 로 머지되고 head 가 삭제된 경우, `prMerged:true` → `merged-deleted` 가 나와 **그 변경이 계획의 base 에는 없는데도** task 가 완료로 아카이브된다. 규칙이 이미 못 박은 조항이다 — "PR base 는 그 레포의 base 다. 다른 작업 브랜치를 base 로 삼지 않는다"(`docs/rules/branch-lifecycle.md` §2). base 가 다른 MERGED PR 은 그 조항 밖에서 만들어진 것이고 완료 증거 자격이 없다.
+
+- **같은 브랜치 이름으로 PR 이 여러 개**일 수 있다(닫힘·머지·재오픈 — `--state all` 이라 전부 온다). CLOSED(미머지)·OPEN 은 애초에 증거 후보가 아니므로 개수와 무관하다. 자격(**base 일치 + MERGED**)을 통과한 PR 이 **정확히 1개**일 때만 그것을 증거로 쓴다 — frontmatter `pr` 에 기록하는 번호도 이 자격 통과 PR 이다.
+- 자격 통과 **0개**(MERGED 는 있는데 전부 base 불일치인 경우 포함)면 `prMerged` 를 주지 않는다 — 판정은 `unknown` 으로 남아 **사람 확인**으로 간다. 보고에 `PR #N 은 MERGED 지만 base 가 <baseRefName> (계획 base <base> 아님) — 증거 불인정` 을 명시해, 사람이 그 stacked 변경의 행방을 추적할 수 있게 한다.
+- 자격 통과 **2개 이상**이면 같은 브랜치가 두 사이클에 재사용된 흔적이다(1 task = 1 브랜치 = 1 PR 위반). 어느 머지가 이 task 의 것인지 도구가 특정할 수 없다 — 자동 증거로 쓰지 않고 `unknown` 유지, 후보 전부(번호·mergedAt)를 보고하고 사람 확인.
+
+**`unknown` 이 나왔고 base 자격을 통과한 MERGED PR 이 정확히 1개면 재판정한다** — GitHub 이 머지 후 head 를 자동 삭제하고 로컬 브랜치까지 정리된 상태에서는 원격·로컬 ref 가 둘 다 없어 `mergedState` 가 내용을 증명할 방법이 없다(→ `unknown`). 그건 **정상 완료 흐름**인데, 그대로 두면 **그 task 는 영원히 history 로 못 간다.** base 자격까지 통과한 머지를 확인했으면 그 사실을 판정에 되먹인다:
 
 ```bash
 node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3],{fetch:true,prMerged:true})))" . feat/<slug> <base>
 ```
 
-`prMerged: true` 는 **로컬·원격 ref 가 둘 다 없을 때만** 참조된다(내용 증거가 있으면 그쪽이 우선). 지울 ref 가 없으므로 이 경로의 오판이 삭제로 이어지지 않는다. ⚠️ PR 상태를 **확인하지 않은 채** `prMerged: true` 를 주지 마라 — 그건 증명이 아니라 가정이다.
+`prMerged: true` 는 **로컬·원격 ref 가 둘 다 없을 때만** 참조된다(내용 증거가 있으면 그쪽이 우선). 지울 ref 가 없으므로 이 경로의 오판이 삭제로 이어지지 않는다. ⚠️ PR 상태를 **확인하지 않은 채** `prMerged: true` 를 주지 마라 — 그리고 **base 자격 검사 없이도 주지 마라.** 이름 일치 + MERGED 는 증명이 아니라 가정이다.
 
 | 상태 | 의미 | 처리 | 판정에 쓴 SHA 기록 |
 |---|---|---|---|

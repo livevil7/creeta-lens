@@ -299,6 +299,18 @@ git cherry origin/<base> origin/<branch> | grep '^+'
 
 > **`merged-deleted` 가 필요한 이유**: 머지 직후 head 브랜치 삭제는 이 문서가 규정한 정상 흐름(§3)이고 GitHub 이 자동으로 하기도 한다. 그러면 `git fetch --prune` 이 `origin/<branch>` 를 지우고, 원격 ref 만 보는 판정은 그것을 **"한 번도 push 안 됨"** 으로 읽는다 — 완료된 작업에 대해 "push 하고 PR 을 또 여시겠습니까" 를 묻게 된다. 그래서 원격 ref 가 없을 때는 **로컬 ref 를 기준으로** 조상 검사 → merge-tree 비교를 한 번 더 돌린다. 증명되면 `merged-deleted`, 증명 안 되면 머지로 올리지 않는다.
 
+### 5.1 PR 을 증거로 쓸 때 — base 자격을 통과한 MERGED 만 인정한다
+
+원격·로컬 ref 가 둘 다 없으면 내용으로 증명할 방법이 없다(→ `unknown`). 이때만 PR 상태를 판정에 되먹인다(`mergedState(..., {prMerged:true})`). 그런데 **`state: MERGED` 라는 사실만으로는 증거가 아니다.**
+
+- **base 자격**: 조회 결과 중 `baseRefName` 이 **그 task 문서 frontmatter 의 `base`** 와 같은 MERGED PR 만 증거 후보다. 조회에 `baseRefName` 을 반드시 포함시킨다(`--json number,state,baseRefName,mergedAt`).
+- **왜**: 이름 일치 + MERGED 만 보면 **stacked PR** 이 통과한다 — head 가 그 레포의 base 가 아니라 **다른 작업 브랜치**로 머지되고 head 가 삭제된 경우, `prMerged:true` → `merged-deleted` 가 나와 **그 변경이 계획의 base 에는 없는데도** task 가 완료로 아카이브된다. §2 가 이미 "PR base 는 그 레포의 base 다" 를 못 박았으므로, base 가 다른 MERGED PR 은 그 조항 밖에서 만들어진 것이고 증거 자격이 없다.
+- **정확히 1개**일 때만 증거로 쓴다. frontmatter `pr` 에 적는 번호도 그 PR 이다.
+- **0개**(MERGED 는 있으나 전부 base 불일치 포함) → `prMerged` 를 주지 않는다. `unknown` 유지, 사람 확인. 보고에 `PR #N 은 MERGED 지만 base 가 <baseRefName> (계획 base <base> 아님) — 증거 불인정` 을 명시해 그 stacked 변경의 행방을 추적할 수 있게 한다.
+- **2개 이상** → 같은 브랜치가 두 사이클에 재사용된 흔적(1 task = 1 브랜치 = 1 PR 위반)이다. 어느 머지가 이 task 의 것인지 도구가 특정할 수 없으므로 `unknown` 유지하고 후보 전부(번호·mergedAt)를 보고한다.
+
+같은 자격 검사가 **board 의 In Review 조인**에도 적용된다 — head 이름만으로 붙이면 다른 base 로 향하는 PR 이 카드에 달라붙는다. 다만 board 는 **하위호환을 택한다**: 문서에 `base` 가 없으면(이 규칙 이전에 쓰인 문서) 이름만으로 조인한다. 실측 근거 — 이 레포 39개 문서 중 `base:` 를 가진 것은 1개뿐이라, 엄격하게 가면 좁은 오조인 1건을 막으려고 나머지 전 코퍼스의 In Review 를 조용히 비우게 된다. **`base` 를 적은 적이 없다는 것은 불일치의 증거가 아니다.** base 때문에 붙이지 않은 건수는 상단 바에 표시한다(침묵 금지).
+
 - **`ahead` 커밋 수를 병합 근거로 쓰지 않는다.** 계보가 다르면 ahead 가 수백이어도 병합할 것이 없고, 반대로 계보가 같아도 커밋 수는 남은 작업량을 말해주지 않는다. 실측: `backup/macmini-preIA-20260723` 은 base 에 없는 패치 169개인데 고유 변경은 4파일이다(§0.6).
 - **두 검사를 다 통과하지 못하는 브랜치는 자동 삭제하지 않는다.** 리베이스 중 충돌을 해결하면 patch-id 가 바뀌어 이미 병합된 브랜치도 `unmerged` 로 나온다. "도구가 병합을 증명할 수 없다"는 뜻이므로 사람이 내용을 확인한 뒤 지운다. 추측으로 지우지 않는다.
 - 구현은 `mergedState(repoPath, branch, base)` 다. 현재 `livevil-research` 실측 출력:
@@ -382,7 +394,7 @@ backup/macmini-preIA-20260723  아카이브 검토 — 자동커밋 누적 의�
   `--base` 를 직접 주려면 §4 로 감지한 값을 넣는다. `main` 을 기본값으로 가정하지 않는다(옵션을 비우면 도구가 §4 우선순위로 감지한다).
 
 - `--apply` 가 지우는 것은 §5 표의 두 `merged` 판정뿐이다. `계보 다름`(→ 태그 아카이브), `아카이브 검토`(§6.1), `유지`, `판정 불가` 는 지우지 않는다.
-- **`--apply` 를 막는 fail-closed 사유 4가지** (판정 전용 실행은 경고만 내고 완주한다 — 아무것도 지우지 않으므로):
+- **`--apply` 를 막는 fail-closed 사유 5가지** (판정 전용 실행은 경고만 내고 완주한다 — 아무것도 지우지 않으므로):
   1. **PR 보호 검사 불가** — `gh` 부재·미인증·일시 실패. 열린 PR 의 head 가 병합처럼 보이면 지워진다.
   2. **PR 목록이 한도에 도달** — 잘려 나간 head 는 본 적이 없으므로 검사가 불완전한 것이다.
   3. **PR 조회 대상 레포 미해석** — 선택한 remote 의 URL 에서 GitHub 레포를 못 뽑으면(비 GitHub 호스트 포함) **어느 레포의 PR 을 확인하는지 모른다.** ⚠️ 이건 gh 호출 자체의 가드가 **못 잡는** 종류다 — 레포를 고정하지 않으면 gh 가 제 기본 레포를 골라 **다른 레포의 PR 목록을 "성공" 으로 반환**한다(실측: 원격 2개 + `gh repo set-default` 상태에서 엉뚱한 레포의 PR 55개를 받아왔고, 이 레포의 열린 PR head 는 보호 목록에 없었다). 그래서 조회는 `--repo OWNER/REPO` 로 **못 박는다**.
@@ -390,7 +402,11 @@ backup/macmini-preIA-20260723  아카이브 검토 — 자동커밋 누적 의�
      - ⚠️ **default 는 로컬 `refs/remotes/<remote>/HEAD` 가 아니라 `git ls-remote --symref <remote> HEAD` 로 라이브 조회한다.** 그 로컬 심볼릭 ref 는 **clone 시점의 캐시**이고 평범한 `fetch` 로 갱신되지 않는다(`git remote set-head` 로만). 원격의 default 가 바뀐 뒤에는 가드가 **"성공" 을 보고하면서 옛 default 를 지키고, 진짜 현재 default 를 삭제 대상으로 흘려보낸다**(실측 재현).
      - 라이브 값과 로컬 캐시가 **다르면 둘 다 `유지`** 로 두고(`stale_default_branch`), 사용자에게 `git remote set-head <remote> --auto` 를 안내한다. **스크립트가 로컬 상태를 대신 고치지 않는다.**
      - 비용: 레포당 네트워크 왕복 1회가 는다. 실측으로 27개 레포 전수 순회가 **27초 → 76초**.
-  - 로컬 모드는 `origin` 을 proxy 로 쓴다(3·4 공통). 우회는 `--delete-without-pr-check` 하나뿐이고, **그것이 명시적·가시적 행위가 되도록** 설계됐다.
+  5. **remote 의 fetch URL 과 push URL 이 다름** — `git remote get-url <remote>` 와 `git remote get-url --push --all <remote>` 의 **실효값**이 하나라도 다르면 차단한다(둘 중 하나라도 못 읽어도 차단). 판정·보호·lease 는 전부 **fetch URL 레포**의 tracking ref 를 근거로 하는데, 삭제는 **push URL 레포**로 나간다 — 검사한 적 없는 레포의 브랜치를 지우는 것이다. 실측 재현: 같은 이름·같은 SHA 의 `feat/x` 를 가진 upstream/fork 구성에서 수정 전 코드가 **fork 의 브랜치를 삭제**했고(SHA 가 같아 lease 도 통과했다), upstream tracking ref 까지 부수적으로 지워졌다.
+     - ⚠️ **`--delete-without-pr-check` 로 우회되지 않는다.** 그 플래그는 "PR 목록을 손으로 확인했다"는 증명인데, PR 목록을 아무리 확인해도 **판정 근거 레포와 삭제 대상 레포가 같아지지는 않는다.** default 가드와 같이 override 없는 차단이다.
+     - 복구는 플래그가 아니라 remote 설정 교정이다 — `pushurl`(또는 `pushInsteadOf`) 을 해제하거나, push 대상을 **별도 remote 로 등록해 그쪽을 `--remote` 로 재판정**한다. `get-url` 은 `pushInsteadOf` 재작성까지 실효값으로 드러내므로 그 형태도 잡힌다.
+     - 실측: 워크스페이스 27개 레포 전수에서 split remote **0개** — 이 가드로 새로 막히는 레포는 없다.
+  - 로컬 모드는 `origin` 을 proxy 로 쓴다(3·4 공통). 로컬 모드에는 push 자체가 없으므로 5 는 해당 없음이다. 우회는 `--delete-without-pr-check` 하나뿐이고(사유 5 는 그것으로도 안 열린다), **그것이 명시적·가시적 행위가 되도록** 설계됐다.
 
 ### 7.1 삭제하는 방법 — 원자적 lease, check-then-delete 금지
 

@@ -67,10 +67,26 @@ function isAsyncLaunch(input) {
   // 그 레코드는 영영 done 이 되지 않아 대시보드가 미해결로 남는다.
   // post-tool-progress.js 의 무장 조건과 같은 순서다 (harness-rules §4.4·§4.5).
   if (input?.tool_input?.run_in_background === false) return false;
-  const text = responseText(input);
-  if (/Async agent launched/i.test(text)) return true;
-  if (/working in the background/i.test(text)) return true;
-  return false;
+  // 필드가 아예 없는 경우(Agent 도구는 기본이 백그라운드라 필드를 안 실는다)에만
+  // 텍스트를 본다. 단 **문구 하나로는 부족하다** — 임의의 결과 텍스트가 그 문구를
+  // 인용할 수 있고(이 훅 문서를 다루는 에이전트가 실제로 그런다), 그러면 이미 끝난
+  // 전경 Task 가 'launched' 로 찍혀 세션 내내 미해결로 남는다.
+  // 그래서 **구조화된 봉투**를 요구한다: 실제 async 반환은 "Async agent launched
+  // successfully." 와 함께 `agentId:` / `output_file:` 를 항상 싣는다(실측). 산문
+  // 인용은 그 조합을 갖추지 못한다.
+  return isAsyncLaunchEnvelope(responseText(input));
+}
+
+/**
+ * Structured async-launch envelope — the launch sentence AND a launch identifier.
+ * Shared shape with post-tool-progress.js; if the harness changes this envelope
+ * both hooks lose their signal at once (harness-rules §4.4·§4.5).
+ */
+function isAsyncLaunchEnvelope(text) {
+  if (!text) return false;
+  const sentence = /Async agent launched|working in the background/i.test(text);
+  const identifier = /\bagentId:\s*\S/i.test(text) || /\boutput_file:\s*\S/i.test(text);
+  return sentence && identifier;
 }
 
 function main() {

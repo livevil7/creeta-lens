@@ -77,7 +77,14 @@ const SPAWN_TOOLS = new Set(['Task', 'Agent']);
 // "Async agent launched successfully." + "The agent is working in the background.").
 // This signal is not redundant: the Agent tool spawns in the background by DEFAULT and
 // then carries no run_in_background field at all, so the text is the only evidence.
-const ASYNC_LAUNCH_RE = /Async agent launched|working in the background/i;
+// 문구 하나로는 부족하다 — 임의의 결과 텍스트가 인용할 수 있다. 실제 async 반환은
+// 문장과 함께 `agentId:` / `output_file:` 를 항상 싣는다(실측). 둘 다 요구한다.
+// post-tool-task.js 의 isAsyncLaunchEnvelope() 와 같은 모양이다.
+const ASYNC_LAUNCH_SENTENCE_RE = /Async agent launched|working in the background/i;
+const ASYNC_LAUNCH_ID_RE = /\bagentId:\s*\S|\boutput_file:\s*\S/i;
+function isAsyncLaunchEnvelope(text) {
+  return !!text && ASYNC_LAUNCH_SENTENCE_RE.test(text) && ASYNC_LAUNCH_ID_RE.test(text);
+}
 // Calling these means the agent is checking on background work right now.
 const POLL_TOOLS = new Set([
   'TaskOutput', 'AgentOutput', 'BashOutput', 'SendMessage', 'KillShell', 'KillTask', 'TaskStop',
@@ -127,7 +134,7 @@ function isBackgroundSignal(toolName, toolInput, input) {
     if (toolInput && toolInput.run_in_background === false) return false;
     // Name-gated on purpose: other tools' output can merely *quote* the phrase
     // (docs/rules/harness-rules.md §4.5 does), and reading a file must not arm.
-    return ASYNC_LAUNCH_RE.test(responseText(input));
+    return isAsyncLaunchEnvelope(responseText(input));
   }
 
   // 2. A poll is a deliberate act of checking work the agent believes is running.
