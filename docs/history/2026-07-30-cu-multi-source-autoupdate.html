@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>/cu 고도화 — 다중 소스 전수 스캔 + 무확인 자동 업데이트 · 완료 보고서</title>
+<meta name="lens:source" content="docs/history/2026-07-30-cu-multi-source-autoupdate.md">
+<meta name="lens:source-hash" content="401b5b050a84">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">08</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 08 · COVER</div>
+  <div class="meta">
+    <span>2026-07-30</span>
+    <span class="dot">·</span>
+    <span class="badge history">History</span>
+    <span class="dot">·</span>
+    <span>v3.26.0</span>
+  </div>
+
+  <h1 class="h-title">/cu 고도화 — 아는 도구 3개 확인기에서 이 컴퓨터의 업데이트 관제로</h1>
+  <p class="lede">
+    도구 이름을 손으로 적어두던 방식을 버리고 <strong>패키지 매니저 7종이 스스로 열거</strong>하게 했다.
+    매 실행마다 뜨던 확인 게이트를 제거해 안전한 항목은 묻지 않고 올린다.
+    되돌리기 어려운 것은 <code>hold</code>/<code>never</code> 로 분리했고, <code>never</code> 는 문서가 아니라 <strong>코드가 강제</strong>한다.
+  </p>
+
+  <div class="hero">
+    <div class="num">25 → 0<span class="unit">← 놓치던 업데이트</span></div>
+    <div class="caption">
+      착수 시점 <code>/cu</code> 는 업데이트 대기 <strong>25건 중 0건</strong>을 보고했다.
+      못 찾은 게 아니라 <strong>찾지 않았다</strong> — 함수 3개를 하드코딩으로 부르는 구조였다.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-07-30-cu-multi-source-autoupdate</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 08 · AT A GLANCE</div>
+  <h2 class="title">결과 요약</h2>
+  <p class="sub">코드 범위는 파일 2개 + 신규 테스트지만, 실행 결과의 범위는 사용자 머신의 실제 소프트웨어다.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">스캐너</div>
+      <div class="v accent">3 → 7</div>
+      <div class="desc">하드코딩 CLI 함수 3개 → 소스 7종. 새 도구를 깔면 코드 수정 없이 편입.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">스캔 항목</div>
+      <div class="v good">34</div>
+      <div class="desc">개편 전 9~10항목. 중복 0, <code>source_errors</code> 없음.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">실제 업그레이드</div>
+      <div class="v good">9건</div>
+      <div class="desc">winget 5 + npm 4. 확인 질문 <strong>0회</strong>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">hold · never</div>
+      <div class="v">14 · 3</div>
+      <div class="desc">전부 <strong>버전 불변</strong> 확인. PostgreSQL 직접 호출은 exit 3 거부.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">단위 테스트</div>
+      <div class="v good">68/68</div>
+      <div class="desc">신규 <code>cu.test.py</code>. fixture 는 실캡처만.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">게이트가 잡은 결함</div>
+      <div class="v warn">14건</div>
+      <div class="desc">Codex 2라운드 + Supervisor. 1라운드는 양쪽 모두 fail.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">플러그인 오탐</div>
+      <div class="v good">2 → 0</div>
+      <div class="desc">semver ↔ HEAD SHA 비교가 원인. ❓2건도 판정 성립.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">편차 기록</div>
+      <div class="v">15건</div>
+      <div class="desc">추가 질문 0회. 게이트 우회 없음.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Problem -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 08 · PROBLEM</div>
+  <h2 class="title">왜 했나 — 표가 신뢰를 잃은 상태였다</h2>
+  <p class="sub">사용자 지적 4가지가 모두 실측으로 확인됐다.</p>
+
+  <div class="compare" style="margin-top:24px">
+    <div class="panel warn">
+      <h3>Before</h3>
+      <p>
+        표에 <strong>9~10줄</strong>. winget 143개 설치 중 19개, npm 8개 중 6개가 낡았는데 <strong>한 건도 안 보임</strong>.
+        VS Code 확장 40여 개는 존재조차 목록에 없음.
+        업데이트가 있으면 매번 골라달라고 물음.
+        agentmemory 는 최신인데 ⚠️, context7 은 ❓.
+      </p>
+    </div>
+    <div class="panel good">
+      <h3>After</h3>
+      <p>
+        소스 6종 <strong>34항목</strong>이 한 표에.
+        아무것도 선택하지 않았는데 안전한 <strong>9건이 이미 최신</strong>.
+        손대지 않은 17건은 사유와 명령이 함께.
+        플러그인 6건 전부 버전 표시 정확.
+      </p>
+    </div>
+  </div>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">근본 원인</div>
+      <h3>못 찾은 게 아니라 찾지 않았다</h3>
+      <p><code>cu.py</code> 가 도구 이름을 손으로 적어둔 함수 3개(claude·codex·gh)를 부르는 구조라, 목록에 없는 도구는 아무리 낡아도 영원히 안 보였다. CLI 하나 추가에 전용 함수 하나가 필요했다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">오탐 원인</div>
+      <h3>성질이 다른 두 값을 비교했다</h3>
+      <p>대부분의 마켓플레이스 manifest 에 <code>version</code> 필드가 없어 fallback 으로 저장소 HEAD SHA 를 "최신"으로 잡고, 이를 설치된 semver 와 비교했다 → 항상 불일치 = 무조건 "업데이트 있음".</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. How it works -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 08 · HOW IT WORKS</div>
+  <h2 class="title">동작 — 소스가 열거하고, 위험도가 결정한다</h2>
+  <p class="sub">질문은 없애고 판단은 정책으로 남겼다.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">1</div>
+      <h3>소스 열거</h3>
+      <div class="what">winget · npm-global · vscode-ext · claude-plugin · cli-special · pip-global · brew. 패키지 매니저가 자기 목록을 낸다. 없는 소스는 조용히 빠지고, <strong>실패한</strong> 소스는 반드시 보고된다.</div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <h3>위험도 부여</h3>
+      <div class="what"><code>auto</code>(무확인) / <code>hold</code>(<code>/cu all</code> 로만) / <code>never</code>(어느 모드에도 제외). 정책은 파일 상단 상수 한 블록에 집결 — 흩어지면 "왜 hold 인가"를 추적할 수 없다.</div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <h3>실행 전 예고</h3>
+      <div class="what">"auto N건을 확인 없이 실행합니다 / hold M건 · never K건은 건드리지 않습니다" 를 <strong>먼저</strong> 출력. 사후 보고만 있으면 사용자가 게이트 제거를 모른 채 실행을 겪는다.</div>
+    </div>
+    <div class="step">
+      <div class="n">4</div>
+      <h3>순차 실행 + 경계 강제</h3>
+      <div class="what">auto 항목을 하나씩. <code>cmd_upgrade</code> 진입부가 <code>never</code> 를 <strong>코드로</strong> 거부(exit 3). 호출자의 필터링을 믿지 않는다.</div>
+    </div>
+    <div class="step">
+      <div class="n">5</div>
+      <h3>사후 재스캔 1회</h3>
+      <div class="what">사전 스냅샷(<code>scan --snapshot</code>)과 대조해 실제로 무엇이 올라갔는지 확인. 무확인 실행에서 이것이 유일한 검증 수단이다.</div>
+    </div>
+    <div class="step">
+      <div class="n">6</div>
+      <h3>보류 항목 안내</h3>
+      <div class="what">사유 + 직접 실행 명령. 승격 필요 항목은 PowerShell <code>foreach</code> 루프 한 줄로 묶어 제시 — winget 은 <code>--id</code> 중복을 거부한다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Decisions -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 08 · DECISIONS</div>
+  <h2 class="title">주요 결정</h2>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <h3><code>never</code> 3단계 신설 — 데이터 손실 우려 대응</h3>
+      <p>초안은 2단계였고 <code>/cu all</code> 이 hold 전량을 실행했다. 그런데 hold 에 PostgreSQL 이 있어 <strong>오타 한 번으로 DB 마이그레이션이 일어난다.</strong> "사용자가 <code>all</code> 을 타이핑했으니 승인"이라는 논리는 되돌릴 수 없는 손실을 정당화하지 못한다 → <code>/cu all</code> 로도 닿지 않는 층을 뒀다. (Pre-mortem P1)</p>
+    </div>
+    <div class="dec">
+      <h3><code>never</code> 를 문서가 아니라 코드로 강제 — 이번 작업의 최대 수정</h3>
+      <p><code>upgrade_targets()</code> 가 never 를 제외하도록 설계했지만 <strong>실행 흐름은 그 함수를 경유하지 않는다</strong>(에이전트가 스캔 JSON 을 읽고 <code>cu.sh upgrade &lt;id&gt;</code> 를 개별 호출). 테스트에서만 불리는 죽은 방어선이었다. Codex 와 Supervisor 가 <strong>독립적으로 같은 지점</strong>을 지목해 발견됐다.</p>
+    </div>
+    <div class="dec">
+      <h3>소스 단위 열거로 전환</h3>
+      <p>CLI 하나당 함수 하나 쓰는 구조를 버렸다. 패키지 매니저가 이미 전체 목록을 안다. 결과적으로 <code>cli:codex</code>·<code>cli:gh</code> 전용 스캐너가 삭제됐다 — 각각 npm·winget 이 잡는다.</p>
+    </div>
+    <div class="dec">
+      <h3>판단 불가는 항상 보수적으로</h3>
+      <p>버전 파싱 실패 → <code>hold</code>. 형태 불일치(semver↔SHA) → <code>None</code>, 절대 <code>True</code> 금지. 미지의 mode 값 → hold 해제 안 함(화이트리스트). 애매함이 폭발 반경을 넓히면 안 된다.</p>
+    </div>
+    <div class="dec">
+      <h3>위험도를 설정 파일로 빼지 않았다 · LLM 에 위임하지 않았다</h3>
+      <p>설정 파일은 요청하지 않은 유연성이고 없을 때·깨졌을 때 처리가 붙는다. LLM 위임은 실행 정책이 인증·네트워크·모델 변경에 흔들리고 "왜 이게 올라갔나"를 재현할 수 없게 만든다 — 실행 정책은 결정적이어야 한다.</p>
+    </div>
+    <div class="dec">
+      <h3>fixture 는 실캡처만, 테스트는 구현보다 먼저</h3>
+      <p>손으로 쓰면 컬럼 폭이 실물과 어긋나 <strong>"테스트는 통과하는데 파서는 깨지는"</strong> 최악의 조합이 된다. 실제로 이 테스트가 <code>redis</code> ⊂ <code>vcredist</code> 부분 문자열 충돌(VC++ Redist 가 never 로 오분류)을 잡아냈다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Validation -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 08 · VALIDATION</div>
+  <h2 class="title">검증 — 실행해보지 않으면 못 잡는 것들</h2>
+  <p class="sub">더블 게이트 1라운드는 Codex·Supervisor 양쪽 모두 fail 이었다. 결함 14건 전수 수정 후 재검증.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">단위 68/68 pass · 실측 auto 9건 업그레이드 · hold 14 · never 3 버전 불변 · Goal 4/4.</div>
+    <ol>
+      <li>
+        <h4>never 경계가 코드로 닫혔다</h4>
+        <div class="det"><code>bash scripts/cu.sh upgrade winget:PostgreSQL.PostgreSQL.18</code> → <strong>실행 없이 exit 3</strong>, PostgreSQL <code>18.4-1</code> 유지. 가드와 분류기가 같은 정책 상수를 쓰는지 검사하는 단정도 추가 — 두 정책이 갈라지면 테스트가 잡는다.</div>
+      </li>
+      <li>
+        <h4>winget HRESULT 마스킹 함정 (실측으로 당했다)</h4>
+        <div class="det">Python <code>subprocess</code> 는 32비트 원값(<code>0x8A15002B</code>=2316632107)을 받지만 셸은 하위 1바이트(43)만 보여준다. 셸에서 잰 값을 상수로 쓰면 Python 경로에서 하나도 안 맞는다. 양쪽 인정 + 종료코드 규약(0/1/2/3)으로 사상해 해석 불가한 값이 새어 나가지 않게 했다.</div>
+      </li>
+      <li>
+        <h4>소스 일시 장애 — 재시도로 통과</h4>
+        <div class="det">msstore REST API 오류(<code>0x8A15003B</code>)로 winget 5건이 <strong>전부</strong> 실패했고 같은 명령 재시도로 통과했다. 한 번의 일시 장애로 그날의 자동 갱신이 통째로 날아가지 않도록 재시도 1회를 넣었다.</div>
+      </li>
+      <li>
+        <h4>CJK 표시폭은 가설이 아니었다</h4>
+        <div class="det">winget 은 표시 폭으로 컬럼을 정렬하므로 한글 이름 행은 문자 인덱스가 어긋난다. 이 머신 출력에 실제로 <code>AVC 인코더 비디오 확장</code> 이 있어 라이브 경로였다 — 실캡처로 보정을 검증했다.</div>
+      </li>
+      <li>
+        <h4>오탐 2건 · ❓2건 해소</h4>
+        <div class="det">agentmemory <code>0.9.28→0.9.28 False</code>, insane-search <code>0.13.0→0.13.0 False</code>. context7·playwright 는 <code>gitCommitSha</code> 로 SHA 대 SHA 판정 성립.</div>
+      </li>
+      <li>
+        <h4>그 외 수정된 결함</h4>
+        <div class="det"><code>upgrade_targets</code> fail-open · 최신 항목 매번 재설치 · <code>/cu scan</code> 이 실제 업그레이드 실행 · 소스 실패 시 "모두 최신" 종료 · 사후 재스캔이 사전 스냅샷 파괴 · winget 실패가 소스를 조용히 삭제 · 비영어 로케일 0건 · 드라이버 복합어 누락 · UAC 무한 대기 · README 계약 불일치 · stderr mojibake.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- 7. Files -->
+<section class="slide" id="files">
+  <div class="page-no">07 / 08 · FILES</div>
+  <h2 class="title">변경 파일</h2>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <h3>구현</h3>
+      <p><code>scripts/cu.py</code> — 497줄 → 약 900줄. 소스 스캐너 7종 + 계약 함수 6개 + <code>never_reason</code> 실행 경계 게이트 + 정책 상수 블록 + 사전 스냅샷.</p>
+    </div>
+    <div class="file-card">
+      <h3>신규 — 테스트</h3>
+      <p><code>scripts/cu.test.py</code> (단정 68개) · <code>tests/fixtures/winget-upgrade.txt</code> · <code>winget-cjk-rows.txt</code> · <code>npm-outdated.json</code> — 전부 실제 출력 캡처.</p>
+    </div>
+    <div class="file-card">
+      <h3>문서</h3>
+      <p><code>skills/cu/SKILL.md</code> (절차 전면 재작성) · <code>README.md</code> (파괴적 변경 고지) · <code>CHANGELOG.md</code> (v3.26.0).</p>
+    </div>
+    <div class="file-card">
+      <h3>릴리즈 부수</h3>
+      <p><code>.claude-plugin/marketplace.json</code>·<code>plugin.json</code> · <code>CLAUDE.md</code> · <code>hooks/*</code> · <code>skills/{c,cc,ccp,ci,cp,cs}/SKILL.md</code> — 버전 문자열 44곳.</p>
+    </div>
+  </div>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next">
+      <div class="l">출시</div>
+      <h3>커밋 <code>c4b7237</code> + <code>fcd3bc5</code> · 태그 <code>v3.26.0</code></h3>
+      <p>원격 확인 <code>refs/tags/v3.26.0 → c4b7237</code>. 마켓플레이스 <code>source.ref</code> 가 태그를 보므로 커밋 → 태그 → push 순서 엄수.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8. What's next -->
+<section class="slide" id="next">
+  <div class="page-no">08 / 08 · WHAT'S NEXT</div>
+  <h2 class="title">남은 것 · 되먹임</h2>
+
+  <div class="next-grid" style="margin-top:20px">
+    <div class="next warn">
+      <div class="l">필요 조치</div>
+      <h3>이 머신에서 아직 활성이 아니다</h3>
+      <p>활성 플러그인 캐시는 <code>lens/3.25.0</code> 이고 그 <code>cu.py</code> 는 구버전이다(계약 함수 0/3). <code>/cu</code> 를 치면 옛 스캐너가 돈다. <strong><code>/lens-upgrade</code> → Claude Code 완전 재시작</strong> 필요. 이번 검증은 전부 레포의 <code>scripts/cu.sh</code> 직접 호출로 수행했다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">한계</div>
+      <h3>승격 커버리지 — 19건 중 auto 5건</h3>
+      <p>Git 2.54→2.55 · AWS CLI · Tailscale · WeChat · QMK · Futuremark 6건은 위험해서가 아니라 <strong>권한 때문에</strong> hold 로 갔다. 관리자 권한 세션에서는 auto 가 된다.</p>
+    </div>
+    <div class="next">
+      <div class="l">정상 동작</div>
+      <h3>context7 · playwright 는 재시작 대기</h3>
+      <p><code>refreshed from source. Restart to apply changes.</code> 재시작 전까지 레지스트리 SHA 가 안 바뀌므로 <code>/cu</code> 가 계속 대기로 표시한다 — 실패가 아니라 정직한 상태.</p>
+    </div>
+    <div class="next">
+      <div class="l">후속</div>
+      <h3>Mac Mini(brew) 실측</h3>
+      <p><code>brew</code> 스캐너는 자리를 만들었으나 Windows 에서만 검증했다. <code>lib/install-sync.js</code> 일관성은 조사 결과 충돌 없음으로 판정 — 후속 태스크 불필요.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">되먹임 — 계획</div>
+      <h3>파일 단위 충돌을 태스크 분할에 반영해야 한다</h3>
+      <p>T1~T5 를 병렬 태스크로 쪼갰지만 전부 같은 <code>cu.py</code> 를 수정하므로 실제로는 직렬화가 강제됐다. Pre-mortem 이 T3·T4 만 지적했는데 실은 T1~T5 전체가 같은 문제였다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">되먹임 — 실행</div>
+      <h3>mtime 부재는 에이전트 사망 근거가 못 된다</h3>
+      <p>배포 8분 시점에 산출물이 없다는 이유로 "Worker 3개 사망"으로 판단하고 직접 실행 전환을 선언했으나 오판이었다 — 세 Worker 모두 정상 동작(212·294·854초 완료). 대형 계획서를 읽는 동안은 산출물이 없는 것이 정상이며, 생존 판정 기준은 완료 알림이어야 한다.</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">되돌리기 쉬운 것은 묻지 않고 올린다. 되돌릴 수 없는 것은 코드가 막는다.</div>
+    <div class="right">creeta-lens · v3.25.0 → v3.26.0<br>2026-07-30</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

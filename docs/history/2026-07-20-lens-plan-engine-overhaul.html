@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lens 계획 엔진 개편 — 품질 게이트 · 모델 통제 · /cs PR 전환 · 완료 보고서</title>
+<meta name="lens:source" content="docs/history/2026-07-20-lens-plan-engine-overhaul.md">
+<meta name="lens:source-hash" content="4789ad38cf52">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">08</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 08 · COVER</div>
+  <div class="meta">
+    <span>2026-07-20</span>
+    <span class="dot">·</span>
+    <span class="badge history">History</span>
+    <span class="dot">·</span>
+    <span>v3.25.0</span>
+  </div>
+
+  <h1 class="h-title">Lens 계획 엔진 개편 — 품질 게이트 · 모델 배분 통제 · /cs PR 전환 · /cpp 정리</h1>
+  <p class="lede">
+    기획서 골격에 필수 섹션을 추가하고, 얕은 계획으로는 실행이 시작되지 않도록 <strong>실행 진입 게이트</strong>를 뒀다.
+    모델 상속과 연쇄 승격을 폐기하고, <code>/cs</code> 를 PR-only 로 바꿨으며, <code>/cpp</code> 를 <code>/cp deep</code> 등급으로 흡수했다.
+    <strong>세 문제의 뿌리는 하나였다 — 정책은 산문으로 선언되고 강제하는 코드가 없었다.</strong>
+  </p>
+
+  <div class="hero">
+    <div class="num">0/80<span class="unit">← NFR·인수기준·미결질문·테스트케이스</span></div>
+    <div class="caption">
+      산출물 <strong>80건 전수조사</strong> 결과. 필수라고 선언된 섹션조차 존재율 <strong>28%</strong> 였다.
+      선언만 있고 검사가 없으면 규칙은 조용히 사라진다.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-07-20-lens-plan-engine-overhaul</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 08 · AT A GLANCE</div>
+  <h2 class="title">결과 요약</h2>
+  <p class="sub">4개 패키지 전량 실행. 26파일, +693 / −448.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">전수조사 근거</div>
+      <div class="v warn">0/80</div>
+      <div class="desc">NFR·인수기준·미결질문·테스트케이스. 필수 섹션 존재율 28%.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">패키지</div>
+      <div class="v good">4/4</div>
+      <div class="desc">모델 정책 · 골격+게이트 · /cs PR-only · 릴리즈.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">패키지 1 검증</div>
+      <div class="v good">6/6</div>
+      <div class="desc">모델 계측 <code>model=haiku</code> 기록 확인, 상속 잔존 0건.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">/cpp 폐지</div>
+      <div class="v accent">−154줄</div>
+      <div class="desc">cp 1042 + cpp 305 = 1347 → cp 1193. 중복이 소멸했다.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">자기 검증</div>
+      <div class="v good">valid:true</div>
+      <div class="desc">개편된 게이트가 <strong>개편 산출물 자신</strong>을 <code>validatePlanStructure(deep)</code> 로 통과시켰다.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">실행 지표</div>
+      <div class="v">6 · 5</div>
+      <div class="desc">추가 질문 6회 · 편차 5건. 게이트 통과.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Problem -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 08 · PROBLEM</div>
+  <h2 class="title">왜 했나 — 규칙이 코드가 아니면 사라진다</h2>
+
+  <div class="compare" style="margin-top:24px">
+    <div class="panel warn">
+      <h3>Before</h3>
+      <p>
+        계획서에 "무엇을 만드는지"가 빠져 관리자가 승인/반려를 판단할 근거가 부족했다.
+        결론만 있고 <strong>선택의 근거</strong>가 없었다.
+        얕은 계획서도 실행이 그냥 시작됐다.
+        단순 업무가 최상위 모델을 먹었고, 어떤 모델이 몇 번 쓰였는지 알 수 없었다.
+        <code>/cs</code> 는 기본 브랜치에 직접 밀어 넣었다.
+      </p>
+    </div>
+    <div class="panel good">
+      <h3>After</h3>
+      <p>
+        비목표·검토된 대안·DO NOT CHANGE·리스크 레지스터·미해결 질문이 필수가 됐다.
+        필수 항목이 비면 <code>/c</code>·<code>/cc</code> 가 <strong>실행을 거부</strong>한다.
+        모든 spawn 이 모델을 명시하고 훅이 기록한다.
+        <code>/cs</code> 는 전부 PR 로 남는다.
+        계획 스킬은 <code>/cp</code> 하나 · 등급 3개.
+      </p>
+    </div>
+  </div>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">핵심 통찰</div>
+      <h3>검사를 작성 시점이 아니라 실행 시점에 뒀다</h3>
+      <p>작성 시점 검사는 우회 경로가 많다 — 다른 쓰기 경로, 파일 없이 응답 본문으로만 낸 계획, 외부에서 수정된 문서, 예전 버전으로 만들어진 문서. 반면 <strong>실행 진입은 우회할 수 없다.</strong> 그래서 레거시 문서까지 자동 커버되고 소급 정리가 불필요해진다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. How it works -->
+<section class="slide" id="how">
+  <div class="page-no">04 / 08 · HOW IT WORKS</div>
+  <h2 class="title">4개 패키지</h2>
+
+  <div class="pipe cols-2" style="margin-top:24px">
+    <div class="step">
+      <div class="n">1</div>
+      <h3>모델 배분 통제</h3>
+      <div class="what">상속 폐기(모든 spawn 이 명시) · 연쇄 승격 폐기(위험도 기반) · TOP 상한(<code>/cc</code> 3 · <code>/ccp</code> 1 · <code>/cp deep</code> 2) · fan-out 조사 중간 티어 고정 · <code>hooks/pre-tool-task.js</code> + <code>lib/agent-tracker.js</code> 계측 신설.</div>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <h3>골격 + 실행 진입 게이트</h3>
+      <div class="what">2A 골격(필수 섹션 5종 + 필수7/조건부부록 + 위험도 등급 + 예약어 3개 + 양방향 가드) · 2B 게이트(필수 섹션 코드 검사 · 차단 질문 0 · 단계↔검증 연결 · 라벨↔내용 일치) · 2C <code>/cpp</code> 폐지. <code>validatePlanStructure</code> 를 현행 골격으로 갱신하고 <strong>실제 배선</strong>했다 — 그전까지 런타임 호출자가 0개였다.</div>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <h3>/cs PR-only</h3>
+      <div class="what">기본 브랜치 직접 push 폐지. 변경을 <code>sync/&lt;date&gt;-&lt;time&gt;</code> 브랜치로 옮겨 PR 로 제안. <strong>커밋 전에 브랜치를 만드는 순서가 핵심</strong> — 기본 브랜치에 먼저 커밋하면 비교할 변경이 없어 PR 자체가 불가능하다. fail-closed.</div>
+    </div>
+    <div class="step">
+      <div class="n">4</div>
+      <h3>릴리즈</h3>
+      <div class="what">CHANGELOG·CLAUDE.md 작성, <code>bump-version.sh</code> 를 12파일로 정정(<code>skills/cpp</code> 삭제 반영), v3.25.0 13/13 반영 확인.</div>
+    </div>
+  </div>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next">
+      <div class="l">되먹임 고리 신설</div>
+      <h3>계획서에 적고 넘기지 않으면 그 판단은 버려진다</h3>
+      <p>핸드오프에 NON_GOALS·DO_NOT_CHANGE·REJECTED_ALTERNATIVES·BLOCKING_QUESTIONS·GRADE 를 추가하고 <strong>worker 프롬프트에 실제 주입</strong>했다. DO NOT CHANGE 가 없으면 worker 가 무관한 코드를 "개선"하고, 비목표가 없으면 범위를 넘고, 기각된 대안이 없으면 이미 버린 접근을 다시 시도한다. 여기에 편차 기록과 실행 지표를 더해 <code>/cp → /cc → ???</code> 로 끊겨 있던 고리를 닫았다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Decisions -->
+<section class="slide" id="decisions">
+  <div class="page-no">05 / 08 · DECISIONS</div>
+  <h2 class="title">주요 결정</h2>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <h3>등급은 분량이 아니라 위험도로</h3>
+      <p>줄 수·페이지 수로 등급을 정하면 길이가 품질의 대리값이 되어 <strong>내용 없는 문서가 길이만으로 통과</strong>한다. 기준은 "되돌리기 얼마나 어려운가".</p>
+    </div>
+    <div class="dec">
+      <h3><code>/cs</code> auto-merge → PR-only 로 축소</h3>
+      <p>당초 사용자 선택은 "PR + 자동 머지"였으나 Codex 협의에서 <em>"auto-merge 가 즉시 실행되면 PR 은 검토 단계가 아니라 기록용 포장"</em> 이라는 반박이 나와 사용자 재확인 후 축소했다. auto-merge 는 비목표로 분리.</p>
+    </div>
+    <div class="dec">
+      <h3>모델 상속 폐기 — 명시하면 기록되고, 기록되면 통제된다</h3>
+      <p>지정을 생략하면 훅이 실제 실행 모델을 관측할 수 없어(<code>tool_input.model</code> = undefined) 계측에 구멍이 생기고, 세션이 최상위 모델일 때 모든 Hard 역할이 자동으로 최상위를 먹었다(실측된 과소비 원인).</p>
+    </div>
+    <div class="dec">
+      <h3>연쇄 승격 폐기 — 기준을 티어 대칭에서 위험도로</h3>
+      <p>종전엔 TOP worker 가 하나라도 있으면 Supervisor·QA 도 TOP 이었다. Hard 1개 + Easy 3개 실행에서도 최상위 모델 2개가 추가로 붙었다. 리뷰 깊이가 필요한 것은 "worker 가 똑똑했을 때"가 아니라 <strong>"틀렸을 때 손해가 클 때"</strong> 다.</p>
+    </div>
+    <div class="dec">
+      <h3>미해결 질문은 "차단만 0"</h3>
+      <p>전량 0 을 기계적으로 강제하면 모델이 불확실성을 드러내는 대신 <strong>임의 가정을 확정처럼 기록</strong>한다 — 질문 은폐를 유도하는 역효과다. 비차단 질문은 가정·확인시점과 함께 남기게 했다.</p>
+    </div>
+    <div class="dec">
+      <h3>기각 2건 — 반박이 성립했다</h3>
+      <p><strong>deep 본문 분리(<code>deep.md</code>)</strong>: 파일 비대화 방지 목적이었으나 정책은 인라인에 남겨야 하므로 오히려 커진다는 반박. 통합으로 중복이 소멸해(−154줄) 애초에 문제가 아니었다. <strong><code>/cpp</code> 통합 순서</strong>: 검증 2건이 "품질 문제 해결 전 인터페이스 변경"이라며 보류를 권고 → 폐지는 진행하되 골격 통일 이후로 순서를 재배치해 위험을 해소.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Validation -->
+<section class="slide" id="validate">
+  <div class="page-no">06 / 08 · VALIDATION</div>
+  <h2 class="title">검증</h2>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">전수조사 80건 → 업계 표준 리서치 → 코드 실측 → Codex 교차 협의(재시도 성공) → 적대적 검증 2건 → 패키지별 검증.</div>
+    <ol>
+      <li>
+        <h4>패키지 1 — 검증 6/6 pass</h4>
+        <div class="det">모델 계측 실행 검증에서 <code>model=haiku</code> 기록 확인. 상속 잔존 <strong>0건</strong>(5개 스킬 + <code>harness-rules.md</code> §4.1 재개정).</div>
+      </li>
+      <li>
+        <h4>패키지 2 — 게이트가 자기 자신을 검증했다</h4>
+        <div class="det"><code>validatePlanStructure(deep)</code> 가 이 계획서 자체에 대해 <code>valid:true</code>. 개편된 게이트를 개편 산출물로 통과시켰다.</div>
+      </li>
+      <li>
+        <h4>패키지 3 — 로컬 테스트 레포로 함정 실측</h4>
+        <div class="det">커밋 전 브랜치 분기 ✓ / 기본 브랜치 직접 커밋 0건 ✓ / <code>master == origin/master</code>(divergence 없음) ✓ / PR 실패 시 직접 push 우회 안 함(fail-closed) ✓.</div>
+      </li>
+      <li>
+        <h4>패키지 4 — 릴리즈</h4>
+        <div class="det">v3.25.0 버전 반영 13/13 확인. <code>bump-version.sh</code> 를 12파일 기준으로 정정.</div>
+      </li>
+      <li>
+        <h4>타임아웃 규칙 개정 — 실측 실패 2건이 근거</h4>
+        <div class="det">2026-07-15 대형 diff 리뷰와 2026-07-20 계획엔진 협의가 <strong>모두 180초 상한에 걸려 죽었고</strong>, <code>-o</code> 부분 수거가 불가능함(0바이트)이 확인됐다. 두 사례 모두 "작업이 클수록 교차검증이 사라지는" 방향 — 하드게이트가 가장 필요한 순간에 정확히 무력화됐다. 깊이만 규모에 맞추고 시간을 안 맞춘 것이 설계 결함이었다 → 규모 분기(180/300/600초) + 대규모 background 필수.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- 7. Files -->
+<section class="slide" id="files">
+  <div class="page-no">07 / 08 · FILES</div>
+  <h2 class="title">변경 파일 — 26개, +693 / −448</h2>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <h3>규칙 (SoT)</h3>
+      <p><code>harness-rules.md</code>(§4.1 재개정 + <strong>§4.4 진행보고 규약 신설</strong>) · <code>codex-integration.md</code>(타임아웃 규모 분기) · <code>live-research.md</code> · <code>release-guide.md</code> · <code>capability-assumptions.json</code></p>
+    </div>
+    <div class="file-card">
+      <h3>코드</h3>
+      <p><code>lib/plan-manager.js</code>(+63, 실제 배선) · <code>hooks/pre-tool-task.js</code> + <code>lib/agent-tracker.js</code>(계측 신설) · <code>scripts/git-sync-all.sh</code>(+105, PR-only) · <code>scripts/bump-version.sh</code></p>
+    </div>
+    <div class="file-card">
+      <h3>스킬</h3>
+      <p><code>skills/cp</code> <strong>+282</strong>(deep 흡수) · <code>cs</code> +47 · <code>cc</code> +80 · <code>c</code> +33 · <code>ccp</code> · <code>ci</code> · <strong><code>skills/cpp</code> 삭제 −307</strong></p>
+    </div>
+    <div class="file-card">
+      <h3>기타</h3>
+      <p><code>templates/report-conversion-spec.md</code> · <code>docs/START_HERE.md</code> · <code>CHANGELOG.md</code> · <code>CLAUDE.md</code> · <code>docs/board_creeta-lens.html</code></p>
+    </div>
+  </div>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next">
+      <div class="l">출시</div>
+      <h3>커밋 <code>ea7c693</code>·<code>b9530df</code>·<code>eb3abed</code>·<code>7c47263</code>·<code>5cbf645</code> · 태그 <code>v3.25.0</code></h3>
+      <p>다국어 트리거 22개는 <code>/cp</code> 로 이관되어 deep 자동 판정 — 습관 단절 0. 레거시 <code>planner: cpp</code> 문서 17건은 task-deep 양식 하위호환 유지.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8. What's next -->
+<section class="slide" id="next">
+  <div class="page-no">08 / 08 · WHAT'S NEXT</div>
+  <h2 class="title">유실 · 계획 외 작업 · 되먹임</h2>
+
+  <div class="next-grid" style="margin-top:20px">
+    <div class="next warn">
+      <div class="l">유실 1건 — 폐기 선택</div>
+      <h3>설계 워크플로(3축×3렌즈) 오케스트레이션 사망</h3>
+      <p><code>journal.jsonl</code> 미생성으로 조용히 죽었다. 복구하지 않고 폐기했고 Codex 협의가 커버 범위를 대체했다. <strong>이 실패가 진행보고 규약 강화의 직접 원인</strong> — 기존 v3.16 규칙이 Workflow 도구를 누락하고 생존 확인을 요구하지 않아 조용한 사망을 못 잡았다.</p>
+    </div>
+    <div class="next">
+      <div class="l">신설된 규약</div>
+      <h3>진행보고 3항 필수 (harness-rules §4.4)</h3>
+      <p><strong>생존 확인 의무(추측 금지)</strong> · 끝난 것/남은 것 · 부분 산출물 선공개. "아직입니다"만 적는 보고는 위반. SoT 신설 + 6개 스킬 인라인.</p>
+    </div>
+    <div class="next">
+      <div class="l">계획에 없던 작업</div>
+      <h3><code>bump-version.sh</code> 정정</h3>
+      <p><code>skills/cpp/SKILL.md</code> 삭제로 릴리스 스크립트가 깨져 12파일 기준으로 고쳐야 했다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">되먹임 — 문서 관리</div>
+      <h3>진행상황은 요약 줄도 함께 갱신해야 한다</h3>
+      <p>"현재 상태" 줄이 <code>패키지 1 완료 — 패키지 2 착수 대기</code> 로 stale 하게 남아 있었다(이후 줄들과 v3.25.0 출시가 전량 완료를 확인). 최신 줄만 추가하면 맨 위 요약이 거짓말을 한다.</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">정책은 산문으로 선언되고 강제하는 코드가 없었다 — 세 문제의 뿌리가 하나였다.</div>
+    <div class="right">creeta-lens · v3.24.0 → v3.25.0<br>2026-07-20</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>

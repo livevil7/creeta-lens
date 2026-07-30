@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lens 모델 정책 전환 — 난이도 사다리 자동 추종 · 완료 보고서</title>
+<meta name="lens:source" content="docs/history/2026-07-15-dynamic-top-model-policy.md">
+<meta name="lens:source-hash" content="3c586bc489a7">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">07</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 07 · COVER</div>
+  <div class="meta">
+    <span>2026-07-15</span>
+    <span class="dot">·</span>
+    <span class="badge history">History</span>
+    <span class="dot">·</span>
+    <span>v3.24.0</span>
+  </div>
+
+  <h1 class="h-title">Lens 모델 정책 전환 — 고정 모델명 폐지, 난이도 사다리 자동 추종</h1>
+  <p class="lede">
+    지시문에 못박혀 있던 <code>opus</code>·<code>gpt-5.5</code> 를 지우고
+    <strong>업무 난이도에 맞는 모델 사다리</strong>로 교체했다.
+    사다리의 각 칸은 이름이 아니라 <strong>상대 위치</strong>라서, 새 모델이 나와도 사람이 문서를 고치지 않는다.
+  </p>
+
+  <div class="hero">
+    <div class="num">7위<span class="unit">← 당시 gpt-5.5 의 순위</span></div>
+    <div class="caption">
+      Lens 의 모든 품질 검증이 순위표 <strong>7위</strong> 모델로 돌고 있었고,
+      Claude 쪽 최고 난이도 자리도 한 세대 전(opus)에 고정돼 있었다.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / history</span>
+    <span>2026-07-15-dynamic-top-model-policy</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 07 · AT A GLANCE</div>
+  <h2 class="title">결과 요약</h2>
+  <p class="sub">신규 로직은 자동 선택기 한 줄뿐 — 나머지는 지시문 텍스트 교체 + 출시 절차.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">검증</div>
+      <div class="v good">9/9</div>
+      <div class="desc">전량 pass. Goal 3/3 달성.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">신규 로직</div>
+      <div class="v accent">1줄</div>
+      <div class="desc">node resolver — codex 순위표에서 1등을 매 호출 직전 선택.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">수정 지점</div>
+      <div class="v">45+</div>
+      <div class="desc">규칙 3종 + 스킬 5종 + 릴리즈. 파일 18개.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">Pre-mortem</div>
+      <div class="v warn">27 → 12</div>
+      <div class="desc">4-skeptic 병렬 공격 27건 수집 → 12건 채택. <strong>blocker 2건 사전 해소</strong>.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">Supervisor</div>
+      <div class="v good">82점</div>
+      <div class="desc"><code>fable</code> 로 실행 — 이 실행 자체가 fable spawn 검증을 겸했다.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">Codex 리뷰</div>
+      <div class="v warn">degrade</div>
+      <div class="desc">대형 diff 로 180초 초과 → §7 규칙대로 Supervisor 단독 게이트. timeout 가드가 라이브 실증됐다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Problem -->
+<section class="slide" id="problem">
+  <div class="page-no">03 / 07 · PROBLEM</div>
+  <h2 class="title">왜 했나 — 이름을 못박으면 세대가 바뀔 때 낡는다</h2>
+
+  <div class="compare" style="margin-top:24px">
+    <div class="panel warn">
+      <h3>Before</h3>
+      <p>
+        지시문에 <code>opus</code>·<code>gpt-5.5</code> 가 문자열로 박혀 있었다.
+        최고 난이도 업무(설계·검토·검증)가 <strong>한 세대 전 두뇌</strong>로 돌고,
+        codex 검증 파트너는 순위표 <strong>7위</strong> 모델이었다.
+        새 모델이 나오면 사람이 문서를 찾아 고쳐야 했다.
+      </p>
+    </div>
+    <div class="panel good">
+      <h3>After</h3>
+      <p>
+        사다리의 칸을 <strong>상대 위치</strong>로 정의했다 — 경량 / 중간 / enum 최상위.
+        codex 는 순위표 1등을 <strong>매 호출 직전 동적 선택</strong>.
+        enum·순위표가 갱신되면 배분이 따라 올라간다.
+      </p>
+    </div>
+  </div>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">사용자 정정 (2026-07-15 Modify)</div>
+      <h3>"최고 모델 무차별 배정"은 목표가 아니었다</h3>
+      <p>초안은 Claude 축을 "전 역할 TOP"으로 잡았다. 사용자 지적 — 원칙은 <strong>난이도별 배분</strong>이고, 사다리의 각 칸이 모델 세대와 함께 자동 상승하는 것이 이 작업의 본질이다. 이 정정으로 <code>/cc</code> 의 v3.11 "전부 opus(품질 우선·비용 비고려)" 철학이 공식 폐기되고 <code>/c</code> 와 사다리가 통일됐다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. Decisions -->
+<section class="slide" id="decisions">
+  <div class="page-no">04 / 07 · DECISIONS</div>
+  <h2 class="title">주요 결정</h2>
+
+  <div class="dec-list" style="margin-top:24px">
+    <div class="dec">
+      <h3>난이도 배분이 원칙, 자동 상승이 본질</h3>
+      <p>Easy=경량 티어 / Medium=중간 티어 / Hard=최상위 티어(TOP). 이름(<code>haiku</code>/<code>sonnet</code>/<code>fable</code>)을 적는 대신 상대 위치로 정의해, enum 이 갱신되면 사다리가 따라 올라가게 했다.</p>
+    </div>
+    <div class="dec">
+      <h3>codex 는 순위표 1등 동적 선택 — 모델과 깊이를 분리</h3>
+      <p><code>~/.codex/models_cache.json</code> 에서 <code>priority</code> 최소 slug 를 매 호출 직전 뽑는다. 특정 모델명을 문서에 못박지 않고, 사용자가 데스크톱 앱에서 바꾼 config 기본값에도 의존하지 않는다. 추론 깊이(<code>xhigh</code>/<code>high</code>)는 별개 다이얼로 유지.</p>
+    </div>
+    <div class="dec">
+      <h3>조용한 강등 금지</h3>
+      <p>resolver 실패로 낮은 모델로 떨어지면 결과물에 ⚠️ 플래그를 남기도록 의무화했다. 빈 값이 <code>-m ""</code> 으로 새어 조용히 기본 모델로 실행되는 경로를 <strong>인자 배열 분기</strong>로 원천 차단했다(성공/실패 경로 양쪽 실측).</p>
+    </div>
+    <div class="dec">
+      <h3>자기 감시 배선</h3>
+      <p>모델 순위가 바뀌어 문서 예시가 낡으면 Lens 정기 감사(<code>/crv</code>)가 스스로 알아차리도록 <code>capability-assumptions.json</code> 에 감사 항목을 넣었다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Validation -->
+<section class="slide" id="validate">
+  <div class="page-no">05 / 07 · VALIDATION</div>
+  <h2 class="title">검증 9/9</h2>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">Pre-mortem 4-skeptic 27건 → 12건 반영(blocker 2 사전 해소) → Supervisor(fable) 82점 pass → 검증 9/9.</div>
+    <ol>
+      <li>
+        <h4>V1 · V2 — resolver 와 표준 호출</h4>
+        <div class="det">resolver 가 순위표 1등 <code>gpt-5.6-sol</code> 을 뽑음 ✓. §4 표준 호출 E2E 가 <code>EXIT 0</code> + <code>V324-OK</code> ✓.</div>
+      </li>
+      <li>
+        <h4>V3 · V4 — 옛 이름 제거와 사다리 반영</h4>
+        <div class="det">옛 모델명 호출형 잔존 <strong>0건</strong> ✓. 5개 스킬에 사다리 반영 ✓.</div>
+      </li>
+      <li>
+        <h4>V5 — fable spawn 실측</h4>
+        <div class="det">Supervisor 를 <code>fable</code> 로 돌린 것이 곧 실측이 됐다 ✓.</div>
+      </li>
+      <li>
+        <h4>V6 · V7 — 출시 반영</h4>
+        <div class="det"><code>git show v3.24.0:.claude-plugin/marketplace.json</code> → ref=v3.24.0 ✓. 이 컴퓨터 플러그인 3.23.1 → 3.24.0 ✓.</div>
+      </li>
+      <li>
+        <h4>V8 · V9 — 크로스플랫폼과 파싱</h4>
+        <div class="det">Mac Mini 플래그 경로 정상 ✓. JSON 파싱 ✓.</div>
+      </li>
+      <li>
+        <h4>Codex 리뷰는 degrade — 그 실패가 다음 개정의 근거가 됐다</h4>
+        <div class="det">대형 diff 로 180초를 초과해 <code>codex-integration.md</code> §7 규칙대로 Supervisor 단독 게이트로 진행했다. 이 실패가 v3.25.0 의 <strong>타임아웃 규모 분기(180/300/600초)</strong> 개정으로 이어졌다.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- 6. Files -->
+<section class="slide" id="files">
+  <div class="page-no">06 / 07 · FILES</div>
+  <h2 class="title">변경 파일 — 18개</h2>
+
+  <div class="files-grid" style="margin-top:24px">
+    <div class="file-card">
+      <h3>규칙 (SoT)</h3>
+      <p><code>docs/rules/codex-integration.md</code> (§4 resolver 강화판) · <code>harness-rules.md</code> · <code>capability-assumptions.json</code></p>
+    </div>
+    <div class="file-card">
+      <h3>스킬 5종</h3>
+      <p><code>skills/c</code> · <code>cc</code>(P4.5 resolver 인라인 — Supervisor 지적 반영) · <code>ccp</code> · <code>ci</code> · <code>cp</code></p>
+    </div>
+    <div class="file-card">
+      <h3>릴리즈</h3>
+      <p><code>.claude-plugin/marketplace.json</code>·<code>plugin.json</code> · <code>CHANGELOG.md</code> · <code>CLAUDE.md</code> · <code>README.md</code> · <code>hooks/*</code></p>
+    </div>
+    <div class="file-card">
+      <h3>출시</h3>
+      <p>커밋 <code>9fd7182</code> → 태그 <code>v3.24.0</code> → push → ref 확인. 다른 컴퓨터는 각자 <code>/lens-upgrade</code>·<code>/ci</code> 시 자동 반영.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 7. What's next -->
+<section class="slide" id="next">
+  <div class="page-no">07 / 07 · WHAT'S NEXT</div>
+  <h2 class="title">수용된 한계 · 이후 변경</h2>
+
+  <div class="next-grid" style="margin-top:20px">
+    <div class="next">
+      <div class="l">수용된 한계</div>
+      <h3>미래 새 모델명의 우열은 자동 판별 불가</h3>
+      <p>Claude 두뇌 목록에는 순위 정보가 없다. 완전 자동 보장은 불가능하므로 <strong>판별 불확실 시 상속을 안전 기본값</strong>으로 두고, <code>/crv</code> 감사가 목록 변화를 감지해 개정을 제안하게 했다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">이후 폐기됨 (v3.25.0)</div>
+      <h3>그 "상속" 규칙 자체가 문제였다</h3>
+      <p>지정을 생략하면 훅이 실제 실행 모델을 관측할 수 없어 계측에 구멍이 생기고, 세션이 최상위 모델일 때 <strong>모든 Hard 역할이 자동으로 최상위를 먹었다</strong>. v3.25.0 에서 상속을 폐기하고 모든 spawn 이 모델을 명시하게 바꿨다 — 명시하면 기록되고, 기록되면 통제된다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">절차화된 교훈</div>
+      <h3>커밋 → 태그 → push → ref 검증 순서 엄수</h3>
+      <p>마켓플레이스가 태그의 <code>ref</code> 를 보므로 순서가 바뀌면 다른 컴퓨터에 옛 코드가 설치된다. 실제 사고 이력이 있어 절차로 못박혔다.</p>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="quote">모델 이름을 적지 않는다 — 사다리의 칸만 적고, 칸은 세대와 함께 올라간다.</div>
+    <div class="right">creeta-lens · v3.23.1 → v3.24.0<br>2026-07-15</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>
