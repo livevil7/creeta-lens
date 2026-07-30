@@ -460,8 +460,29 @@ pip 글로벌 outdated가 수십 건이면 hold 목록이 pip으로 뒤덮여 Po
 
 - **마지막 업데이트**: 2026-07-30
 - **현재 경로**: Plan A (Plan B 전환 없음 — W1~W4 트리거 미발동)
-- **Goal 달성**: QA 실측 대기 (4개 기준 중 3개는 정적 검증 완료, 2번 기준은 실제 업그레이드 필요)
-- **재개 포인트**: Codex 재리뷰 통과 확인 → T7 실측(auto 실행) → T8 릴리즈 v3.26.0
+- **Goal 달성**: 4/4 ✓ (실측 증거 확보 — 아래)
+- **재개 포인트**: 완료. `/cp done` 으로 history 전환 권장. **단 이 머신에 활성화는 별건** — 아래 참조.
+
+**⚠️ 출시됐지만 이 머신에서 아직 활성이 아니다.** 활성 플러그인 캐시는 `~/.claude/plugins/cache/CreetaCorp/lens/3.25.0` 이고 거기의 `cu.py` 는 구버전이다(계약 함수 0/3). `/cu` 를 치면 여전히 옛 스캐너가 돈다. 활성화: `/lens-upgrade` → Claude Code **완전 재시작**. 검증은 레포의 `scripts/cu.sh` 를 직접 호출해 수행했다.
+
+**Goal 달성 증거 (실측)**
+
+| 기준 | 결과 |
+|---|---|
+| 종류를 가리지 않고 한 목록 | 소스 6종 열거 — winget 19 · plugin 6 · npm 6 · cli 1 · vscode 1 · pip 1 = 34항목, 중복 0, `source_errors` 없음 (개편 전 9~10항목) |
+| 고르지 않아도 안전한 것은 최신 | auto 9건 실제 업그레이드 (winget 5 + npm 4). 업그레이드 과정에서 `AskUserQuestion` 0회. 재스캔에서 34 → 25항목 |
+| 되돌리기 어려운 것은 미실행 | hold 14 · never 3 전부 버전 불변 (PostgreSQL 18.4-1 · Node 24.15.0 · Python 3.13.13 · VCRedist 14.44.35211.0 · AppInstaller 1.29.279.0 · railway 4.65.0 · shopify 3.94.3). `cu.sh upgrade winget:PostgreSQL.PostgreSQL.18` → 실행 없이 exit 3 |
+| 플러그인 버전 표시 정확 | 오탐 2건 해소 (agentmemory `0.9.28→0.9.28 False`, insane-search `0.13.0→0.13.0 False`), ❓2건 판정 성립 (context7·playwright SHA 대 SHA). 6건 전부 `needs_update` 가 `None` 아님 |
+
+- **단위 테스트**: `python scripts/cu.test.py` → **68/68 passed, exit 0**
+- **출시**: 커밋 `c4b7237` · 태그 `v3.26.0` (원격 확인 `refs/tags/v3.26.0 → c4b7237`) · 버전 참조 44곳 갱신
+- **context7·playwright**: `claude plugin update` 가 `refreshed from source. Restart to apply changes.` 로 응답. 재시작 전까지 레지스트리 SHA 가 안 바뀌므로 `/cu` 가 계속 대기로 표시하는 것이 정직한 상태다(실패가 아님).
+
+### 후속 (이번 범위 밖)
+
+- **승격 커버리지**: 비승격 셸에서 winget 19건 중 auto 가 5건뿐이었다. Git·AWS CLI·Tailscale·WeChat·QMK·Futuremark 6건은 위험해서가 아니라 권한 때문에 hold 로 갔다. 관리자 권한 세션에서는 auto 가 된다. SKILL.md 가 PowerShell `foreach` 루프 한 줄을 제시하도록 해뒀다.
+- **Mac Mini(brew) 실측**: `brew` 스캐너는 자리를 만들었으나 Windows 에서만 검증했다.
+- **`lib/install-sync.js` 일관성**: Worker 조사 결과 그쪽은 설치 유무만 대조하고 최신 버전 해석 로직이 아예 없어 이번 규칙과 충돌하지 않는다 — 후속 태스크 불필요로 판정.
 
 ### 편차 기록 (계획 ↔ 실제)
 
