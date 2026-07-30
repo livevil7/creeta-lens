@@ -1,0 +1,5 @@
+Name                                                  Id                                                                                    Version              Available            Source
+AVC 인코더 비디오 확장                                MSIX\Microsoft.AVCEncoderVideoExtension_1.1.23.0_x64__8wekyb3d8bbwe                   1.1.23.0                                  
+HEIF 이미지 확장                                      MSIX\Microsoft.HEIFImageExtension_1.2.36.0_x64__8wekyb3d8bbwe                         1.2.36.0                                  
+Microsoft Store 환경 호스트                           MSIX\Microsoft.StorePurchaseApp_22606.1401.2.0_x64__8wekyb3d8bbwe                     22606.1401.2.0                            
+Microsoft 사진                                        MSIX\Microsoft.Windows.Photos_2026.11060.2004.0_x64__8wekyb3d8bbwe                    2026.11060.2004.0                         

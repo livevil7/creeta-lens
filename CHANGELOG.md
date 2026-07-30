@@ -1,3 +1,45 @@
+## [3.26.0] - 2026-07-30
+
+`/cu` 고도화 — 아는 도구 3개 확인기에서 이 머신의 업데이트 관제로. 무확인 자동 실행 + 3단 위험도.
+계획: `docs/tasks/2026-07-30-cu-multi-source-autoupdate.md`.
+
+근거: 실측으로 `/cu` 가 **업데이트 대기 25건 중 0건을 보고**하고 있었다 — winget 설치 143개 중 19개, npm 글로벌 8개 중 6개가 낡은 채였고 VS Code 확장 40여 개는 존재조차 목록에 없었다. 못 찾은 게 아니라 **찾지 않았다**: `cu.py` 가 도구 이름을 손으로 적어둔 함수 3개(claude·codex·gh)를 부르는 구조라 목록에 없는 도구는 영원히 안 보였다. 여기에 플러그인 버전 표시 **오탐 2건**(agentmemory·insane-search — 최신인데 "업데이트 있음")까지 겹쳐 표 전체가 신뢰를 잃은 상태였다.
+
+### Breaking (v3.26.0)
+
+- **`/cu` 가 더 이상 묻지 않는다.** 매 실행마다 뜨던 `AskUserQuestion` multi-select 게이트를 제거하고, `auto` 등급 항목을 **확인 없이 즉시 실행**한다. 업데이트가 있다는 걸 알고 `/cu` 를 친 사용자에게 다시 목록을 띄워 클릭을 요구하는 것은 절차만 늘리는 일이었다. 보기만 하려면 `/cu scan`.
+- **3모드**: `/cu`(auto 전량) / `/cu all`(auto+hold) / `/cu scan`(스캔만).
+- **`cli:codex`·`cli:gh` 전용 스캐너 제거** — codex 는 `npm-global` 이, gh 는 `winget` 이 자동으로 잡는다. `cli-special` 에 남는 것은 `cli:claude`(전용 `claude update` 경로)와 `plugin:lens@CreetaCorp`(`/lens-upgrade` 위임) 2개뿐.
+- **스캔 출력이 배열 → 객체**: `{"items": [...], "source_errors": [...]}`. 항목에 `source`·`risk`·`hold_reason` 추가.
+
+### Added (v3.26.0)
+
+- **소스 단위 스캐너 7종** — winget / npm-global / vscode-ext / claude-plugin / cli-special / pip-global / brew(macOS). 패키지 매니저가 자기 목록을 열거하므로 **새 도구를 깔면 코드 수정 없이 목록에 들어온다**. 없는 소스는 조용히 빠진다(per-machine 원칙 유지).
+- **3단 위험도** — `auto`(무확인 실행) / `hold`(`/cu all` 로만) / `never`(`/cu all` 로도 안 됨). `never` 는 데이터 디렉터리 보유 SW(PostgreSQL·MySQL·MongoDB·Redis)·드라이버·winget 자신·pip 글로벌. **`/cu all` 오타 한 번으로 DB 마이그레이션이 일어나면 되돌릴 수 없다** — 그래서 `all` 아래 층을 뒀다(Pre-mortem P1).
+- **`never` 를 실행 경계에서 코드로 강제** — `never_reason()` + `cmd_upgrade` 진입부 게이트. `cu.sh upgrade winget:PostgreSQL.PostgreSQL.18` 을 직접 호출해도 실행 없이 exit 3 으로 거부한다. 분류기와 같은 정책 상수를 쓰는지 검사하는 단정까지 둬서 두 정책이 갈라지면 테스트가 잡는다.
+- **사전 스냅샷** — `scan --snapshot` 이 `~/.claude/lens/cu-last-scan.json` 에 실행 전 상태를 남긴다. 무확인 실행에서 "무엇이 어떤 버전에서 갔는지"를 사후에 재구성할 유일한 근거. 쓰기 실패는 경고가 아니라 **실패(exit 1)** — 감사 기록 없이 업그레이드가 진행되면 안 된다.
+- **승격 필요 항목 일괄 명령** — 비승격 셸에서는 위험해서가 아니라 *권한 때문에* 막히는 항목이 다수다(이 머신 실측 6건). winget 은 `--id` 중복을 거부하므로(exit 2) PowerShell `foreach` 루프 한 줄로 제시한다.
+- **테스트 68개** (`scripts/cu.test.py`, 신규) — 레포 관행(`lib/install-sync.test.js`)대로 의존성 없는 단독 실행. fixture 는 **실제 출력 캡처만** 사용한다(손으로 쓰면 컬럼 폭이 실물과 어긋나 "테스트는 통과하는데 파서는 깨지는" 최악의 조합이 된다).
+
+### Fixed (v3.26.0)
+
+- **플러그인 버전 오탐 2건** — 대부분의 마켓플레이스 manifest 에 `version` 필드가 없어 fallback 으로 저장소 HEAD SHA 를 "최신"으로 잡고, 이를 설치된 semver 와 비교했다. **성질이 다른 두 값이라 항상 불일치 = 무조건 "업데이트 있음"**. 해석 순서에 **마켓 클론의 `<source>/.claude-plugin/plugin.json`** 을 추가하고(핵심 수정), `compare_versions` 한 곳에 **형태 불일치 → `None`** 가드를 뒀다. agentmemory `0.9.28→0.9.28 False`, insane-search `0.13.0→0.13.0 False`.
+- **"버전 모름" 플러그인 2건** — 레지스트리 `version` 이 `'unknown'` 이면 `gitCommitSha` 로 대체. context7·playwright 가 SHA 대 SHA 비교로 정상 판정된다.
+- **winget 실패가 소스를 조용히 삭제** — `if rc != 0 and not out:` 이라 winget 이 비정상 종료하면서 stdout 에 진단문을 쓰면 성공으로 통과하고, 파싱할 표가 없어 결과가 빈 목록이 됐다 → 사용자에게는 "winget 최신". 판정 기준을 "stdout 유무"에서 **"행을 실제로 파싱했는가"** 로 교체.
+- **winget "올릴 것 없음"을 실패로 오분류** — winget 은 정상 상태에서도 0 이 아닌 코드로 끝낸다. **HRESULT 함정**: Python `subprocess` 는 32비트 원값(`0x8A15002B`=2316632107)을 받지만 셸은 하위 1바이트(43)만 보여준다 — 셸에서 잰 값을 상수로 쓰면 Python 경로에서 하나도 안 맞는다. 양쪽 표현을 모두 인정하고, winget 원시 코드를 **종료코드 규약(0/1/2/3)으로 사상**해 해석 불가한 값(43·59·2316632107)이 새어 나가지 않게 했다.
+- **소스 일시 장애로 그날 갱신이 통째로 날아감** — msstore REST API 오류(`0x8A15003B`)로 winget 5건이 전부 실패했고, 같은 명령 재시도로 통과했다. 재시도 1회 추가.
+- **비영어 로케일에서 0건이 조용히 나옴** — 헤더/요약줄 탐지가 영어 컬럼명 전용. 헤더 미발견을 `source_errors` 로 승격.
+- **CJK 패키지명 파싱** — winget 은 표시 폭으로 컬럼을 정렬하므로 한글 이름 행은 문자 인덱스가 어긋난다. 이 머신 출력에 실제로 한글 패키지명이 있어(`AVC 인코더 비디오 확장`) 실캡처로 표시폭 보정을 검증했다.
+- **`upgrade_targets` fail-open** — `mode != "default"` 였으므로 오타·빈 문자열 등 미지의 값이 전부 `hold`(런타임·시스템 구성요소)를 해제했다. 화이트리스트로 반전 — 판단 불가는 보수적으로.
+- **최신 항목까지 매번 재설치** — 스캔은 최신 여부와 무관하게 설치된 플러그인·CLI 를 전부 내보내므로, `risk` 만 보고 실행하면 무관한 항목 하나가 낡을 때 최신 플러그인 6건 + `cli:claude` 가 no-op 재설치됐다. `needs_update is False` 제외(단 `aggregate` 항목은 예외 — VS Code 일괄 갱신은 최신 조회 수단이 없어 항상 `null` 이지만 실행이 의도된 동작).
+- **`/cu scan` 이 실제로 업그레이드를 실행** — 절차가 3모드 공용인데 scan 에서 멈추는 분기가 없었다.
+- **소스 실패 시 "모두 최신"으로 종료** — 소스가 타임아웃했는데 나머지가 최신이면 `source_errors` 보고 전에 끝났다. 진실의 정반대를 보고하는 경로.
+- **사후 재스캔이 사전 스냅샷을 파괴** — 매 스캔이 같은 경로에 썼으므로, 필수 재스캔이 비교 대상 자체를 덮어썼다. `--snapshot` 명시 플래그로 분리.
+- **`/cu all` UAC 무한 대기** — `--disable-interactivity` 는 winget 내부 프롬프트만 막고 OS 의 권한 상승 대화상자는 못 막는다. 600초 상한 추가(R2 잔여 경로).
+- **드라이버가 `auto` 로 흐름** — `driver` 가 토큰 정확 일치라 `Intel.WirelessDriver`(토큰 `wirelessdriver`)를 놓쳤다. 접미사 일치로 변경. 단 `redis` ⊂ `vcredist` 오매칭 때문에 나머지 NEVER 키워드는 토큰 일치 유지.
+- **README 계약 불일치** — 공개 문서가 여전히 multi-select 를 약속하고 있었다. 3모드·3단 위험도·파괴적 변경 고지로 갱신.
+- **stderr 한글 mojibake** — `sys.stdout` 만 UTF-8 재설정하고 stderr 는 빠져 있었다.
+
 ## [3.25.0] - 2026-07-20
 
 계획 엔진 개편 — 기획서 품질 게이트 · 모델 배분 통제 · /cs PR 전환 · /cpp 정리.

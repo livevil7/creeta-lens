@@ -1,4 +1,4 @@
-# Lens v3.25.0
+# Lens v3.26.0
 
 **Never wonder which plugin to use again.**
 
@@ -175,22 +175,31 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 | `/cps` (fresh repo) | Globs real docs, assembles `docs/START_HERE.md`, injects a one-line pointer into CLAUDE.md if missing |
 | `/cps` (START_HERE exists) | Re-derives from current docs, shows a diff, and asks before overwriting (never silently overwrites manual edits) |
 
-### `/cu` — Per-machine CLI + plugin updater
+### `/cu` — Per-machine updater across every package source
 
 ```
-/cu
+/cu          # scan, then upgrade everything safe — no confirmation
+/cu all      # also upgrade the held-back items (runtimes, system components, major jumps)
+/cu scan     # scan only, change nothing
 ```
 
-`/cu` is the **wide** counterpart to `/lens-upgrade`. It scans every CLI and plugin Claude Code actually touches on *this* machine (Claude Code CLI, Codex CLI, gh CLI, every installed plugin across every marketplace), compares installed vs latest, and updates **only the items you pick** via multi-select.
+`/cu` is the **wide** counterpart to `/lens-upgrade`. It enumerates by **source** rather than by hardcoded tool name — winget, npm globals, VS Code extensions, pip globals, brew (macOS), and every installed Claude Code plugin — so a newly installed tool shows up without any code change.
 
-| You type | What happens |
-| --- | --- |
-| `/cu` (everything up-to-date) | Reports "all current", asks nothing, exits |
-| `/cu` (anything stale) | Renders comparison table → AskUserQuestion multi-select → runs only the picks |
+Each item gets a **risk** grade, and that grade decides whether it runs:
 
-Per-machine safe: items not installed on this box never appear in the list, so different machines get different (correct) results.
+| Risk | Runs | Covers |
+| --- | --- | --- |
+| `auto` | `/cu` and `/cu all`, **without asking** | plugins · npm patch/minor · other winget items · VS Code extensions |
+| `hold` | `/cu all` only | major version jumps · language runtimes (Node/Python/JDK) · system components · items needing elevation while unelevated |
+| `never` | **neither** — command shown only | data-directory software (PostgreSQL, MySQL, MongoDB, Redis) · drivers · winget itself · pip globals |
 
-Auto-upgrade path: `claude update`, `claude plugin update <name>@<marketplace>`, npm-global codex (`npm install -g @openai/codex@latest`), winget-sourced gh on Windows, brew-sourced gh on macOS, and lens itself delegated to `/lens-upgrade`. When the install source can't be identified (e.g. apt/dnf/pacman, VSCode-bundled codex), the command is printed and the user runs it.
+> **Breaking change in v3.26.0**: `/cu` no longer asks which items to update. It upgrades every `auto` item immediately. The old behaviour was a multi-select prompt on every run; if you were relying on that, use `/cu scan` to look without changing anything.
+
+`never` is refused by `cu.py` itself, not just by the agent — so `/cu all`, or even a hand-typed `cu.sh upgrade winget:PostgreSQL.PostgreSQL.18`, cannot start a database migration you can't undo.
+
+Per-machine safe: items not installed on this box never appear, so different machines get different (correct) results. A source that isn't installed is simply absent; a source that *failed* is reported explicitly, never folded into "all current".
+
+Every run writes a pre-upgrade snapshot to `~/.claude/lens/cu-last-scan.json` and re-scans once afterwards, so what actually landed is verifiable rather than assumed.
 
 ### `/ci` — Sync installed plugins to your manifest
 
