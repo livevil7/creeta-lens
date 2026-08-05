@@ -7,7 +7,7 @@ user-invocable: true
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.27.0 — Multi-repo git synchronizer. Pulls fast-forward; outgoing work goes to a `sync/` branch, becomes a PR, and is merged in the same run. Fail-soft across repos, fail-closed on PR failure. | MIT |
+| cs | Lens Sync v3.28.0 — Multi-repo git synchronizer. Pulls fast-forward; outgoing work goes to a `sync/` branch, becomes a PR, and is merged in the same run. Fail-soft across repos, fail-closed on PR failure. | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,7 +17,7 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.27.0**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.28.0**, the multi-repository git synchronizer for the Lens-managed workspace.
 
 `/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — most logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
@@ -73,6 +73,7 @@ Auto-detected from `$HOME` (no hardcoded user/machine paths), overridable via `G
 
 - `$HOME/Documents/Git`, `$HOME/Documents/GIT`
 - `$HOME/projects`, `$HOME/Projects`, `$HOME/git`
+- **`$HOME` itself** (v3.28) — repos parked directly in the home directory. Measured on the Mac Mini: `livevil-setting`, `livevil-research`, `namane-mkt`, `creeta-homepage` all live there and were silently outside every scan root, so `/cs` quietly synced 32 of 36 repos. One of the four holds the Claude file memory. Only 1-level dirs containing `.git` are picked up and the list is de-duplicated by device:inode, so overlapping roots cost nothing.
 
 `$HOME` resolves correctly on macOS, Linux, and Windows (Git Bash), so the same defaults work everywhere. If your workspace lives elsewhere, set `GIT_ROOTS="/path/one /path/two"` before invoking.
 
@@ -156,12 +157,17 @@ Common failure modes and what they mean:
 | `gh 미설치 — PR 생성 불가` | No `gh`, or unauthenticated | Install/authenticate `gh`. `/cs` deliberately does **not** fall back to a direct push |
 | `push 거부 — .github/workflows` | Token lacks `workflow` scope | Push those files manually, or re-scope the token |
 | `fetch failed` | Remote unreachable | Check network or remote URL |
+| listed under `⚠️ 원격 없음` | The remote repo no longer exists on GitHub (deleted or renamed) | **Not a failure — a state.** v3.28 reports these separately and skips them instead of retrying every run. Measured: 13 of 36 repos on the Mac Mini. Fix the remote or move the folder out of the workspace if you want it gone from the report |
 
 ## Hook complement
 
 Lens Sync also registers a `SessionStart` hook that can run **`/cs pull` automatically** at the start of every session, so incoming changes from other machines are picked up before you start working. Outgoing changes always require explicit `/cs` (or `/cs push`) — there is no auto-push.
 
 This hook is **off by default** so a slow multi-repo fetch can never delay session startup. To enable it, set `LENS_SYNC_AUTO_PULL=1` in your environment. Explicit `/cs pull` works regardless of this setting.
+
+**Minimum interval (v3.28).** SessionStart fires for headless `claude -p` runs too, not just interactive sessions — measured on the Mac Mini, one `claude -p` call bumps the session counter by one against a running total of 20,027. On a machine with automation that made the hook unusable: every pipeline run would fetch dozens of repos. Rather than sniffing the environment for "is this interactive" (brittle across harness versions), the hook skips if the **last auto-pull was under 30 minutes ago**, which also removes duplicate fetches when you open several interactive windows. Tune with `LENS_SYNC_PULL_INTERVAL_MIN` (`0` disables the guard). Stamp lives at `~/.claude/lens/.last-auto-pull`.
+
+⚠️ An unattended server still wants a scheduler, not this hook — no interactive sessions means no trigger. Use cron/launchd for that box.
 
 ## When NOT to use /cs
 
@@ -179,4 +185,4 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 
 - Script: `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
-- Version: aligned with the Lens plugin version (currently 3.27.0)
+- Version: aligned with the Lens plugin version (currently 3.28.0)

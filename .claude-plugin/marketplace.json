@@ -7,13 +7,13 @@
   },
   "metadata": {
     "description": "Lens plugin marketplace",
-    "version": "3.27.0"
+    "version": "3.28.0"
   },
   "plugins": [
     {
       "name": "lens",
       "description": "Skill navigator + multi-repo git sync for Claude Code. Scans plugins (Skills, MCP, LSP), recommends best match in 8 languages, executes with /c, /cc, /cp. Multi-repo sync with /cs (opt-in auto-pull on session start, push on demand).",
-      "version": "3.27.0",
+      "version": "3.28.0",
       "author": {
         "name": "Lens",
         "email": "livevil7@gmail.com"
@@ -23,7 +23,7 @@
       "source": {
         "source": "github",
         "repo": "livevil7/creeta-lens",
-        "ref": "v3.27.0"
+        "ref": "v3.28.0"
       },
       "license": "MIT",
       "category": "productivity",
