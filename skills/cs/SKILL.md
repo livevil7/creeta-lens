@@ -1,13 +1,13 @@
 ---
 name: "cs"
-description: "Lens Sync — Multi-repo git synchronizer. Fetches all repos under the workspace and fast-forward pulls. Outgoing work is committed to a throwaway sync/ branch and proposed as a PR — never pushed straight to a base branch; fail-closed if gh is unavailable. Run /cs to sync everything; /cs pull or /cs push for one direction."
+description: "Lens Sync — Multi-repo git synchronizer. Fetches all repos under the workspace and fast-forward pulls. Outgoing work is committed to a throwaway sync/ branch, opened as a PR for the record, and merged in the same run so every machine actually gets it; fail-closed if gh is unavailable. Run /cs to sync everything; /cs pull or /cs push for one direction."
 argument-hint: "[pull|push|sync] (default: sync)"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.26.0 — Multi-repo git synchronizer. Pulls fast-forward; outgoing work goes to a `sync/` branch and a PR (never a direct base-branch push). Fail-soft across repos, fail-closed on PR failure. | MIT |
+| cs | Lens Sync v3.27.0 — Multi-repo git synchronizer. Pulls fast-forward; outgoing work goes to a `sync/` branch, becomes a PR, and is merged in the same run. Fail-soft across repos, fail-closed on PR failure. | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,7 +17,7 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.26.0**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.27.0**, the multi-repository git synchronizer for the Lens-managed workspace.
 
 `/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — most logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
@@ -33,37 +33,39 @@ For every git repo discovered under the workspace roots:
 
 1. `git fetch` (silent)
 2. If `behind > 0` and `ahead == 0` → `git pull --ff-only`
-3. If `dirty` or `ahead > 0` → **PR flow** (v3.25, see below) — never a direct push to the base branch
+3. If `dirty` or `ahead > 0` → **PR-and-merge flow** (v3.27, see below) — never a direct push to the base branch
 
 Diverged repos (both ahead and behind) are left untouched and reported as "manual resolve required". This protects the user from accidental merges.
 
-## PR-only push (v3.25)
+## PR-and-merge push (v3.27)
 
-`/cs` no longer pushes to base branches. Outgoing work is moved onto a throwaway branch and proposed as a PR:
+**`/cs` exists to get every repo onto GitHub.** The PR is the *record* of what went up — not a gate the sync has to pass. Outgoing work goes onto a throwaway branch, becomes a PR, and is merged in the same run:
 
 ```
 create branch sync/<date>-<time>   ← BEFORE committing
   → commit there
   → push -u
   → gh pr create --base <upstream branch>
-  → checkout back to base, reset --hard to origin/<base>
+  → gh pr merge --merge --delete-branch      ← default
+  → checkout back to base, fetch, reset --hard to origin/<base>
 ```
 
 **Order is the whole trick.** Committing to the base branch first and *then* pushing it leaves nothing to compare, so no PR can be opened. The branch must be cut before the commit.
 
-**The reset is not data loss.** The commits live on the pushed branch and on the remote; resetting the local base branch just puts it back in step with origin so the next `/cs` does not see a false `diverged`.
+**Why the merge is not optional (v3.27).** The commit lives on the side branch, so `checkout <base>` alone takes those changes *out of the working tree* — they vanish locally until something puts them on the base branch. Only the merge does that. Without it the run ends with the change on neither the local tree nor any other machine, which is the opposite of syncing. v3.25–3.26 shipped without the merge and produced exactly that: memory files disappearing locally (2026-08-02, 2026-08-04) and PRs sitting open for weeks while other machines fell 26 commits behind.
 
 | Behaviour | Why |
 | --- | --- |
-| **Merging is left to a human** | Auto-merging on creation would make the PR a receipt, not a review gate. Out of scope for this version. |
+| **Merged by default** | A sync tool that stops until a human clicks Merge is not syncing. `LENS_SYNC_AUTO_MERGE=0` restores the review-gate behaviour for one run. |
+| **Merge failure is reported, not fatal** | If the merge is refused (branch protection, required checks, conflict) the PR stays open and the run reports `미병합` — the old behaviour. Nothing is lost; a human finishes it. |
 | **fail-closed** | If `gh` is missing, unauthenticated, or PR creation fails, `/cs` reports a failure. It never falls back to a direct base-branch push — that would silently break the PR guarantee. |
 | **base = the branch's own upstream** | Not the repo default. `Returns_ERP_v20` sits on `staging`, where `staging → main` promotion is a separate, deploy-critical procedure. Targeting `main` here would be a production incident. |
 | **duplicate PRs avoided** | An open PR with the same head is reused instead of opening another. |
 | **`.github/workflows` detected** | The `gh` token has no `workflow` scope, so GitHub rejects those pushes. Detected up front and reported as the reason. |
-| **unmerged ≠ synced** | The report warns explicitly: until the PR merges, other machines (Mac Mini and friends) do **not** have the change. Never report that as "sync complete". |
+| **unmerged ≠ synced** | If a merge does not go through, the report warns explicitly: until the PR merges, other machines (Mac Mini and friends) do **not** have the change. Never report that as "sync complete". |
 | **PR body stays dumb** | Changed-file list only. Adding LLM diff analysis would make git sync depend on auth, cost, and model availability — a sync tool must not break for those reasons. The script stays pure POSIX shell. |
 
-**Escape hatch**: `LENS_SYNC_PR=0` restores the old direct-push behaviour for one run.
+**Escape hatches**: `LENS_SYNC_AUTO_MERGE=0` leaves PRs open for human review. `LENS_SYNC_PR=0` skips the PR entirely and pushes straight to the base branch.
 
 ## Workspace roots
 
@@ -93,9 +95,9 @@ The script is portable shell. It uses only `git`, `awk`, `printf`, and standard 
 
 | Action | What runs | When to use |
 |--------|-----------|-------------|
-| `/cs` (no arg) | pull + branch + commit + PR | normal workflow — incoming pulled, outgoing proposed as PRs |
+| `/cs` (no arg) | pull + branch + commit + PR + merge | normal workflow — incoming pulled, outgoing recorded as a PR and merged |
 | `/cs pull` | pull only | start of a session, just want incoming changes |
-| `/cs push` | branch + commit + PR | finish a sprint, propose everything outgoing as PRs |
+| `/cs push` | branch + commit + PR + merge | finish a sprint, get everything outgoing onto GitHub |
 
 `sync` is identical to running `pull` then `push` back-to-back, but in a single repo traversal.
 
@@ -177,4 +179,4 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 
 - Script: `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
-- Version: aligned with the Lens plugin version (currently 3.26.0)
+- Version: aligned with the Lens plugin version (currently 3.27.0)

@@ -107,6 +107,7 @@ for repo in "${REPOS[@]}"; do
 
   did_pull=false
   did_push=false
+  merged=false
   repo_err=""
 
   # ── PULL 단계 ─────────────────────────
@@ -217,7 +218,27 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$branch" 2>/de
                       || repo_err="PR 생성 실패 (gh 인증/권한 확인)"
                   fi
                   if [ -z "$repo_err" ]; then
-                    pushed+=("$name (PR: $branch → $base_branch, 미병합)")
+                    # PR 은 "무엇을 올렸는지"의 기록이지 통과 게이트가 아니다 —
+                    # /cs 의 1순위 목적은 전 레포를 GitHub 에 동기화하는 것이다.
+                    # 병합하지 않으면 base 가 커밋을 못 받아 아래 checkout 에서
+                    # 로컬이 되감기고, 다른 머신도 변경을 못 받는다(= 동기화 실패).
+                    # 검토 게이트로 쓰려면 LENS_SYNC_AUTO_MERGE=0.
+                    if [ "${LENS_SYNC_AUTO_MERGE:-1}" != "0" ]; then
+                      if [ -z "$pr" ] || [ "$pr" = "null" ]; then
+                        pr=$( (cd "$repo" && gh pr list --head "$branch" --state open \
+                                 --json number --jq '.[0].number' 2>/dev/null) || true )
+                      fi
+                      if [ -n "$pr" ] && [ "$pr" != "null" ]; then
+                        if (cd "$repo" && gh pr merge "$pr" --merge --delete-branch >/dev/null 2>&1); then
+                          merged=true
+                        fi
+                      fi
+                    fi
+                    if $merged; then
+                      pushed+=("$name (PR #$pr → $base_branch, 병합됨)")
+                    else
+                      pushed+=("$name (PR: $branch → $base_branch, 미병합)")
+                    fi
                     did_push=true
                   fi
                 else
@@ -234,6 +255,11 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$branch" 2>/de
               # push 실패 시엔 되돌리지 않는다 (아직 원격에 없으므로).
               git -C "$repo" checkout -q "$base_branch" 2>/dev/null || true
               if [ -z "$repo_err" ]; then
+                if $merged; then
+                  # 병합됐으면 base 를 원격에서 당겨온다 — 방금 올린 변경이
+                  # 로컬 워킹트리에 그대로 남는다(되감기 없음).
+                  git -C "$repo" fetch -q "$upstream_remote" 2>/dev/null || true
+                fi
                 git -C "$repo" reset -q --hard "$upstream_remote/$base_branch" 2>/dev/null || true
               fi
             fi
