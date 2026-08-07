@@ -43,64 +43,60 @@ fi
 
 TODAY=$(date +%Y-%m-%d)
 
-echo "=== Updating 12 files ==="
+echo "=== Updating 9 files ==="
 
 # Regex patterns match ANY v MAJOR.MINOR(.PATCH)? — the patch segment is
-# optional so 2-part banners (e.g. "Lens v3.1", "Lens Multi v3.4") are caught
-# too. Earlier 3-part-only patterns silently skipped those, leaving the c/cc/cs
-# skill banners stuck for several releases.
+# optional so 2-part banners (e.g. "Lens Multi v3.4") are caught too. Earlier
+# 3-part-only patterns silently skipped those, leaving skill banners stuck for
+# several releases.
+#
+# v3.29: skills/c and skills/ccp were removed (harness thinning) — their entries
+# are gone from both the update list and the verification list below. The
+# verification list also referenced skills/cpp, which had been deleted back in
+# v3.25; that stale path is dropped too.
 
 # 1. .claude-plugin/plugin.json
 sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
-echo "[1/12] .claude-plugin/plugin.json"
+echo "[1/9] .claude-plugin/plugin.json"
 
 # 2. .claude-plugin/marketplace.json (version + ref)
 sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/marketplace.json
 sed "${SEDI[@]}" -E "s/\"ref\": \"v[0-9]+\.[0-9]+\.[0-9]+\"/\"ref\": \"v$NEW_VERSION\"/" .claude-plugin/marketplace.json
-echo "[2/12] .claude-plugin/marketplace.json"
+echo "[2/9] .claude-plugin/marketplace.json"
 
 # 3. hooks/hooks.json
 sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/hooks.json
-echo "[3/12] hooks/hooks.json"
+echo "[3/9] hooks/hooks.json"
 
 # 4. hooks/session-start.js (multiple occurrences)
 sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+\.[0-9]+/Lens v$NEW_VERSION/g" hooks/session-start.js
-echo "[4/12] hooks/session-start.js"
+echo "[4/9] hooks/session-start.js"
 
-# 5. skills/c/SKILL.md
-sed "${SEDI[@]}" -E "s/Lens v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens v$NEW_VERSION/g" skills/c/SKILL.md
-echo "[5/12] skills/c/SKILL.md"
-
-# 6. skills/cc/SKILL.md
+# 5. skills/cc/SKILL.md
 sed "${SEDI[@]}" -E "s/Lens Multi v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Multi v$NEW_VERSION/g" skills/cc/SKILL.md
-echo "[6/12] skills/cc/SKILL.md"
+echo "[5/9] skills/cc/SKILL.md"
 
-# 7. skills/cp/SKILL.md
+# 6. skills/cp/SKILL.md
 sed "${SEDI[@]}" -E "s/Lens Plan v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Plan v$NEW_VERSION/g" skills/cp/SKILL.md
-echo "[7/12] skills/cp/SKILL.md"
+echo "[6/9] skills/cp/SKILL.md"
 
-
-# 7c. skills/ccp/SKILL.md (Lens Power Verify banner — distinct prefix)
-sed "${SEDI[@]}" -E "s/Lens Power Verify v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Power Verify v$NEW_VERSION/g" skills/ccp/SKILL.md
-echo "[8/12] skills/ccp/SKILL.md"
-
-# 8. skills/cs/SKILL.md (banner + "currently X.Y.Z" prose)
+# 7. skills/cs/SKILL.md (banner + "currently X.Y.Z" prose)
 sed "${SEDI[@]}" -E "s/Lens Sync v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Sync v$NEW_VERSION/g" skills/cs/SKILL.md
 sed "${SEDI[@]}" -E "s/currently [0-9]+\.[0-9]+\.[0-9]+/currently $NEW_VERSION/g" skills/cs/SKILL.md
-echo "[9/12] skills/cs/SKILL.md"
+echo "[7/9] skills/cs/SKILL.md"
 
-# 8b. skills/ci/SKILL.md (Creeta Install banner in the table row)
+# 8. skills/ci/SKILL.md (Creeta Install banner in the table row)
 sed "${SEDI[@]}" -E "s/Creeta Install v[0-9]+\.[0-9]+(\.[0-9]+)?/Creeta Install v$NEW_VERSION/g" skills/ci/SKILL.md
-echo "[10/12] skills/ci/SKILL.md"
+echo "[8/9] skills/ci/SKILL.md"
 
-# 9. CLAUDE.md (Current version + Updated date)
+# 9a. CLAUDE.md (Current version + Updated date)
 sed "${SEDI[@]}" -E "s/Current: \*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
 sed "${SEDI[@]}" -E "s/Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Updated: $TODAY/" CLAUDE.md
-echo "[11/12] CLAUDE.md"
+echo "[9/9] CLAUDE.md"
 
-# 10. README.md (title)
+# 9b. README.md (title) — folded into the last step, not a separate count
 sed "${SEDI[@]}" -E "s/^# Lens v[0-9]+\.[0-9]+\.[0-9]+/# Lens v$NEW_VERSION/" README.md
-echo "[12/12] README.md"
+echo "[--] README.md"
 
 # 10. CHANGELOG.md - prepend new section header (user fills in details).
 # Uses awk because git-bash sed can choke on multi-line substitutions.
@@ -128,18 +124,15 @@ COUNT=$(grep -rl "v$NEW_VERSION\|\"$NEW_VERSION\"" \
   .claude-plugin/marketplace.json \
   hooks/hooks.json \
   hooks/session-start.js \
-  skills/c/SKILL.md \
   skills/cc/SKILL.md \
   skills/cp/SKILL.md \
-  skills/cpp/SKILL.md \
-  skills/ccp/SKILL.md \
   skills/cs/SKILL.md \
   skills/ci/SKILL.md \
   CLAUDE.md \
   README.md \
   CHANGELOG.md 2>/dev/null | wc -l)
 
-echo "Files with v$NEW_VERSION: $COUNT/12 (+CHANGELOG)"
+echo "Files with v$NEW_VERSION: $COUNT/10 (+README, +CHANGELOG)"
 
 # Check stale version remnants — any v[0-9].[0-9].[0-9] that is NOT the new
 # version, across version-bearing files (excludes CHANGELOG and docs/history

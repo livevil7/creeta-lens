@@ -22,7 +22,7 @@
 
 ## 2. 버전이 기록된 파일 (13곳 — `scripts/bump-version.sh` 가 일괄 처리)
 
-**모든 파일을 동시에 같은 버전으로 업데이트해야 한다.** 수동 대신 **`bash scripts/bump-version.sh <X.Y.Z>`** 를 쓰면 아래 13파일을 자동 범프하고 stale 검증까지 한다.
+**모든 파일을 동시에 같은 버전으로 업데이트해야 한다.** 수동 대신 **`bash scripts/bump-version.sh <X.Y.Z>`** 를 쓰면 아래 11파일을 자동 범프하고 stale 검증까지 한다.
 
 | # | 파일 | 위치 | 형식 |
 |---|------|------|------|
@@ -30,14 +30,15 @@
 | 2 | `.claude-plugin/marketplace.json` | `"version": "X.Y.Z"` + `"ref": "vX.Y.Z"` | JSON value (2곳) |
 | 3 | `hooks/hooks.json` | `"description": "Lens vX.Y.Z — ..."` | 문자열 내 버전 |
 | 4 | `hooks/session-start.js` | `Lens vX.Y.Z activated` (4곳) | 문자열 리터럴 |
-| 5 | `skills/c/SKILL.md` | `Lens vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 6 | `skills/cc/SKILL.md` | `Lens Multi vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 7 | `skills/cp/SKILL.md` | `Lens Plan vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 9 | `skills/ccp/SKILL.md` | `Lens Power Verify vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
-| 10 | `skills/cs/SKILL.md` | `Lens Sync vX.Y.Z` + `currently X.Y.Z` | YAML + Markdown |
-| 11 | `CLAUDE.md` | `Current: **vX.Y.Z**` + `Updated: YYYY-MM-DD` + Recent Changes | Markdown |
-| 12 | `README.md` | `# Lens vX.Y.Z` (title) | Markdown |
-| 13 | `CHANGELOG.md` | `## [X.Y.Z] - YYYY-MM-DD` 섹션 추가 | Markdown |
+| 5 | `skills/cc/SKILL.md` | `Lens Multi vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
+| 6 | `skills/cp/SKILL.md` | `Lens Plan vX.Y.Z` (description + table, 2곳) | YAML + Markdown |
+| 7 | `skills/cs/SKILL.md` | `Lens Sync vX.Y.Z` + `currently X.Y.Z` | YAML + Markdown |
+| 8 | `skills/ci/SKILL.md` | `Creeta Install vX.Y.Z` (table row) | Markdown |
+| 9 | `CLAUDE.md` | `Current: **vX.Y.Z**` + `Updated: YYYY-MM-DD` + Recent Changes | Markdown |
+| 10 | `README.md` | `# Lens vX.Y.Z` (title) | Markdown |
+| 11 | `CHANGELOG.md` | `## [X.Y.Z] - YYYY-MM-DD` 섹션 추가 | Markdown |
+
+> v3.29 에서 `skills/c/` · `skills/ccp/` 가 제거돼 표에서 빠졌다. `skills/cpp/` 는 v3.25 삭제분인데 스크립트 검증 목록에만 남아 있던 유령 경로였고 v3.29 에서 정리했다.
 
 ### 검색 명령어 (빠뜨린 곳 확인)
 

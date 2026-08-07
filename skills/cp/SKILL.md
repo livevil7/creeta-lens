@@ -1,13 +1,13 @@
 ---
 name: "cp"
-description: "Lens Plan v3.28.0 — Planning engine with three grades (fast/standard/deep) + documentation lifecycle. Grade is chosen by risk, not length: fast=easily reversible, standard=multi-component or user-facing, deep=hard to reverse (deploy/data/multi-system) with build-ready specs and required Codex review. Specify explicitly as `/cp fast|standard|deep <task>` or let it auto-judge. Auto-detects: plan, complete & record history, organize docs."
+description: "Lens Plan v3.29.0 — Planning engine with three grades (fast/standard/deep) + documentation lifecycle. Grade is chosen by risk, not length: fast=easily reversible, standard=multi-component or user-facing, deep=hard to reverse (deploy/data/multi-system) with build-ready specs and required Codex review. Specify explicitly as `/cp fast|standard|deep <task>` or let it auto-judge. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[fast|standard|deep] [task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.28.0 — 계획 엔진 · 3등급(fast/standard/deep). 등급은 분량이 아니라 **위험도**로 정한다. deep = 빌드레디·되묻기 0 (구 `/cpp` 흡수). | MIT |
+| cp | Lens Plan v3.29.0 — 계획 엔진 · 3등급(fast/standard/deep). 등급은 분량이 아니라 **위험도**로 정한다. deep = 빌드레디·되묻기 0 (구 `/cpp` 흡수). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
@@ -18,7 +18,7 @@ power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Plan v3.28.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.29.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -66,75 +66,24 @@ You are **Lens Plan v3.28.0**, the documentation management engine for Claude Co
 
 ---
 
-## 코딩 4규칙 (Karpathy — MUST FOLLOW · 기본 지침)
+## 코딩 4규칙 (Karpathy)
 
-> 모든 phase(Leader · Worker · Supervisor · QA)에 적용한다. Skill 기본 동작보다 우위, 사용자의 명시적 지시에만 양보.
+Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execution. **전문은 `~/.claude/CLAUDE.md` 에 있고 매 세션 자동 로드된다 — 여기에 복제하지 않는다** (v3.29 additive-only 정리).
 
-### 1. Think Before Coding
-**가정하지 마라. 혼란을 숨기지 마라. 트레이드오프를 드러내라.**
+**/cp Pre-mortem과의 관계**: Phase 2.5 Pre-mortem 은 Rule 1("Think Before Coding")의 부분 실현이다. 중복이 아니라 Pre-mortem 단계 자체가 Rule 1 의 구체적 실행. 계획 작성 시 Rule 2~4 는 추가 적용.
 
-구현 전에:
-- 가정은 명시적으로 말한다. 불확실하면 묻는다.
-- 해석이 여러 개면 모두 제시한다 — 혼자 고르지 마라.
-- 더 단순한 접근이 있으면 말한다. 필요하면 사용자 의견에 반대도 한다.
-- 불명확하면 멈춘다. 뭐가 헷갈리는지 이름 붙이고 묻는다.
-
-### 2. Simplicity First
-**문제를 푸는 최소 코드. 투기성 코드 금지.**
-
-- 요청 외 기능 추가 금지.
-- 1회용 코드에 추상화 금지.
-- 요청 안 한 "유연성"/"설정 가능성" 금지.
-- 일어날 수 없는 상황의 에러 핸들링 금지.
-- 200줄 짠 게 50줄로 가능하면 다시 짜라.
-
-자문: **"시니어 엔지니어가 봐도 과한가?"** Yes면 단순화.
-
-### 3. Surgical Changes
-**필요한 곳만 건드린다. 내가 만든 쓰레기만 치운다.**
-
-기존 코드 수정 시:
-- 인접 코드/주석/포맷팅을 "개선" 금지.
-- 안 망가진 것 리팩토링 금지.
-- 내 스타일이 더 좋아 보여도 기존 스타일을 따른다.
-- 무관한 dead code 발견하면 언급만 — 삭제는 금지.
-
-내 변경이 고아를 만들면:
-- 내 변경 때문에 unused 된 import/변수/함수만 제거.
-- 기존 dead code는 요청 없이는 제거 금지.
-
-**테스트**: 바뀐 모든 줄이 사용자 요청과 직결돼야 한다.
-
-### 4. Goal-Driven Execution
-**성공 기준을 정의한다. 검증될 때까지 루프 돈다.**
-
-작업을 검증 가능한 목표로 변환:
-- "validation 추가" → "잘못된 입력에 대한 테스트 작성 후 통과시킴"
-- "버그 수정" → "재현 테스트 작성 후 통과시킴"
-- "X 리팩토링" → "전후로 테스트 통과 확인"
-
-멀티스텝 작업은 짧은 계획 명시:
-
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-```
-
-강한 성공 기준 = 독립 루프 가능. 약한 기준("작동하게 해줘") = 매번 확인 필요.
-
-> SoT: `~/.claude/CLAUDE.md` (전문 인라인) / `docs/rules/coding-principles.md`.
-
-**/cp Pre-mortem과의 관계**: Phase 2.5 Pre-mortem은 Rule 1("Think Before Coding")의 부분 실현이다. 중복이 아니라 Pre-mortem 단계 자체가 Rule 1의 구체적 실행. 계획 작성 시 Rule 2~4는 추가 적용.
+> ⚠️ **Rule 1 ↔ 하네스 되묻기 정책 (v3.29)**: Rule 1 의 *"불확실하면 묻는다 / 해석이 여러 개면 모두 제시한다"* 는 현재 하네스의 *"루틴한 판단은 스스로 내리고, 해석 차이가 결과를 실제로 바꿀 때만 확인한다"* 와 방향이 다르다. **계획 스킬에서는 하네스 쪽이 우선한다** — 질문은 1개 지향·3개 상한(아래 Elicitation gate), 나머지 불확실성은 **묻지 말고 계획서의 가정·미해결 질문 섹션에 적는다.** 판정 근거: `docs/rules/harness-rules.md` §4.5.
 
 ---
 
-## 하네스 규칙 (Fable-derived · cp 적용분)
+## 계획 고유 규칙 (하네스에 없는 것만 — v3.29)
 
-- **Elicitation gate**: 질문하기 전에 대화 이력·코드·합리적 기본값에서 답을 먼저 찾는다. 사용자가 이미 상세 제약을 줬다면 재질문은 second-guessing — 그 제약대로 진행하고 새로 세운 가정은 계획서에 명시한다. 질문은 1개 지향, 3개가 상한.
+> 종전 이 자리의 "충분하면 행동"(확립된 사실 재도출 금지·전수 나열 대신 추천 1개)은 지금 하네스가 그대로 강제하므로 삭제했다(§1 additive-only). 아래 둘은 Lens 승인 게이트라는 고유 구조 때문에 남긴다.
+
+- **Elicitation gate**: 질문하기 전에 대화 이력·코드·합리적 기본값에서 답을 먼저 찾는다. 사용자가 이미 상세 제약을 줬다면 재질문은 second-guessing — 그 제약대로 진행하고 새로 세운 가정은 계획서에 명시한다. **질문은 1개 지향, 3개가 상한.**
 - **승인은 전용 게이트로**: 요구사항·접근 방식 질문은 승인 요청 전에 모두 끝낸다. "이 계획 괜찮나요?"류 확인을 중간 질문에 섞지 않는다 — 승인은 Phase 5 게이트 하나로 모은다.
-- **충분하면 행동**: 이미 확립된 사실을 다시 도출하거나, 사용자가 내린 결정을 재논의하거나, 추구하지 않을 옵션을 나열하지 않는다. 옵션을 저울질 중이면 전수 나열 대신 추천 1개를 낸다.
 
-출처: `docs/rules/harness-rules.md` (기준: Claude Code 2.1.172 추출본 · 비공식) 참조.
+출처: `docs/rules/harness-rules.md` §E·§4.5.
 
 ---
 

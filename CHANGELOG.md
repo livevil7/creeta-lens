@@ -1,3 +1,34 @@
+## [3.29.0] - 2026-08-07
+
+**하네스 감축 — 네이티브가 흡수한 규율을 걷어낸다.** LLM 세대가 올라가면서 Lens 가 대신 강제하던 규율이 Claude Code 하네스 안으로 들어왔다. 흡수된 규칙을 스킬 본문에 그대로 두면 토큰만 쓰는 게 아니라 **호스트가 한 번 말하는 것을 Lens 가 열두 번 반복해 가중치를 왜곡**한다. 라이브 세션(2.1.222)의 시스템 프롬프트·도구 설명과 문장 단위로 대조해 중복분을 제거했다. 판정 근거·걷어낸 것 전량: `docs/rules/harness-rules.md` §5, 감사 리포트: `docs/history/2026-08-07-harness-thinning-audit.md`.
+
+### Removed (v3.29.0) — BREAKING
+
+- **`/c` 스킬 폐지** (777줄). 순차 단일 워커 + 승인 + Supervisor + QA 는 지금 하네스 본체가 TodoWrite 로 기본 수행한다. 본문의 상당량이 `/cc` 와 동일 텍스트였다. 병렬 실행은 `/cc`, 계획은 `/cp`.
+- **`/ccp` 스킬 폐지** (228줄). 적대적 다중검증·완결성 비평·판정 게이트는 네이티브 Workflow 도구의 Quality patterns 과 **항목명까지 1:1** 이고, `claude ultrareview`(클라우드 멀티에이전트 리뷰)·`/code-review`·`/security-review` 가 리뷰 축을 덮는다. "실제 실행으로 작동 증명"은 `/cc` Phase 6 QA 가 계속 수행한다.
+- **전담 Monitor 에이전트 폐지.** `/c`·`/cc` 가 매 실행마다 강제 배포하던 haiku 폴링 서브에이전트를 없앴다. 하네스가 백그라운드 작업 완료 시 본체를 자동 재호출하므로 폴링은 낭비이고, `ScheduleWakeup` 도구 설명이 이 패턴을 명시적으로 금지한다(*"polling is wasted"*). **진행보고 의무(§4.4)는 그대로** — 수행 주체만 서브에이전트에서 Leader 본체로 옮겼다. 외부 프로세스 감시가 필요하면 네이티브 `Monitor` 도구를 쓴다.
+- **SessionStart 컨텍스트 주입 축소** — 스킬 인벤토리 표·Auto-Recommendation 규칙·Quick Commands·Lens Suggestion Line 제거. 호스트가 이미 전체 스킬 목록을 더 나은 설명으로 제공한다. 훅 출력 **4,804B → 603B**(주입 컨텍스트 147자). 남는 것은 호스트가 알 수 없는 것뿐 — 세션 메모리·플랜 히스토리·`/crv` staleness 알림.
+- **키워드 추천기 제거** — `lib/keyword-matcher.js`·`lib/plugin-registry.js`·`.lens-cache.json` 삭제. 네이티브 Skills auto-discovery 가 의미 기반으로 라우팅하고, `KNOWN_PLUGINS` 는 v3.13 부터 빈 배열이었다.
+- **죽은 설정 키 4개 제거** — `autoRecommend`·`showReport`·`minMatchScore`·`customKeywords`. 전부 위 추천기 전용이었다.
+
+### Changed (v3.29.0)
+
+- **오케스트레이션 규율 6항목 삭제** (`/cc` Phase 3.0) — pipeline 기본/barrier 예외·위임 후 중복 금지·결과 릴레이·SendMessage 재사용·하이브리드 스카우팅·규모 스케일링. 전부 Agent·Workflow 도구 설명에 문장 단위로 존재한다. `/cc` 고유분(Leader 의 결과 재서술 의무, fan-out 전 인라인 정찰)만 남겼다.
+- **"침묵은 성공이 아니다" 프롬프트 삭제** — 네이티브 `Monitor` 도구 설명의 `Coverage — silence is not success` 절이 자문 문장까지 동일하게 강제한다.
+- **워커 "작업 규율" 8줄 → Leader 향 보고 계약 2줄.** 정직 보고·완료 판정·되돌리기 확인은 시스템 프롬프트가 강제한다. 남긴 둘은 하네스가 알 수 없는 것 — "당신의 최종 메시지는 Leader 만 읽는다"(파이프라인 구조)와 "멈추면 병렬 전체가 블로킹된다"(비용 구조).
+- **Karpathy 4규칙 전문 복붙 12곳 → 1곳.** `~/.claude/CLAUDE.md` 가 매 세션 자동 로드되므로 스킬 본문 복제는 순수 중복이었다. 유일하게 남긴 사본은 `/cc` **워커 dispatch 프롬프트** — 서브에이전트는 사용자 전역 지침을 읽지 않는다.
+- **`harness-rules.md` 전면 개정** — §2 인벤토리에 `[네이티브]`/`[Lens]` 표시 도입, §C·§D 를 "네이티브 위치 색인"으로 전환, **§4.5**(Karpathy Rule 1 ↔ 하네스 되묻기 정책 충돌 심사) · **§4.6**(Monitor 폐지 근거) · **§5**(걷어낸 것 전량 추적표) 신설.
+- **§1 additive-only 예외 3개 → 2개.** 폐지한 예외 3("자주 위반되는 규칙의 3중 반복")은 판정 기준이 없어 어떤 규칙이든 3번 복붙할 명분으로 쓰이던 만능 우회로였다. 남은 예외 1(워커 디스패치)도 **전제가 실측된 적 없음**을 명시했다 — "서브에이전트에서 하네스 준수가 약해진다"는 근거가 저장소 어디에도 없다.
+- **`capability-assumptions.json`** — `native-work-discipline`·`native-code-review` 행 신설(13행), `acted_v3.29` 필드 도입, `last_full_audit` 2026-06-05 → 2026-08-07. **`native-todowrite-background` 행은 2026-06-06 에 이미 "Monitor 에이전트는 순수 오버헤드"로 판정해 두었으나 조치가 v3.29 까지 밀려 있었다** — 판정과 코드 사이의 지연이 이 레지스트리의 최대 실패 모드임을 행에 기록했다.
+- **`/cc` Phase 1.3** 스킬 매칭 SoT 를 Lens 훅 주입 표 → 호스트 시스템 프롬프트의 스킬 목록으로 변경.
+- **`scripts/bump-version.sh`** 12파일 → 9파일. 삭제된 `skills/c`·`skills/ccp` 제거, 그리고 **v3.25 에 삭제된 `skills/cpp/` 가 검증 목록에만 유령으로 남아 있던 것** 정리.
+- 문서 동기화: `CLAUDE.md`(스킬표·훅표·lib표·폴더구조·설정표) · `README.md` · `docs/START_HERE.md` · `docs/rules/release-guide.md`(13→11파일) · `documentation-guide.md` · `publishing-guide.md`.
+
+### Fixed (v3.29.0)
+
+- **슬래시 명령 OVERRIDE 가 v3.13 이후 한 번도 실행되지 않았다.** `scripts/user-prompt-handler.js` 는 `autoRecommend === false` 일 때 **1번째 분기에서 즉시 반환**했는데, 그 아래에 사용자가 `/cp` 라고 쳤을 때 되묻지 않고 즉시 Skill 도구를 호출하게 하는 OVERRIDE 가 있었다. `autoRecommend` 는 v3.13 부터 기본 `false`. 핸들러를 OVERRIDE 전용으로 재작성하며 복구했고 `/cp deep …`·`/cc`·일반 문장 3케이스로 실측 확인했다.
+
+
 ## [3.28.0] - 2026-08-05
 
 `/cs` 가 "워크스페이스 전체"라고 말하면서 실제로는 일부만 돌고 있었다. 세 구멍을 막는다.

@@ -33,7 +33,7 @@
 ### PR 템플릿 (awesome list)
 
 ```markdown
-- [lens](https://github.com/CreetaCorp/lens) - Skill navigator for Claude Code. Scans all plugins, recommends the best match, and executes — single (/c), parallel (/cc), or plan-first (/cp). 8 languages.
+- [lens](https://github.com/CreetaCorp/lens) - Plan-first execution engine for Claude Code. Plan (/cp), run in parallel (/cc), sync repos (/cs), keep tooling current (/cu, /ci). 8 languages.
 ```
 
 ## 3. 독립 마켓플레이스 (현재 방식)

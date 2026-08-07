@@ -1,4 +1,4 @@
-# Lens v3.28.0
+# Lens v3.29.0
 
 **Never wonder which plugin to use again.**
 
@@ -49,18 +49,18 @@ git clone https://github.com/livevil7/creeta-lens.git
 claude --plugin-dir ./creeta-lens
 ```
 
-Then use `/lens:c` inside Claude Code.
+Then use `/lens:cp` inside Claude Code.
 
 ### Option 2: Copy to your commands (Quick setup)
 
-Copy the skill file to your user-level commands for a shorter `/c` command:
+Copy a skill file to your user-level commands for a shorter command name:
 
 ```bash
 mkdir -p ~/.claude/commands
-curl -o ~/.claude/commands/c.md https://raw.githubusercontent.com/livevil7/creeta-lens/main/skills/c/SKILL.md
+curl -o ~/.claude/commands/cp.md https://raw.githubusercontent.com/livevil7/creeta-lens/main/skills/cp/SKILL.md
 ```
 
-Restart Claude Code, then use `/c` directly.
+Restart Claude Code, then use `/cp` directly.
 
 ### Option 3: Load as a local plugin
 
@@ -71,19 +71,6 @@ claude --plugin-dir /path/to/lens
 ```
 
 ## Usage
-
-### `/c` — Navigate to the best skill
-
-```
-/c <what you want to do>
-```
-
-| You type | What happens |
-| --- | --- |
-| `/c build a login page` | Recommends your best auth + frontend skill |
-| `/c review my PR` | Recommends your code review skill |
-| `/c deploy to production` | Recommends your deployment skill |
-| `/c` (no args) | Shows full skill inventory |
 
 ### `/cc` — Leader-Worker-Supervisor-QA Orchestration
 
@@ -107,7 +94,7 @@ Key behaviors:
 | `/cc build a dashboard with auth` | Leader decomposes → Workers build auth, UI, tests in parallel → Supervisor reviews → QA verifies |
 | `/cc review this codebase` | Leader plans review strategy → Workers analyze different areas → Supervisor synthesizes → QA validates |
 | `/cc refactor the payment module` | Leader breaks down refactoring → Workers handle each component → Supervisor ensures consistency → QA checks |
-| `/cc` (no args) | Shows full skill inventory (same as `/c`) |
+| `/cc` (no args) | Shows full skill inventory |
 
 ### `/cp` — Plan first, then execute
 
@@ -115,7 +102,7 @@ Key behaviors:
 /cp <what you want to do>
 ```
 
-Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execution. Every plan is built on four themes — **What (goal) → Why (the problem/motivation) → How (Plan A/B) → Review (verification)** — with **Why** a required gate so you never finely solve the wrong problem. The plan is saved as a markdown file and presented for your approval. `/cp` is the **fast/standard lane** — quick fixes and standard plans. Speed tiers (Fast/Standard) scale the ceremony to the task size; for deep build-ready plans, it points you to `/cpp`.
+Unlike `/cc`, which starts building immediately, `/cp` generates a **work plan document** before any execution. Every plan is built on four themes — **What (goal) → Why (the problem/motivation) → How (Plan A/B) → Review (verification)** — with **Why** a required gate so you never finely solve the wrong problem. The plan is saved as a markdown file and presented for your approval. `/cp` is the **fast/standard lane** — quick fixes and standard plans. Grades scale the ceremony to the risk of the task.
 
 | You type | What happens |
 | --- | --- |
@@ -123,7 +110,7 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 | `/cp build auth with JWT` | Standard tier — full plan, saves to `docs/2026-02-28-jwt-auth.md`, asks for approval |
 | `/cp refactor the API layer` | Creates a step-by-step plan, saves to `docs/`, waits for your go-ahead |
 | `/cp flow` | FLOW mode — maps user-journey stages ↔ engines/modules ↔ dependencies into one interactive flowchart, saved as `docs/rules/flow.md` + `flow.html` (the project's big-picture Rule) |
-| `/cp` (no args) | Shows full skill inventory (same as `/c`) |
+| `/cp` (no args) | Shows full skill inventory |
 
 ### Grades — `fast` / `standard` / `deep`
 
@@ -146,21 +133,11 @@ Unlike `/c` and `/cc`, `/cp` generates a **work plan document** before any execu
 
 > `/cpp` was folded into `deep` in v3.25 and removed. Its trigger words still route here.
 
-### `/ccp` — Power Verify (full review + QA + repair)
-
-```
-/ccp <what to make sure actually works>
-```
-
-`/ccp` (Lens Power Verify) is the **QA/fix partner to `/cc`**: where `/cc` **builds**, `/ccp` takes what was **built or is already running** (a feature, PR, screen, work from another session, or a live service) and runs a **full review → QA → repair**. It **proves it actually works by really running it** — spinning up Playwright, hitting endpoints, observing real behavior — via **4 adversarial skeptics in parallel** (functional, edge/error, regression/integration, UX/ops — UI adds accessibility/responsive, API adds security/permissions), each trying to *refute* that it works. If any reproduces a blocking failure, it does a **minimal repair** (failed axes only, passed axes frozen) and re-verifies — until done, or it honestly reports `verified=false` with the blockers. Safety-gated: read-only first, destructive changes (deploy/DB/payment/mass-delete) require approval; capped at 5 iterations + a budget. Codex-reviewed design.
-
-| You type | What happens |
-| --- | --- |
-| `/ccp make sure the checkout flow really works` | Runs it via Playwright → 4 skeptics try to break it → repairs blockers → evidence report |
-| `/ccp does this PR actually do what it claims` | Independent adversarial audit of existing work, not a rebuild |
-| `/ccp build a new screen` | Downgrade guard — suggests `/cc` instead (nothing built yet to verify) |
-
-**The boundary**: `/cc` **builds** (with build-time QA as it goes); `/ccp` independently does a **full review + QA + repair** of something *already built or running*. **The core pair**: `/cc` builds → `/ccp` proves it works & fixes it. (`/cpp` plans → `/cc` builds → `/ccp` verifies.)
+> **Removed in v3.29: `/ccp` (Power Verify).** Its adversarial multi-verify, completeness critic
+> and repair loop are now covered by native Claude Code: `/code-review` (and `claude ultrareview`
+> for a cloud multi-agent pass), `/security-review`, and the Workflow tool's built-in quality
+> patterns. The "prove it really runs" axis stays in `/cc` Phase 6 QA, which executes the
+> verification commands directly (Playwright / curl / tests).
 
 ### `/cps` — Generate a repo orientation document
 
@@ -245,20 +222,14 @@ Every run writes a pre-upgrade snapshot to `~/.claude/lens/cu-last-scan.json` an
 
 **When to use which:**
 
-| | `/c` | `/cc` | `/cp` |
+| | `/cc` | `/cp` | `/cs` |
 |---|---|---|---|
-| Goal | Best single skill | All relevant skills | Plan before executing |
-| Output | One skill's result | Synthesized multi-agent output | Work plan document + execution |
-| Speed | Fast | Slower (parallel agents) | Deliberate (plan → approve → execute) |
-| Use when | You know what you need | You want comprehensive coverage | You want to review before running |
+| Goal | Build it now, in parallel | Plan before executing | Sync every repo |
+| Output | Synthesized multi-agent output | Work plan document + execution | Pulled/pushed repos + PR record |
+| Speed | Slower (parallel agents) | Deliberate (plan → approve → execute) | Fast |
+| Use when | The work is clear and splits into independent pieces | You want to review before running | Switching machines |
 
 ## How It Works
-
-### `/c` — Single skill navigator
-1. **Scan** — Detects all installed skills, MCP tools, and LSP servers
-2. **Recommend** — Matches your request to the best skill(s) via AskUserQuestion
-3. **Execute** — Runs the chosen skill immediately
-4. **Discover** — If no match, suggests installable plugins from registry
 
 ### `/cc` — Leader-Worker-Supervisor-QA Orchestration
 1. **Leader** — Decomposes the task into sub-tasks and presents a work plan for user approval
@@ -275,7 +246,7 @@ Leader --> Workers (parallel) --> Supervisor --> QA --> Final Report
 ```
 
 ### `/cp` — Plan-first execution engine
-1. **Scan** — Same as `/c`
+1. **Goal & Why** — Defines what becomes possible (plain language) and why it matters
 2. **Analyze & Match** — Identifies all relevant skills with reasons
 3. **Generate Plan** — Creates a work plan document and saves to project `docs/`
 4. **Approve** — Presents plan for user approval (Approve / Modify / Cancel)
@@ -284,21 +255,22 @@ Leader --> Workers (parallel) --> Supervisor --> QA --> Final Report
 
 ## Features
 
-- Auto-scans all installed plugins at session start
-- Detects Skills, MCP tools, and LSP servers from plugin cache
-- **Zero hardcoded dependencies** — works with any plugin combination
-- Dynamic keyword matching from scanner-extracted triggers
-- Interactive skill selection via AskUserQuestion
-- Compares overlapping skills and explains the difference
-- Recommends execution order for multi-skill workflows
 - **Plan-first execution** — `/cp` generates a work plan document before executing, with user approval
 - Plan files saved as `YYYY-MM-DD-slug.md` in project `docs/` (configurable via `planDir`)
+- **Zero hardcoded dependencies** — works with any plugin combination
+- Cross-vendor double review — Codex reviews the same diff independently of the Claude Supervisor
+- Difficulty-based model ladder with a hard cap on top-tier spawns per command
 - Agent dashboard — tracks parallel Task agent lifecycle in real-time
-- Slash command priority override — `/skill-name` invokes immediately without re-recommendation
-- Max 5 recommendations (no overwhelm)
+- Slash command priority override — `/skill-name` invokes the skill immediately, with no confirmation round-trip
 - Responds in your language (EN, KO, JA, ZH, ES, FR, DE, IT)
 - Session memory — remembers your most used skills across sessions
-- Plugin Discovery — suggests installable plugins when no match found
+
+> **Additive-only (v3.29).** Lens deliberately does *not* restate rules Claude Code already
+> enforces. Orchestration discipline, QA patterns, monitor coverage, honest-reporting rules and
+> skill auto-discovery all live in the host now, so they were removed from Lens rather than
+> duplicated. What remains is what the host does not do: persistent plan documents, multi-repo
+> sync, machine tooling management, cross-vendor review, and model-cost policy. See
+> `docs/rules/harness-rules.md` §5.
 
 ## Configuration
 
@@ -320,11 +292,7 @@ Leader --> Workers (parallel) --> Supervisor --> QA --> Final Report
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `autoRecommend` | `true` | Show skill suggestions in responses |
-| `showReport` | `true` | Show Lens tip line when skill matches |
-| `minMatchScore` | `5` | Minimum keyword match score for recommendations |
 | `memoryPath` | `null` | Custom path for memory file (null = `~/.claude/lens/`) |
-| `customKeywords` | `[]` | Additional keyword-to-skill mappings |
 | `planDir` | `null` | Custom plan file directory (null = project `docs/`) |
 | `defaultPlanLanguage` | `null` | Force plan document language (null = auto-detect) |
 | `saveSynthesisResults` | `true` | Save /cc synthesis results to `.lens/results/` |

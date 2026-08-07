@@ -1,10 +1,6 @@
 {
   "version": "1.7.0",
-  "autoRecommend": false,
-  "showReport": true,
-  "minMatchScore": 5,
   "memoryPath": null,
-  "customKeywords": [],
   "planDir": null,
   "defaultPlanLanguage": null,
   "saveSynthesisResults": true,
