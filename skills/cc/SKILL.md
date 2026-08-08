@@ -1,13 +1,13 @@
 ---
 name: "cc"
-description: "Lens Multi v3.29.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and runs them as simultaneous Task workers, then reviews quality (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.30.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and runs them as simultaneous Task workers, then reviews quality (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.29.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.30.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
 동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
@@ -18,7 +18,7 @@ tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
 alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
 eseguire tutto, parallelo, esecuzione parallela, worker paralleli
 
-You are **Lens Multi v3.29.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.30.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -302,10 +302,10 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 > - **파괴적/되돌리기 어려운 작업**(대량 삭제·배포·외부 발행): 자동 진행 금지 → **plan-only 로 계획만 출력하고 종료**, 사람이 상호작용 세션에서 재실행하도록 안내.
 > 이 폴백은 Phase 1.5·경로전환(5.x)·경고모드(6.2) 등 **모든 `AskUserQuestion` 게이트에 공통 적용**. 상호작용 세션(`LENS_NONINTERACTIVE` 미설정)에선 기존대로 승인 필수.
 
-**AskUserQuestion** (header: "Lens Multi v3.29.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.30.0 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.29.0 — 실행 계획
+Lens Multi v3.30.0 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -765,7 +765,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.29.0 — 반복 {N}/5
+Lens Multi v3.30.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -910,7 +910,7 @@ Lens Multi v3.29.0 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.29.0 — 최종 결과                       ║
+║   Lens Multi v3.30.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -1078,7 +1078,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ### Phase 7: 최종 보고
 ```
-Lens Multi v3.29.0 — 최종 결과
+Lens Multi v3.30.0 — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: 1/5  |  점수: 92/100
 
