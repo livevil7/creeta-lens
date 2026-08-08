@@ -328,15 +328,53 @@ def _cell_to_index(line, cell):
     return len(line)
 
 
+# winget 헤더는 OS 표시 언어를 따른다. 영문 라벨만 찾으면 비영문 로케일에서 표 전체를
+# 못 읽고 소스가 통째로 조용히 빠진다 (2026-08-08 한국어 Windows 실측: 21건 -> 0건 보고).
+# 별칭은 **구체적인 것부터** 둔다 - 한국어 Id 컬럼은 "장치 ID" 이고, 여기서 "ID" 를 먼저
+# 맞히면 컬럼 시작이 "장치" 가 아니라 "ID" 로 잡혀 경계가 오른쪽으로 밀린다.
+WINGET_HEADER_ALIASES = {
+    "Id":        ("장치 ID", "장치ID", "Id", "ID"),
+    "Version":   ("버전", "Version"),
+    "Available": ("사용 가능", "사용가능", "Available"),
+    "Source":    ("원본", "Source"),
+}
+
+
+def _display_width(text):
+    """문자열의 콘솔 표시 폭. CJK(W/F)는 2칸."""
+    return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in text)
+
+
+def _find_header_label(header, aliases):
+    """별칭 중 처음 걸리는 것의 **표시 폭 오프셋**을 돌려준다.
+
+    문자 인덱스가 아니라 표시 폭이어야 한다 - _cell_to_index() 가 표시 폭을 입력으로
+    받기 때문이다. ASCII 헤더는 둘이 같아 종전 동작이 그대로 유지되지만, 한글 헤더에서는
+    달라서 문자 인덱스를 쓰면 컬럼 경계가 왼쪽으로 밀린다.
+    """
+    for alias in aliases:
+        if alias.isascii():
+            m = re.search(r"\b" + re.escape(alias) + r"\b", header)
+        else:
+            m = re.search(re.escape(alias), header)
+        if m:
+            return _display_width(header[:m.start()])
+    return None
+
+
 def _winget_header_cols(header):
-    """헤더 행에서 Id/Version/Available/Source 컬럼 시작 위치를 산출."""
-    pos = {}
-    for col in ("Id", "Version", "Available", "Source"):
-        m = re.search(rf"\b{col}\b", header)
-        pos[col] = m.start() if m else None
+    """헤더 행에서 Id/Version/Available/Source 컬럼 시작 **표시 폭**을 산출."""
+    pos = {col: _find_header_label(header, aliases)
+           for col, aliases in WINGET_HEADER_ALIASES.items()}
     if pos["Id"] is None or pos["Version"] is None or pos["Available"] is None:
         return None
     return pos
+
+
+def _looks_like_winget_header(line):
+    """헤더 후보인가 - Id/Version/Available 세 라벨이 로케일 무관하게 다 보이는가."""
+    return all(_find_header_label(line, WINGET_HEADER_ALIASES[c]) is not None
+               for c in ("Id", "Version", "Available"))
 
 
 def parse_winget_upgrade(text):
@@ -354,7 +392,7 @@ def parse_winget_upgrade(text):
         s = line.strip()
         if not s:
             continue
-        if "Id" in line and "Version" in line and "Available" in line:
+        if _looks_like_winget_header(line):
             got = _winget_header_cols(line)
             if got:
                 cols = got  # 두 번째 표 섹션이 나오면 경계 재산출

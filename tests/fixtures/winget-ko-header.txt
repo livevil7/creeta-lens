@@ -1,0 +1,12 @@
+이름                                                               장치 ID                         버전          사용 가능     원본
+-------------------------------------------------------------------------------------------------------------------------------------
+Antigravity (User)                                                 Google.AntigravityIDE           1.23.2        2.1.1         winget
+AWS Command Line Interface v2                                      Amazon.AWSCLI                   2.35.20.0     2.36.17       winget
+Battle.net                                                         Blizzard.BattleNet              Unknown       1.19.3.3219   winget
+Cursor (User)                                                      Anysphere.Cursor                2.4.36        3.14.27       winget
+FFmpeg                                                             Gyan.FFmpeg                     8.1.2         9.0           winget
+Git                                                                Git.Git                         2.53.0        2.55.0.3      winget
+HP Connection Optimizer                                            HP.ConnectionOptimizer          2.0.20.0      2.0.22        winget
+Microsoft Visual C++ 2015-2022 Redistributable (x64) - 14.44.35211 Microsoft.VCRedist.2015+.x64    14.44.35211.0 14.51.36247.0 winget
+Microsoft Visual C++ 2015-2022 Redistributable (x86) - 14.44.35211 Microsoft.VCRedist.2015+.x86    14.44.35211.0 14.51.36247.0 winget
+Node.js                                                            OpenJS.NodeJS.LTS               24.13.1       24.19.0       winget

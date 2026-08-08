@@ -131,6 +131,59 @@ def test_notion():
 test("Notion.Notion (name embeds version '7.23.0') parses cleanly", test_notion)
 
 
+# --- 로케일 회귀 (2026-08-08) --------------------------------------------
+# 한국어 Windows 에서 헤더가 "이름 / 장치 ID / 버전 / 사용 가능 / 원본" 이라
+# 영문 라벨만 찾던 파서가 표를 통째로 못 읽었다. /cu 는 winget 소스를 조용히
+# 0건으로 보고했고 사용자에게는 "다 최신"으로 보였다 (실제 대기 21건).
+# 픽스처는 그 머신의 실제 캡처다.
+KO_FIXTURE = (FIXTURE_DIR / "winget-ko-header.txt").read_text(encoding="utf-8")
+_ko_items = None
+
+
+def _parsed_ko():
+    global _ko_items
+    if _ko_items is None:
+        _ko_items = cu.parse_winget_upgrade(KO_FIXTURE)
+    return _ko_items
+
+
+def test_ko_header_parses():
+    items = _parsed_ko()
+    assert len(items) == 10, (
+        f"한국어 로케일 헤더에서 10행을 읽어야 한다 (0 이면 로케일 회귀), got {len(items)}"
+    )
+
+
+test("한국어 로케일 헤더('이름/장치 ID/버전/사용 가능/원본')를 읽는다", test_ko_header_parses)
+
+
+def test_ko_columns_not_shifted():
+    """헤더 위치를 문자 인덱스로 잡으면 CJK 헤더에서 경계가 왼쪽으로 밀린다.
+    표시 폭으로 잡아야 id/version/available 이 제자리에 온다."""
+    it = next((x for x in _parsed_ko() if x["id"] == "Amazon.AWSCLI"), None)
+    assert it is not None, "Amazon.AWSCLI 를 못 찾음 — 컬럼 경계가 밀렸을 가능성"
+    assert it["installed"] == "2.35.20.0", f"installed 기대 '2.35.20.0', got {it['installed']!r}"
+    assert it["latest"] == "2.36.17", f"latest 기대 '2.36.17', got {it['latest']!r}"
+
+
+test("CJK 헤더에서 컬럼 경계가 밀리지 않는다 (표시 폭 기준)", test_ko_columns_not_shifted)
+
+
+def test_ko_id_column_start():
+    """한국어 Id 컬럼 라벨은 '장치 ID' 다. 별칭 순서가 잘못돼 'ID' 를 먼저 맞히면
+    컬럼 시작이 '장치' 가 아니라 'ID' 로 잡혀 id 가 잘린다."""
+    header = KO_FIXTURE.splitlines()[0]
+    cols = cu._winget_header_cols(header)
+    assert cols is not None, "한국어 헤더에서 컬럼 위치를 못 구했다"
+    label_start = cu._display_width(header[:header.index("장치 ID")])
+    assert cols["Id"] == label_start, (
+        f"Id 컬럼은 '장치' 에서 시작해야 한다 (기대 {label_start}, got {cols['Id']})"
+    )
+
+
+test("Id 컬럼 별칭이 '장치 ID' 전체를 잡는다 ('ID' 부분매치 아님)", test_ko_id_column_start)
+
+
 def test_wechat():
     it = _winget_by_id("Tencent.WeChat.Universal")
     assert it is not None, "Tencent.WeChat.Universal not found"
