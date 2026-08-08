@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>멀티머신 정체성 아키텍처 · 보고서</title>
+<meta name="lens:source" content="docs/tasks/2026-08-08-multimachine-identity-architecture.md">
+<meta name="lens:source-hash" content="648167ea0f25">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">11</b></div>
+
+<main class="deck">
+
+<!-- 1. Cover -->
+<section class="slide" id="cover">
+  <div class="page-no">01 / 11 · COVER</div>
+  <div class="meta">
+    <span>2026-08-08</span>
+    <span class="dot">·</span>
+    <span class="badge task">Task</span>
+    <span class="dot">·</span>
+    <span>grade: deep</span>
+    <span class="dot">·</span>
+    <span>creeta-lens + livevil-setting + agentmemory</span>
+  </div>
+
+  <h1 class="h-title">멀티머신 정체성 아키텍처 — 기록이 섞이고 사라지는 구조를 끊는다</h1>
+  <p class="lede">
+    컴퓨터 4대가 같은 기록을 공유하는데, 어느 것이 <strong>같은 것</strong>이고 어느 것이 <strong>다른 것</strong>인지
+    정의한 적이 없다. 그래서 서로 다른 두 대가 하나로 합쳐지고, 한 대는 혼자 갈라지고, 어느 사실이 어느 컴퓨터 것인지 아무도 모른다.
+  </p>
+
+  <div class="hero">
+    <div class="num">331<span class="unit">세션이 뒤엉킨 네임스페이스 위에</span></div>
+    <div class="caption">
+      <strong>agentmemory</strong>는 서로 다른 PC 두 대를 <strong>하나로 합치고</strong>(user + livev → <code>Git</code>),
+      같은 워크스페이스를 <strong>대소문자 하나로 갈라놓는다</strong>(<code>GIT</code> vs <code>Git</code>).
+      <strong>파일 메모리</strong>는 267개가 잘 공유되지만 <strong>어느 머신 사실인지 표시가 없다</strong>(130개, 49%).
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span>creeta-lens / docs / tasks</span>
+    <span>2026-08-08-multimachine-identity-architecture</span>
+  </div>
+</section>
+
+<!-- 2. At a glance -->
+<section class="slide" id="glance">
+  <div class="page-no">02 / 11 · AT A GLANCE</div>
+  <h2 class="title">실측 규모</h2>
+  <p class="sub">서브에이전트 없이 현 세션에서 직접 조사. Windows 로컬 파일 · agentmemory 서버 API · Mac Mini SSH 실측값.</p>
+
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi">
+      <div class="l">agentmemory 세션</div>
+      <div class="v warn">331</div>
+      <div class="desc">뒤엉킨 네임스페이스 위에 관측 <strong>9,725</strong>건이 쌓여 있다.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">project 키 종류</div>
+      <div class="v warn">13</div>
+      <div class="desc"><code>Git</code>·<code>GIT</code>·<code>ADMIN</code>·<code>user</code>·<code>livev</code>·<code>undefined</code>·<code>06. 계약서</code> 포함.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">파일 메모리 (이 PC)</div>
+      <div class="v">267</div>
+      <div class="desc">그중 <strong>130개(49%)</strong>가 머신 고유 사실인데 머신 태그가 없다.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">머신 태그 없는 사실</div>
+      <div class="v warn">130</div>
+      <div class="desc">267개 중 49%가 SSH·디스크·경로 같은 <strong>머신 한정</strong> 사실인데 표시가 없다.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">설치목록 SoT</div>
+      <div class="v warn">4</div>
+      <div class="desc">넷이 전부 다르다. 지운 플러그인 2개가 그중 하나에 살아 있다.</div>
+    </div>
+    <div class="kpi">
+      <div class="l">메모리 본문 하드코딩</div>
+      <div class="v good">0</div>
+      <div class="desc">걱정과 달리 깨끗. 스킬 소스도 <code>${CLAUDE_PLUGIN_ROOT}</code> 치환을 쓴다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Diagnosis 1 -->
+<section class="slide" id="diagnosis-1">
+  <div class="page-no">03 / 11 · DIAGNOSIS 1/2</div>
+  <h2 class="title">agentmemory — 네임스페이스가 뒤엉켰다</h2>
+  <p class="sub">프로젝트 키 = <code>basename(git top-level ?? cwd)</code>. 머신 차원 없음 · 대소문자 정규화 없음 · 워크스페이스 루트 개념 없음.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">잘못 합쳐짐 · 192세션</div>
+      <h3>서로 다른 두 컴퓨터가 한 네임스페이스로</h3>
+      <p><code>Git</code> = <code>c:\Users\user\...</code>(120) + <code>c:\Users\livev\...</code>(72). 물리적으로 다른 PC 두 대의 경로·설치상태·SSH 사실이 <strong>구분 없이 섞여</strong> 회상된다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">잘못 갈라짐 · 76세션</div>
+      <h3>대소문자 하나로 같은 워크스페이스가 분리</h3>
+      <p><code>GIT</code>(ADMIN PC) vs <code>Git</code>(나머지). 같은 주제를 물어도 <strong>어느 컴퓨터냐에 따라 다른 과거</strong>가 나온다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">개념 붕괴 · 34세션</div>
+      <h3>사용자명이 프로젝트명이 됨</h3>
+      <p>cwd가 홈이면 <code>ADMIN</code>·<code>user</code>·<code>livev</code>가 프로젝트가 된다. 무관한 모든 것이 한 통에 담긴다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">잡음 · 7세션</div>
+      <h3>Dropbox 폴더 · undefined</h3>
+      <p><code>06. 계약서</code>(Dropbox 계약서 폴더)가 프로젝트로 등록. <code>undefined</code> 6건은 cwd 미기록이라 <strong>복원 불가</strong>.</p>
+    </div>
+    <div class="next">
+      <div class="l">추가 분열</div>
+      <h3>하위 레포 진입 시 또 갈라짐</h3>
+      <p><code>Returns_ERP_v20</code>가 user PC·livev PC 양쪽에서 따로, <code>livevil-research</code>가 ADMIN·user 양쪽에서 따로 존재.</p>
+    </div>
+    <div class="next good">
+      <div class="l">해결 지렛대</div>
+      <h3>공식 스위치가 이미 있다</h3>
+      <p><code>AGENTMEMORY_PROJECT_NAME</code> 환경변수가 1순위로 키를 덮어쓴다. <strong>포크 불필요</strong> — 켜기만 하면 된다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. Diagnosis 2 -->
+<section class="slide" id="diagnosis-2">
+  <div class="page-no">04 / 11 · DIAGNOSIS 2/2</div>
+  <h2 class="title">파일 메모리 · 설치목록 · 동기화</h2>
+  <p class="sub">agentmemory와 정반대로 고장났다. 그리고 색인 문서 자체가 틀린 사실을 주장하고 있다.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">머신 구분 부재 · 진짜 아픈 곳</div>
+      <h3>130개(49%)가 머신 한정 사실인데 무태그</h3>
+      <p>SSH·디스크·launchd·경로처럼 "이 머신에서만 참"인 사실이 공유 풀에 그대로 섞여 있다. sj-omen에서 물어도 <strong>Mac Mini의 상태가 근거로 딸려 나온다.</strong> 프론트매터 <code>machine</code> 태그가 필요하다.</p>
+    </div>
+    <div class="next">
+      <div class="l">배선 불일치 · 오판 정정</div>
+      <h3>머신마다 연결 방식이 다르다</h3>
+      <p>Mac Mini·SJ_X1은 정식 <code>autoMemoryDirectory</code>(267개 실측·cron pull 정상), <strong>sj-omen만 구식 <code>&lt;JUNCTION&gt;</code></strong>. ⚠️ 최초 조사에서 <code>projects/&lt;key&gt;/memory</code>를 세어 "Mac Mini 0건"이라 <strong>오판했다</strong> — 그 경로는 설정이 대체하는 바로 그 경로였다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">지운 게 되살아난다</div>
+      <h3>설치목록 SoT 4개가 전부 다름</h3>
+      <p><code>~/.claude/lens/manifest.json</code>에 오늘 지운 <strong>ponytail</strong>과 영구 제거한 <strong>understand-anything</strong>이 아직 있다. 제거 경로 어느 것도 이 파일을 갱신하지 않는다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">기록이 지워진다</div>
+      <h3><code>/cs</code>의 reset --hard가 메모리를 되돌린다</h3>
+      <p>대상 레포 <code>livevil-setting</code>이 곧 메모리 정션의 타깃이다. 2026-08-02에 라이브 메모리 <strong>17건</strong>이 이 경로로 실제 소실됐다.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">커버리지 구멍</div>
+      <h3><code>/cs</code>가 Mac Mini 진짜 레포를 못 본다</h3>
+      <p>스캔 루트에 <code>$HOME</code>이 없다. 실제 작업 레포 4개는 홈 직속(<code>~/livevil-setting</code> 등)이라 <strong>한 개도 안 잡히고</strong>, 대신 2월에 멈춘 옛 클론 더미를 훑는다.</p>
+    </div>
+    <div class="next">
+      <div class="l">드리프트</div>
+      <h3>배포본 ≠ 실물 (5곳) · Lens 버전 불일치</h3>
+      <p>배포본으로 새 PC를 세팅하면 <strong>지금과 다른 환경</strong>이 나온다. 실물 훅은 <code>C:\Users\ADMIN</code> 절대경로 하드코딩. Lens는 sj-omen 3.29.0 / macmini 3.28.0.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Goal -->
+<section class="slide" id="goal">
+  <div class="page-no">05 / 11 · GOAL</div>
+  <h2 class="title">목표</h2>
+  <p class="sub">Done = 아무 두 대를 골라 같은 질문을 던졌을 때, 공통 사실은 똑같이 나오고 머신 고유 사실은 각자 자기 것만 나온다.</p>
+
+  <div class="goal-list" style="margin-top:24px">
+    <div class="goal"><div class="box"></div><div class="t"><strong>섞이지 않는다</strong> — 어느 컴퓨터에서 물어봐도 그 컴퓨터의 사실과 다른 컴퓨터의 사실이 구분되어 나온다.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>사라지지 않는다</strong> — 한 컴퓨터에서 정리한 내용이 다른 컴퓨터에서도 그대로 보인다. 한쪽에만 있는 일이 없어진다.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>되살아나지 않는다</strong> — 지웠다고 하면 어느 컴퓨터에서 무슨 명령을 돌려도 다시 안 깔린다.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>동기화가 기록을 지우지 않는다</strong> — <code>/cs</code>가 메모리를 되돌리는 사고가 재발하지 않는다.</div></div>
+    <div class="goal"><div class="box"></div><div class="t"><strong>문서가 현실과 일치한다</strong> — "설정 X가 되어 있습니다"라고 말하면 실제 파일이 그렇다.</div></div>
+  </div>
+
+  <p class="sub" style="margin-top:28px">
+    <strong>핵심 설계 — 정체성 2축</strong>: 지금 고장난 이유는 "어느 프로젝트인가"와 "어느 컴퓨터인가"를
+    <strong>한 개의 문자열로 표현하려 했기 때문</strong>이다. <code>workspace_id</code>(논리) 와 <code>machine_id</code>(물리) 를 분리하고,
+    <code>scope</code>(global / workspace / machine) 로 "이 사실이 어디까지 참인가"를 명시한다.
+    머신 표준은 <code>sj-omen</code> · <code>sj-rog</code> · <code>sj-x1</code> · <code>macmini</code> 4종.
+  </p>
+</section>
+
+<!-- 6. Plan 1 -->
+<section class="slide" id="plan-1">
+  <div class="page-no">06 / 11 · PLAN 1/3</div>
+  <h2 class="title">P0 ~ P2 — 보호하고, 규격을 정하고, agentmemory를 고친다</h2>
+  <p class="sub">되돌릴 수 없는 것부터 보호한다. 규격 문서(SoT)를 코드보다 먼저 만든다.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">P0</div>
+      <h3>동결 · 백업</h3>
+      <div class="what">
+        4대 새 세션 시작 금지 공지 →
+        메모리 267개를 <strong>정션 밖</strong> 경로로 통째 백업 →
+        agentmemory DB 스냅샷(331세션/9,725관측) →
+        <code>settings.json</code>·<code>manifest.json</code>·<code>installed_plugins.json</code> 백업.
+        <br><em>검증: 백업본에서 267 / 331 / 9,725 재확인.</em>
+      </div>
+    </div>
+    <div class="step">
+      <div class="n">P1</div>
+      <h3>규격 문서화</h3>
+      <div class="what">
+        <code>livevil-setting/docs/rules/machine-identity.md</code> 신규 —
+        machine_id 4종 표 + workspace_id + scope 3값 + 새 머신 추가 절차.
+        <code>MEMORY.md</code> 헤더의 <strong>거짓 문장 정정</strong>.
+        <code>claude-memory-multimachine-sync.md</code>를 실측 기준으로 재작성.
+      </div>
+    </div>
+    <div class="step">
+      <div class="n">P2</div>
+      <h3>네임스페이스 정상화</h3>
+      <div class="what">
+        각 머신 <code>settings.json</code> env에 <code>AGENTMEMORY_PROJECT_NAME</code> 추가 —
+        <code>livevil@sj-omen</code> / <code>@sj-rog</code> / <code>@sj-x1</code> / <code>@macmini</code>.
+        <strong>과거 331세션은 재키잉하지 않는다</strong> — <code>legacy</code> 표시만.
+        <br><em>검증: 4대에서 각 1세션 후 키 4종이 정확히 찍히는가.</em>
+      </div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top:24px">
+    <strong>왜 과거를 재키잉하지 않나</strong> — 홈디렉터리 세션 34건은 머신은 알아도 <em>어느 프로젝트인지</em> 불명이고
+    <code>undefined</code> 6건은 아무것도 모른다. <strong>40건(12%)이 원리적으로 복원 불가</strong>다.
+    반면 재키잉은 9,725건 관측의 외래키를 전부 다시 쓰는 작업이라, 얻는 것 대비 잃을 수 있는 것이 <strong>비대칭</strong>이다.
+  </p>
+</section>
+
+<!-- 7. Plan 2 -->
+<section class="slide" id="plan-2">
+  <div class="page-no">07 / 11 · PLAN 2/3</div>
+  <h2 class="title">P3 ~ P5 — 메모리를 정식 배선으로, 설치목록을 하나로</h2>
+  <p class="sub">P3-2(정션 제거)는 되돌릴 수 없다. P3-1 검증 통과 전에는 절대 실행하지 않는다.</p>
+
+  <div class="pipe cols-3" style="margin-top:24px">
+    <div class="step">
+      <div class="n">P3</div>
+      <h3>정션 → autoMemoryDirectory</h3>
+      <div class="what">
+        <strong>범위 축소</strong> — Mac Mini·SJ_X1은 2026-08-05에 이미 전환 완료(프로덕션 검증됨). <strong>남은 건 sj-omen 1대.</strong>
+        <code>settings.json</code>에 <code>autoMemoryDirectory</code> 추가 →
+        <strong>267개가 잡히는지 확인한 뒤에만</strong> 정션 제거 →
+        <code>bootstrap-sjrog.ps1</code> Phase 5 삭제 + mac/linux 설치기에도 동등 로직.
+        <br><em>검증: sj-omen 새 세션 메모리 267개 · <code>dir /AL</code> 정션 0개.</em>
+      </div>
+    </div>
+    <div class="step">
+      <div class="n">P4</div>
+      <h3>머신 태그 부여</h3>
+      <div class="what">
+        267개 프론트매터에 <code>metadata.machine</code> 추가(기본 <code>global</code>).
+        머신 고유 130개 중 <strong>파일명·제목에 머신명이 명시된 것만</strong> 기계적 태깅.
+        애매한 것은 <code>unknown</code>으로 격리 — <strong>자동 분류 금지</strong>.
+        <br><em>검증: 태그 합계 267 · 본문 변경 0바이트(sha256 대조).</em>
+      </div>
+    </div>
+    <div class="step">
+      <div class="n">P5</div>
+      <h3>설치목록 단일화</h3>
+      <div class="what">
+        <code>skills.json</code>을 <strong>유일 SoT</strong>로 선언하고 실물 기준 정정 →
+        <code>enabledPlugins</code>를 거기서 생성 →
+        <code>~/.claude/lens/manifest.json</code>을 파생물로 강등하고 ponytail·understand-anything을 <code>excluded</code>로 →
+        <code>/ci</code>에 stale 경고 가드.
+        <br><em>검증: 4대에서 <code>/ci</code> 드라이런이 전부 0건.</em>
+      </div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top:24px">
+    <strong>순서 엄수</strong> — P5-1(skills.json 정정)을 P5-2(생성 전환)보다 먼저 한다.
+    현재 <code>skills.json</code>에는 실제로 안 깔린 <code>ui-ux-pro-max</code>·<code>watch@claude-video</code>가 있어서,
+    방향을 잘못 잡으면 <strong>안 쓰는 플러그인 2개가 4대 전부에 설치</strong>된다.
+  </p>
+</section>
+
+<!-- 8. Plan 3 -->
+<section class="slide" id="plan-3">
+  <div class="page-no">08 / 11 · PLAN 3/3</div>
+  <h2 class="title">P6 ~ P7 + Plan B</h2>
+  <p class="sub">동기화를 안전하게 만들고, 배포본과 실물을 수렴시킨다. 그리고 1순위가 깨질 때의 우회로.</p>
+
+  <div class="pipe cols-2" style="margin-top:24px">
+    <div class="step">
+      <div class="n">P6</div>
+      <h3><code>/cs</code> 안전화 · 커버리지 수정</h3>
+      <div class="what">
+        메모리 타깃 레포를 <code>reset --hard</code> 대상에서 제외하거나 실행 전 별도 백업 →
+        Mac Mini에 <code>GIT_ROOTS="/Users/user"</code> 설정(또는 <code>$HOME</code> 1레벨 스캔 추가) →
+        <code>~/Documents/GIT</code> 옛 클론 더미는 <strong>스캔 제외만</strong>(삭제 아님).
+        <br><em>검증: Mac Mini <code>/cs</code>가 실제 레포 4개를 잡는가 · 실행 전후 메모리 파일 수가 줄지 않는가.</em>
+      </div>
+    </div>
+    <div class="step">
+      <div class="n">P7</div>
+      <h3>배포본 수렴 · 버전 정렬</h3>
+      <div class="what">
+        배포본 <code>settings.json</code>을 실물 기준 갱신 + 머신 의존 3개 값은 <code>%%NAME%%</code> 치환 토큰으로 →
+        SessionStart 훅의 <code>C:\Users\ADMIN</code> 절대경로를 <code>$HOME</code> 기반으로 →
+        <code>manifest.json</code>의 <code>workspaceDefault</code>와 <code>CLAUDE.md</code>의 <code>D:\GIT\</code> 모순 해소 →
+        4대 Lens 동일 버전 정렬.
+      </div>
+    </div>
+  </div>
+
+  <div class="next-grid" style="margin-top:28px">
+    <div class="next">
+      <div class="l">Plan B-1 · 트리거: P3-1/P3-4 실패</div>
+      <h3>정션 유지 + mac 심링크</h3>
+      <p>Windows 3대는 현행 정션 유지, Mac Mini는 심링크로 동등 배선. 머신별 심링크 목록을 <code>machine-identity.md</code>에 명시. <strong><code>/cs</code> 보호 가드는 필수</strong> — 이 방식에서는 사고가 이미 실증됐다.<br><em>대가: 플랫폼별 배선이 갈리고 경로 변경 때마다 재작업.</em></p>
+    </div>
+    <div class="next">
+      <div class="l">Plan B-2 · 트리거: env 미주입</div>
+      <h3>OS 사용자 환경변수로 승격</h3>
+      <p><code>AGENTMEMORY_PROJECT_NAME</code>을 <code>setx</code> / <code>~/.zshrc</code>로.<br><em>대가: settings.json 한 곳에서 안 보이고 새 머신 세팅 단계가 늘어난다.</em></p>
+    </div>
+    <div class="next">
+      <div class="l">Plan B-3 · 트리거: 태그 자동판정 불가 &gt;50%</div>
+      <h3>전량 <code>unknown</code> + 회상 시점 판정</h3>
+      <p>판정된 것만 확정 태그로 승격.<br><em>대가: 정리가 늦어지지만, 오분류로 잘못된 사실이 굳는 것보다 안전하다.</em></p>
+    </div>
+  </div>
+</section>
+
+<!-- 9. Alternatives -->
+<section class="slide" id="alternatives">
+  <div class="page-no">09 / 11 · ALTERNATIVES</div>
+  <h2 class="title">검토된 대안 · Codex 교차 협의</h2>
+  <p class="sub">Codex 협의 통과(RC=0). <strong>근본 결함 지목이 일치</strong>했다 — "프로젝트·머신 정체성에 대한 단일 규격과 SoT가 없다".</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next">
+      <div class="l">대안 A · 기각</div>
+      <h3>agentmemory를 포크해 로직을 고친다</h3>
+      <p><em>Good</em>: 설정 누락 위험 0, 새 머신에서도 자동으로 옳다. <em>Bad</em>: 남의 레포라 업데이트마다 재적용해야 하고 <strong><code>/cu</code>가 업데이트를 자동 실행하므로 조용히 원복된다.</strong> → 공식 스위치가 있는데 포크할 이유가 없다.</p>
+    </div>
+    <div class="next">
+      <div class="l">대안 B · 기각</div>
+      <h3>agentmemory를 버리고 파일 메모리로 통합</h3>
+      <p><em>Good</em>: 계층이 하나면 정체성 문제도 하나. <em>Bad</em>: 자동 수집 9,725건이 사라지고 MCP 도구 20여 개 철거 비용. → 문제는 <strong>계층 수가 아니라 정체성 규격 부재</strong>다.</p>
+    </div>
+    <div class="next">
+      <div class="l">대안 C · 기각</div>
+      <h3>agentmemory도 전체 경로를 키로</h3>
+      <p><em>Good</em>: 절대 안 섞이고 구현이 쉽다. <em>Bad</em>: 머신마다 완전 격리되어 공통 지식 공유가 0이 된다. 대소문자·사용자명 문제도 그대로 남는다. → <strong>정밀도를 얻고 공유를 잃는 거래.</strong></p>
+    </div>
+    <div class="next">
+      <div class="l">대안 D · 기각</div>
+      <h3>workspace_id를 레포 단위로 잘게</h3>
+      <p><em>Good</em>: 회상 정밀도 상승. <em>Bad</em>: <strong>지금 이미 그렇고, 그게 문제의 일부</strong>다 — 루트에서 열었냐 하위에서 열었냐로 갈린다. 레포×머신 = 100개 넘는 네임스페이스. → 정밀도보다 일관성이 먼저.</p>
+    </div>
+    <div class="next good">
+      <div class="l">채택 · Codex 분기 해소</div>
+      <h3>계층별로 나눠 적용</h3>
+      <p>Codex는 A/B 중 하나를 고르라는 전제로 답했다. 이 계획은 <strong>agentmemory=키에 머신 포함 / 파일메모리=단일 풀+머신 태그</strong>로 나눈다. 각 대안의 단점이 계층 특성과 <strong>정확히 상보적</strong>이기 때문 — 자동 로그에서 "공통 지식 중복"은 문제가 아니고, 267건 수동 큐레이션에서 "태그 누락"은 관리 가능한 규모다.</p>
+    </div>
+    <div class="next">
+      <div class="l">Codex 추가 지적 · 전량 반영</div>
+      <h3>9건이 계획에 흡수됨</h3>
+      <p>쓰기 동결·원본 보존·건수/해시 대조(P0) · 정션 타깃 백업 위치(P0-2) · 130개 자동분류 위험(P4-2) · 재키잉 금지(P2-3) · 동시기록 충돌 규칙 부재(R6) · repo rename/worktree(R7) · <strong>중앙 서버 단일 장애점(R8, 후속 과제)</strong>. ⚠️ 단 Codex의 "Mac 0건 = 플랫폼 불일치" 결론은 <strong>내가 준 틀린 전제</strong> 위에 선 것이라 무효 — 검증 안 된 사실을 협의 상대에게 주면 그 위에 정교한 오답이 쌓인다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 10. Risks -->
+<section class="slide" id="risks">
+  <div class="page-no">10 / 11 · RISKS</div>
+  <h2 class="title">리스크 레지스터</h2>
+  <p class="sub">각 행에 트리거 · 영향 · 대응 · <strong>중단 조건</strong>. 이름만 적힌 리스크는 아무도 모니터링하지 않는다.</p>
+
+  <div class="next-grid" style="margin-top:24px">
+    <div class="next warn">
+      <div class="l">R1 · 높음 · 되돌리기 불가</div>
+      <h3>정션 제거 순서 사고 → 메모리 267개 소실</h3>
+      <p><em>트리거</em>: sj-omen에서 P3-2를 P3-1 검증 전에 실행. <em>대응</em>: 백업을 <strong>정션 밖</strong>(<code>~/.claude/backups/</code>)에 보관 — <strong>P0에서 완료됨</strong> + P3-1 통과를 하드 게이트로. <em>중단</em>: 백업 위치가 정션 안이면 즉시 중단.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">R2 · 중간</div>
+      <h3>안 쓰는 플러그인이 4대에 설치</h3>
+      <p><em>트리거</em>: P5-2를 P5-1 전에 실행. <em>대응</em>: 단계 순서 엄수 + 드라이런 필수. <em>중단</em>: 드라이런 <code>toInstall</code>에 ui-ux-pro-max/watch가 뜨면 중단.</p>
+    </div>
+    <div class="next warn">
+      <div class="l">R3 · 중간</div>
+      <h3>오염된 메모리가 git으로 4대에 전파</h3>
+      <p><em>트리거</em>: P4 태그 오분류 후 커밋·푸시. <em>대응</em>: 별도 브랜치 → diff 검토 → 머지. <em>중단</em>: diff에 본문 변경이 1바이트라도 있으면 중단.</p>
+    </div>
+    <div class="next">
+      <div class="l">R4 · 중간</div>
+      <h3>마이그레이션 중 다른 머신에서 쓰기</h3>
+      <p><em>대응</em>: P2-3(과거 미변경) 설계가 과거 오염을 차단. P4 구간만 재시도. <em>중단</em>: 건수 대조 불일치 시 P0 백업에서 재시작.</p>
+    </div>
+    <div class="next">
+      <div class="l">R5 · 중간</div>
+      <h3><code>autoMemoryDirectory</code> 미지원 CLI 버전</h3>
+      <p><em>대응</em>: Plan B-1(정션 원복)로 전환. <strong>위험 하향</strong> — Mac Mini·SJ_X1에서 이미 프로덕션 검증됐으므로 sj-omen만 남았다. <em>중단</em>: sj-omen에서 실패하면 정션 유지하고 별건으로 분리.</p>
+    </div>
+    <div class="next">
+      <div class="l">R6~R8 · Codex 제기</div>
+      <h3>충돌 규칙 부재 · rename · 단일 장애점</h3>
+      <p>동시 기록 충돌 해소 규칙이 없어 최신 사실 판정이 비결정적(R6, <code>/cs</code> PR 경로 강제) · repo rename/worktree가 새 분열 유발(R7, workspace_id 고정 명시) · <strong>Mac Mini 장애 시 4대 동시 기억 상실(R8 — 이번 범위 밖, 후속 과제)</strong>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 11. Resume -->
+<section class="slide" id="resume">
+  <div class="page-no">11 / 11 · RESUME</div>
+  <h2 class="title">재개 포인트</h2>
+  <p class="sub">현재 경로 Plan A · 승인 대기. 조사 7개 축 전수 실측 완료 · Codex S4 교차 협의 통과(RC=0) · 설계 확정.</p>
+
+  <div class="timeline" style="margin-top:24px">
+    <div class="lead">P0 백업이 모든 후속 단계의 전제다. 백업 위치가 정션 밖인지부터 확인하고 시작한다. 마이그레이션 전 구간에서 <code>/cs</code>를 돌리지 않는다 — 보호 가드(P6-1)가 들어가기 전까지는 위험 구간이다.</div>
+    <ol>
+      <li class="todo">
+        <h4>P0-1 — 동결 공지</h4>
+        <div class="det">4대 머신 새 세션 시작 금지. 쓰기가 계속되면 건수 대조가 불가능해진다.</div>
+      </li>
+      <li class="todo">
+        <h4>P0-2 — 메모리 267개 백업 (정션 밖)</h4>
+        <div class="det">백업을 <code>livevil-setting</code> 안에 두면 백업과 원본이 같은 운명을 맞는다.</div>
+      </li>
+      <li class="todo">
+        <h4>P0-3 — agentmemory DB 스냅샷</h4>
+        <div class="det">Mac Mini. 건수 기록: 331세션 / 9,725관측.</div>
+      </li>
+      <li class="todo">
+        <h4>비차단 확인 1건</h4>
+        <div class="det"><code>ui-ux-pro-max</code>와 <code>watch@claude-video</code>를 계속 쓸 것인가 — P5-1 직전 사용자 1회 확인. 가정: 안 쓰는 것으로 보고 제외.</div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const rail = document.getElementById("rail");
+  const crumbNow = document.getElementById("crumb-now");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  document.getElementById("crumb-total").textContent = String(slides.length).padStart(2, "0");
+  function tick() {
+    const h = document.documentElement;
+    rail.style.width = Math.min(100, Math.max(0, h.scrollTop / (h.scrollHeight - h.clientHeight) * 100)) + "%";
+    let idx = 0;
+    for (let i = 0; i < slides.length; i++) {
+      if (slides[i].getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    crumbNow.textContent = String(idx + 1).padStart(2, "0");
+  }
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
+</body>
+</html>
