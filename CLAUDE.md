@@ -1,12 +1,15 @@
-# lens — Skill navigator & plan-first execution engine for Claude Code
+# lens — Plan-first execution engine for Claude Code
 
-Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the best match, and executes it. Plan-first execution with /cp.
+Plan-first execution engine for Claude Code: plan with /cp, build in parallel with /cc, sync repos with /cs, keep machine tooling current with /cu and /ci.
 
 ## Version
 
-- Current: **v3.25.0**
-- Updated: 2026-07-20
+- Current: **v3.29.0**
+- Updated: 2026-08-07
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.29.0 breaking: **하네스 감축 — 네이티브가 흡수한 규율 걷어내기.** LLM 세대가 오르며 Lens 가 대신 강제하던 규율이 Claude Code 하네스로 흡수됐다. 라이브 세션(2.1.222) 시스템 프롬프트·도구 설명과 문장 단위 대조 후 중복 제거. ① **`/c`·`/ccp` 스킬 폐지** — `/c`(777줄)는 하네스 본체+TodoWrite 가 기본 수행, `/ccp`(228줄)는 Workflow Quality patterns 과 항목명까지 1:1 + `claude ultrareview`·`/code-review`·`/security-review` 가 대체(실행 증명 축은 `/cc` P6 QA 존치). ② **전담 Monitor 에이전트 폐지** — 하네스가 완료 시 본체를 자동 재호출하고 `ScheduleWakeup` 설명이 폴링을 금지한다. **진행보고 의무는 유지, 수행 주체만 Leader 본체로.** ③ **오케스트레이션 규율 6항목·QA 패턴 4항목·"침묵은 성공이 아니다" 삭제** — 전부 Agent·Workflow·Monitor 도구 설명에 존재. ④ **Karpathy 4규칙 전문 복붙 12곳 → 1곳**(`/cc` 워커 dispatch — 서브에이전트는 전역 지침을 못 읽음). ⑤ **SessionStart 주입 4,804B → 603B** — 스킬표·추천규칙·Suggestion Line 제거(호스트가 이미 제공), 키워드 추천기 `lib` 2개+캐시+죽은 설정 4키 삭제. ⑥ `harness-rules.md` §4.5(Rule 1↔되묻기 충돌 심사)·§4.6(Monitor 폐지)·§5(추적표) 신설, §1 예외 3→2(만능 우회로 폐지, 남은 예외의 전제가 미검증임을 명시). ⑦ **fix: 슬래시 OVERRIDE 가 v3.13 이후 무동작이었다** — `autoRecommend:false` 조기 반환이 그 아래 OVERRIDE 까지 죽이고 있었음, 복구·실측. 상세: `CHANGELOG.md` + `docs/history/2026-08-07-harness-thinning-audit.md`.
+- v3.28.0 fix: **`/cs` 가 조용히 덜 하고 있던 것 3건** — ① **홈 직하 repo 를 통째로 놓쳤다.** 루트가 `Documents/Git`·`projects`·`git` 뿐이라 홈 바로 밑 repo 는 어디에도 안 걸렸다. 실측: Mac Mini 36개 중 **32개만** 돌고 있었고, 빠진 4개에 **Claude 파일 메모리가 사는 `livevil-setting`** 이 있었다 → `$HOME` 을 루트에 추가(dedup 로 중복 없음). ② **없어진 원격 13개를 매번 '실패'로 쌓았다** → `⚠️ 원격 없음` 분리 + 재시도 스킵 + `--json` 에 `missing_remote`. ③ **SessionStart 자동 pull 이 헤드리스 `claude -p` 에도 붙는다**(실측 누적 20,027 세션) → 환경 스니핑 대신 **최소 간격 가드**(기본 30분, `LENS_SYNC_PULL_INTERVAL_MIN`). ⚠️ 무인 서버는 여전히 cron 이 답이다. 상세: `CHANGELOG.md`.
+- v3.27.0 breaking: **`/cs` PR-only → PR-and-merge** — PR 은 "무엇을 올렸는지"의 기록이지 통과 게이트가 아니다. v3.25.0 이 자동 머지를 잘라내면서 **1순위 목적(전 레포 GitHub 동기화)이 막혀 있었다** — 병합 전까지 변경이 로컬 워킹트리에도 다른 머신에도 없어 라이브 메모리가 두 번 사라졌고(2026-08-02 17개·2026-08-04) PR 3건 방치로 Mac Mini 가 26커밋 뒤처졌다. 원인은 목적의 전도 — 당시 사용자 선택은 "PR + 자동 머지"였는데 Codex 의 *"auto-merge 면 PR 은 기록용 포장"* 반박이 채택됐다. **그 "기록용 포장"이 이 도구가 원한 것 그 자체였다.** 이제 PR 생성 후 같은 실행에서 병합하고, 거부되면 `미병합` 으로 보고한다. 되감기의 진짜 원인은 `reset --hard` 가 아니라 **base 가 커밋을 못 받는 것**이었다(커밋은 sync 브랜치에 있으므로 `checkout base` 만으로 빠진다). 탈출구 `LENS_SYNC_AUTO_MERGE=0`. 상세: `CHANGELOG.md`.
 - v3.25.0 feat/breaking: **계획 엔진 개편**. ① **`/cpp` 폐지 → `/cp deep` 흡수** (3등급 fast/standard/deep, 트리거 22개 이관, `planner: cpp` 하위호환). ② **등급 기준 = 분량이 아니라 위험도** + `/cp fast|standard|deep` 명시 지정 + **양방향 불일치 가드**(낮춰=강한경고/높여=가벼운안내). ③ **골격 신규 필수**: 🚧비목표·🔀**검토된 대안**·🚫DO NOT CHANGE·⚠️리스크 레지스터·❓미해결 질문(차단만 0). 필수 7 + 조건부 부록. ④ **실행 진입 게이트**(`/cc`·`/c`) — 작성 시점은 우회 경로가 많아 실행 시점에 검사. 미달 시 실행 거부. ⑤ **되먹임 고리** — 핸드오프 4블록 확장 + worker 프롬프트 주입 + 편차 기록 + 실행 지표(추가 질문 수). ⑥ **모델 상속 폐기** — 모든 spawn 모델 명시, `/ccp` TOP 6→1, `/cc` 연쇄승격→위험도 기반, TOP 상한. 계측 훅 배선. ⑦ **`/cs` PR-only** — 커밋 **전** 브랜치 분기, fail-closed, base=upstream, 미병합≠동기화완료. ⑧ `validatePlanStructure` 부활(v3.4 골격에서 3세대 드리프트). ⑨ 진행보고 생존확인 의무. ⑩ codex 타임아웃 규모분기(180/300/600). 상세: `CHANGELOG.md` + `docs/tasks/2026-07-20-lens-plan-engine-overhaul.md`.
 - v3.24.0 feat: **모델 정책 전환 — 고정 모델명 폐지, 난이도 사다리 + 최신 최고 모델 자동 추종** (사용자 지시: 무차별 최고 모델 배정 금지). ① Claude 축 — Easy=경량(현재 haiku)/Medium=중간(현재 sonnet)/Hard=**TOP**(세션이 enum 최상위 이상이면 상속, 미만이면 enum 최상위 명시 — 현재 fable). 칸=상대 위치라 모델 세대와 함께 자동 상승. `/c`·`/cc` 사다리 통일(`/cc` v3.11 "전부 opus" 폐기), `/ccp`=Hard 성격→TOP, Supervisor/QA=최고 Worker 티어 동급, Monitor=haiku. ② codex 축 — `-m gpt-5.5` 폐지 → **resolver**(`~/.codex/models_cache.json` priority-1 동적 선택, 현재 gpt-5.6-sol) + `MODEL_ARG` 배열 분기(빈 `-m ""` 차단) + ⚠️ 강등 플래그 의무. ③ capability-assumptions에 모델 드리프트 감시 채널. 상세: `CHANGELOG.md` + `docs/rules/codex-integration.md` §4·§6 + `docs/rules/harness-rules.md` §4.1.
 - v3.23.0 feat: **`/cp flow` 신설 + Fable 하네스 규칙 이식**. ① FLOW 모드 — 프로젝트의 "이용자 단계별 화면 ↔ 엔진/모듈 ↔ 종속·재사용"을 한 장의 인터랙티브 플로우차트로 그려 `docs/rules/flow.md`(SoT)+`flow.html`(뷰, **05-dark-developer 토큰**) = 전체 그림 Rule. 템플릿 쌍(`templates/flow.template.md`+`flow-viewer.example.html`, livevil-boost 일반화) + CONVERT `doc_kind: flow` 가드(flow 뷰어가 task 덱으로 덮이는 사고 차단). ② 하네스 규칙 — 공개 추출본(Claude Code 2.1.172 Fable, 비공식·재서술) 기반 `docs/rules/harness-rules.md` SoT + 6개 스킬 역할별 인라인(워커 "작업 규율"·Monitor "침묵은 성공이 아니다"·/cc 오케스트레이션 규율·/ccp QA 패턴·/cp·/cpp elicitation gate·/cr 리서치 규율). **additive-only 원칙**(하네스가 이미 강제하면 재복붙 금지). 상세: `CHANGELOG.md`.
@@ -30,17 +33,14 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 | Skill | Description | Workflow |
 |-------|-------------|----------|
-| `/c` | Single skill navigator | Scan → Recommend → Execute → Discover |
 | `/cc` | 개발(빌드) — 병렬 멀티에이전트 엔진 | Scan → Multi-Match → Parallel Execute → Synthesize |
 | `/cp` | 계획 엔진 — **3등급(fast/standard/deep)** | 등급은 **위험도**로 판정(분량 아님). `/cp fast|standard|deep <요청>` 명시 지정 + **양방향 불일치 가드**(낮춰=강한경고/높여=가벼운안내). 골격 **What→Why(6하원칙)→🧰실행전략→How→💡시사점/주의점/SideEffect→✅Review(검증수단)**. deep = 6축 fan-out + **Codex 하드게이트** + 빌드레디 태스크 + 되묻기 0 (구 `/cpp` 흡수) |
-| `/ccp` | Power Verify (개발 후 전체 리뷰·QA·수정) | `/cc`가 만든/가동 중인 것 → 실제 실행 베이스라인 → 4렌즈 적대적 검증 → 만장일치 게이트 → 최소 수복(안전장치) → 증거 리포트(verified true/false) |
 | `/cps` | Repo orientation doc | Scan docs → Assemble 4 sections → Diff gate → Write → Conditional CLAUDE.md pointer |
 | `/cr` | Creeta Research (라이브 딥리서치) | Refine topic → Read live-research substrate → multi-angle parallel gather (Exa·GitHub·YouTube·community·RSS) → cross-check conflicts → report to conversation (no file saved) |
 | `/crv` | Self-modernization audit | Load registry → probe/web native capabilities → classify KEEP/THIN/OBSOLETE + upgrade/ergonomics → (deep) conversation mining → report + /cp handoff → stamp |
 | `/ci` | Install sync (per-user) | Dry-run diff (manifest ↔ installed) → 4-bucket preview (install/remove/foreign/ok) → approve → install missing (marketplace add + `install --scope user`) → remove **only excluded** (backup + per-item confirm) → foreign report-only → re-diff. Self-protecting: never uninstalls Lens. Backend `lib/install-sync.js` |
 
-- `/c <request>` picks the best one skill and runs it
-- `/cc <request>` runs ALL relevant skills as parallel Task agents, then synthesizes outputs
+- `/cc <request>` decomposes the request and runs the pieces as parallel Task agents, then synthesizes outputs
 - `/cp <request>` generates a work plan document, gets user approval, then executes
 - `/cps` generates/updates `docs/START_HERE.md` — a repo's first-read orientation + question-routing entry point
 - `/ci` syncs installed plugins to a per-user manifest (`~/.claude/lens/manifest.json`): installs missing, removes only explicitly-excluded (backup + per-item confirm), reports foreign read-only
@@ -50,8 +50,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 | Hook | Event | File | When |
 |------|-------|------|------|
-| SessionStart | Session start (once) | `hooks/session-start.js` | Scans plugins, caches results, loads memory, inits dashboard + plans dir, injects context |
-| UserPromptSubmit | Every message | `scripts/user-prompt-handler.js` | Keyword matching for auto-suggest; `/command` override for explicit invocation |
+| SessionStart | Session start (once) | `hooks/session-start.js` | Loads session memory + plan history, inits dashboard + plans dir, emits the `/crv` staleness nudge. **Injects no skill inventory** (v3.29 — the host already provides one) |
+| UserPromptSubmit | Every message | `scripts/user-prompt-handler.js` | `/command` override only (v3.29) — forces the Skill tool to fire immediately on an explicit slash command. Keyword auto-suggest removed |
 | PreToolUse | Before Task tool | `hooks/pre-tool-task.js` | Registers sub-agent as "running" in dashboard |
 | PostToolUse | After Task tool | `hooks/post-tool-task.js` | Marks a **synchronous** sub-agent `done`/`error` with its duration. A **background** launch is marked `launched` (completion never observed) — never `done`, and excluded from "all complete" wording |
 | PostToolUse | After every tool | `hooks/post-tool-progress.js` | Enforces the 2-minute progress-report rule: injects a reminder when background work is in flight and the last report is over 2 minutes old. Silent otherwise |
@@ -61,10 +61,8 @@ Scans all installed plugins (Skills, MCP tools, LSP servers), recommends the bes
 
 | Module | File | Key Exports | Description |
 |--------|------|-------------|-------------|
-| Skill Scanner | `skill-scanner.js` | `scanInstalledSkills()`, `formatSkillTable()`, `detectDomain()` | Scans `~/.claude/plugins/cache/`. Skills, MCP, LSP, Hybrid. 24 domain patterns. 4-level env var path resolution |
-| Keyword Matcher | `keyword-matcher.js` | `matchKeywords()`, `saveScanCache()`, `formatKeywordTable()` | Dynamic keyword map from scan results. Zero hardcoded mappings. Cache at `.lens-cache.json` |
+| Skill Scanner | `skill-scanner.js` | `scanInstalledSkills()`, `formatSkillTable()`, `detectDomain()` | Scans `~/.claude/plugins/cache/`. Skills, MCP, LSP, Hybrid. Used only for the SessionStart one-line count since v3.29 |
 | Memory Store | `memory-store.js` | `loadMemory()`, `saveMemory()`, `recordSessionStart()`, `recordSkillUsage()`, `recordPlanCreation()` | Persists at `~/.claude/lens/.lens-memory.json`. Usage counts, recent skills, plan history |
-| Plugin Registry | `plugin-registry.js` | `searchRegistry()`, `KNOWN_PLUGINS` | Installable-plugin discovery. `KNOWN_PLUGINS` is currently **empty** (registry disabled); kept as an opt-in extension point. Per-message auto-suggest is **off by default** (`autoRecommend:false`) — native Skills auto-discovery handles routing |
 | Agent Tracker | `agent-tracker.js` | `initSession()`, `registerAgent()`, `completeAgent()`, `endSession()` | Tracks Task agent lifecycle in `.lens/agent-dashboard.json`. Atomic writes, error logs |
 | Plan Manager | `plan-manager.js` | `getPlansDir()`, `ensurePlansDir()`, `getStatePath()`, `generateSlug()`, `generateFileName()`, `generatePlanId()`, `savePlanState()`, `loadPlanState()`, `listPlans()`, `formatPlanSummary()`, `generatePlanContent()`, `parsePlanFrontmatter()`, `updatePlanStatus()`, `validatePlanStructure()`, `REQUIRED_SECTIONS`, `extractGoal()`, `extractPlanBTriggers()` | Plan file naming (`YYYY-MM-DD-slug.md`), Goal-first document generation (8-lang headers), YAML frontmatter parsing, status lifecycle, state at `.lens/plan-state.json`. v3.4+ `extractGoal` / `extractPlanBTriggers` 는 `/cc` 핸드오프 진입 시 SUCCESS_CRITERIA 와 Plan B Trigger 매칭에 사용 |
 
@@ -76,9 +74,9 @@ lens/
 │   ├── plugin.json            # Plugin manifest (version source of truth)
 │   └── marketplace.json       # Marketplace registration
 ├── skills/
-│   ├── c/SKILL.md             # /c — single skill navigator
 │   ├── cc/SKILL.md            # /cc — parallel multi-agent engine
-│   └── cp/SKILL.md            # /cp — plan-first execution
+│   ├── cp/SKILL.md            # /cp — plan-first execution (3 grades)
+│   └── …                      # ci, cps, cr, crv, cs, cu, lens-upgrade
 ├── hooks/
 │   ├── hooks.json             # Hook registration (5 hooks)
 │   ├── session-start.js       # SessionStart handler
@@ -89,9 +87,7 @@ lens/
 │   └── user-prompt-handler.js # UserPromptSubmit handler
 ├── lib/
 │   ├── skill-scanner.js       # Plugin scanner (Skills, MCP, LSP)
-│   ├── keyword-matcher.js     # Dynamic keyword matching
 │   ├── memory-store.js        # Session memory persistence
-│   ├── plugin-registry.js     # Known plugins for discovery
 │   ├── agent-tracker.js       # Agent dashboard state management
 │   └── plan-manager.js        # Plan document management
 ├── templates/                     # AI reference only — code (generatePlanContent) does NOT read these at runtime
@@ -112,16 +108,11 @@ lens/
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `autoRecommend` | `true` | Suggest skills via UserPromptSubmit hook |
-| `showReport` | `true` | Show "Lens Tip" line when a skill matches |
-| `minMatchScore` | `5` | Minimum keyword match score for auto-suggestions |
 | `memoryPath` | `null` | Custom memory file path (null = `~/.claude/lens/`) |
-| `customKeywords` | `[]` | Additional keyword-to-skill mappings |
 | `planDir` | `null` | Custom plan file directory (null = project `docs/`) |
 | `defaultPlanLanguage` | `null` | Force plan language (null = auto-detect from user) |
 | `saveSynthesisResults` | `true` | Save /cc synthesis results to .lens/results/ |
 | `resultsDir` | `null` | Custom results directory (null = `.lens/results/`) |
-| `autoRecommend` | `false` | (v3.13: default off) Per-message skill auto-suggest. Native Skills auto-discovery routes instead |
 | `autoCommitOnComplete` | `true` | `/cc`/`/cps`: auto commit+sync after gates pass. Respects `.gitignore` (does NOT extra-filter secrets — user version-controls secrets deliberately); branch-first; diverged→report-only. Set `false` to opt out |
 | `capabilityAuditNudge` | `true` | Show `/crv` staleness nudge at session start (Lens repo only, no network) |
 | `capabilityAuditIntervalDays` | `30` | Days before the `/crv` audit is considered stale |
@@ -139,7 +130,6 @@ lens/
 
 | File | Location | Purpose |
 |------|----------|---------|
-| `.lens-cache.json` | Plugin root | Scan results cache for UserPromptSubmit |
 | `.lens-memory.json` | `~/.claude/lens/` | Session memory (usage counts, history) |
 | `agent-dashboard.json` | `.lens/` (project root) | Agent lifecycle tracking |
 | `plan-state.json` | `.lens/` (project root) | Plan status tracking (draft→approved→completed) |

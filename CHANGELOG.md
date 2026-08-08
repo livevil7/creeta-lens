@@ -1,3 +1,135 @@
+## [3.29.0] - 2026-08-07
+
+**하네스 감축 — 네이티브가 흡수한 규율을 걷어낸다.** LLM 세대가 올라가면서 Lens 가 대신 강제하던 규율이 Claude Code 하네스 안으로 들어왔다. 흡수된 규칙을 스킬 본문에 그대로 두면 토큰만 쓰는 게 아니라 **호스트가 한 번 말하는 것을 Lens 가 열두 번 반복해 가중치를 왜곡**한다. 라이브 세션(2.1.222)의 시스템 프롬프트·도구 설명과 문장 단위로 대조해 중복분을 제거했다. 판정 근거·걷어낸 것 전량: `docs/rules/harness-rules.md` §5, 감사 리포트: `docs/history/2026-08-07-harness-thinning-audit.md`.
+
+### Removed (v3.29.0) — BREAKING
+
+- **`/c` 스킬 폐지** (777줄). 순차 단일 워커 + 승인 + Supervisor + QA 는 지금 하네스 본체가 TodoWrite 로 기본 수행한다. 본문의 상당량이 `/cc` 와 동일 텍스트였다. 병렬 실행은 `/cc`, 계획은 `/cp`.
+- **`/ccp` 스킬 폐지** (228줄). 적대적 다중검증·완결성 비평·판정 게이트는 네이티브 Workflow 도구의 Quality patterns 과 **항목명까지 1:1** 이고, `claude ultrareview`(클라우드 멀티에이전트 리뷰)·`/code-review`·`/security-review` 가 리뷰 축을 덮는다. "실제 실행으로 작동 증명"은 `/cc` Phase 6 QA 가 계속 수행한다.
+- **전담 Monitor 에이전트 폐지.** `/c`·`/cc` 가 매 실행마다 강제 배포하던 haiku 폴링 서브에이전트를 없앴다. 하네스가 백그라운드 작업 완료 시 본체를 자동 재호출하므로 폴링은 낭비이고, `ScheduleWakeup` 도구 설명이 이 패턴을 명시적으로 금지한다(*"polling is wasted"*). **진행보고 의무(§4.4)는 그대로** — 수행 주체만 서브에이전트에서 Leader 본체로 옮겼다. 외부 프로세스 감시가 필요하면 네이티브 `Monitor` 도구를 쓴다.
+- **SessionStart 컨텍스트 주입 축소** — 스킬 인벤토리 표·Auto-Recommendation 규칙·Quick Commands·Lens Suggestion Line 제거. 호스트가 이미 전체 스킬 목록을 더 나은 설명으로 제공한다. 훅 출력 **4,804B → 603B**(주입 컨텍스트 147자). 남는 것은 호스트가 알 수 없는 것뿐 — 세션 메모리·플랜 히스토리·`/crv` staleness 알림.
+- **키워드 추천기 제거** — `lib/keyword-matcher.js`·`lib/plugin-registry.js`·`.lens-cache.json` 삭제. 네이티브 Skills auto-discovery 가 의미 기반으로 라우팅하고, `KNOWN_PLUGINS` 는 v3.13 부터 빈 배열이었다.
+- **죽은 설정 키 4개 제거** — `autoRecommend`·`showReport`·`minMatchScore`·`customKeywords`. 전부 위 추천기 전용이었다.
+
+### Changed (v3.29.0)
+
+- **오케스트레이션 규율 6항목 삭제** (`/cc` Phase 3.0) — pipeline 기본/barrier 예외·위임 후 중복 금지·결과 릴레이·SendMessage 재사용·하이브리드 스카우팅·규모 스케일링. 전부 Agent·Workflow 도구 설명에 문장 단위로 존재한다. `/cc` 고유분(Leader 의 결과 재서술 의무, fan-out 전 인라인 정찰)만 남겼다.
+- **"침묵은 성공이 아니다" 프롬프트 삭제** — 네이티브 `Monitor` 도구 설명의 `Coverage — silence is not success` 절이 자문 문장까지 동일하게 강제한다.
+- **워커 "작업 규율" 8줄 → Leader 향 보고 계약 2줄.** 정직 보고·완료 판정·되돌리기 확인은 시스템 프롬프트가 강제한다. 남긴 둘은 하네스가 알 수 없는 것 — "당신의 최종 메시지는 Leader 만 읽는다"(파이프라인 구조)와 "멈추면 병렬 전체가 블로킹된다"(비용 구조).
+- **Karpathy 4규칙 전문 복붙 12곳 → 1곳.** `~/.claude/CLAUDE.md` 가 매 세션 자동 로드되므로 스킬 본문 복제는 순수 중복이었다. 유일하게 남긴 사본은 `/cc` **워커 dispatch 프롬프트** — 서브에이전트는 사용자 전역 지침을 읽지 않는다.
+- **`harness-rules.md` 전면 개정** — §2 인벤토리에 `[네이티브]`/`[Lens]` 표시 도입, §C·§D 를 "네이티브 위치 색인"으로 전환, **§4.5**(Karpathy Rule 1 ↔ 하네스 되묻기 정책 충돌 심사) · **§4.6**(Monitor 폐지 근거) · **§5**(걷어낸 것 전량 추적표) 신설.
+- **§1 additive-only 예외 3개 → 2개.** 폐지한 예외 3("자주 위반되는 규칙의 3중 반복")은 판정 기준이 없어 어떤 규칙이든 3번 복붙할 명분으로 쓰이던 만능 우회로였다. 남은 예외 1(워커 디스패치)도 **전제가 실측된 적 없음**을 명시했다 — "서브에이전트에서 하네스 준수가 약해진다"는 근거가 저장소 어디에도 없다.
+- **`capability-assumptions.json`** — `native-work-discipline`·`native-code-review` 행 신설(13행), `acted_v3.29` 필드 도입, `last_full_audit` 2026-06-05 → 2026-08-07. **`native-todowrite-background` 행은 2026-06-06 에 이미 "Monitor 에이전트는 순수 오버헤드"로 판정해 두었으나 조치가 v3.29 까지 밀려 있었다** — 판정과 코드 사이의 지연이 이 레지스트리의 최대 실패 모드임을 행에 기록했다.
+- **`/cc` Phase 1.3** 스킬 매칭 SoT 를 Lens 훅 주입 표 → 호스트 시스템 프롬프트의 스킬 목록으로 변경.
+- **`scripts/bump-version.sh`** 12파일 → 9파일. 삭제된 `skills/c`·`skills/ccp` 제거, 그리고 **v3.25 에 삭제된 `skills/cpp/` 가 검증 목록에만 유령으로 남아 있던 것** 정리.
+- 문서 동기화: `CLAUDE.md`(스킬표·훅표·lib표·폴더구조·설정표) · `README.md` · `docs/START_HERE.md` · `docs/rules/release-guide.md`(13→11파일) · `documentation-guide.md` · `publishing-guide.md`.
+
+### Fixed (v3.29.0)
+
+- **슬래시 명령 OVERRIDE 가 v3.13 이후 한 번도 실행되지 않았다.** `scripts/user-prompt-handler.js` 는 `autoRecommend === false` 일 때 **1번째 분기에서 즉시 반환**했는데, 그 아래에 사용자가 `/cp` 라고 쳤을 때 되묻지 않고 즉시 Skill 도구를 호출하게 하는 OVERRIDE 가 있었다. `autoRecommend` 는 v3.13 부터 기본 `false`. 핸들러를 OVERRIDE 전용으로 재작성하며 복구했고 `/cp deep …`·`/cc`·일반 문장 3케이스로 실측 확인했다.
+
+
+## [3.28.0] - 2026-08-05
+
+`/cs` 가 "워크스페이스 전체"라고 말하면서 실제로는 일부만 돌고 있었다. 세 구멍을 막는다.
+
+근거: v3.27.0 검증 중 Mac Mini 를 훑다가 드러났다. 셋 다 **도구가 조용히 덜 하고 있던** 종류다 —
+에러가 아니라 침묵이라 눈치채기 어려웠다.
+
+### Fixed (v3.28.0)
+
+- **스캔 루트가 홈 직하 repo 를 통째로 놓쳤다.** 루트 후보가 `Documents/Git`·`projects`·`git` 뿐이라
+  홈 바로 밑에 둔 repo 는 어느 루트에도 안 걸렸다. 실측: Mac Mini 의 `livevil-setting`·`livevil-research`·
+  `namane-mkt`·`creeta-homepage` 4개가 여기 해당해 **36개 중 32개만 동기화**되고 있었다. 하필 그중
+  `livevil-setting` 이 **Claude 파일 메모리가 사는 repo** 라, `/cs` 만 쳐서는 메모리가 영원히 안 올라갔다.
+  → `$HOME` 을 루트에 추가. 수집 루프가 `.git` 있는 1레벨만 담고 device:inode 로 dedup 하므로
+  기존 루트와 겹쳐도 중복되지 않는다.
+- **없어진 원격을 매번 "실패"로 쌓았다.** GitHub 에서 삭제·이름변경된 repo 는 `Repository not found` 로
+  fetch 가 죽는데 이것이 진짜 실패와 같은 칸에 들어갔다. 실측: Mac Mini 36개 중 **13개**가 이 상태여서
+  정작 봐야 할 diverged 1건이 노이즈에 묻혔고, 매 실행마다 13번을 헛되이 재시도했다.
+  → `⚠️ 원격 없음` 으로 분리 보고 + 해당 repo 는 이후 단계 건너뜀. `--json` 에 `missing_remote` 추가.
+
+### Changed (v3.28.0)
+
+- **SessionStart 자동 pull 에 최소 간격 가드.** 이 훅은 대화형 세션만이 아니라 **헤드리스 `claude -p`
+  에도 붙는다** — 실측으로 호출 1회에 `sessionCount` 가 +1 되고 Mac Mini 누적이 **20,027회**였다.
+  자동화가 도는 서버에서 켜면 파이프라인 실행마다 repo 수십 개를 fetch 하게 되어 사실상 켤 수 없는
+  기능이었다. 세션 종류를 환경 스니핑으로 추측하는 대신(하네스 버전에 쉽게 깨진다) **마지막 pull 이후
+  경과 시간**으로 자른다 — 대화형에서 창을 여러 개 열 때의 중복 fetch 도 함께 사라진다.
+  기본 30분, `LENS_SYNC_PULL_INTERVAL_MIN` 으로 조정(`0` 이면 가드 해제). 스탬프는
+  `~/.claude/lens/.last-auto-pull`.
+  ⚠️ 무인 서버는 여전히 스케줄러가 답이다 — 대화형 세션이 없으면 이 훅은 트리거 자체가 안 걸린다.
+- v3.25 시절 주석("병합은 사람이 한다") 잔재를 v3.27 현행(같은 실행에서 병합)으로 정정.
+
+## [3.27.0] - 2026-08-05
+
+`/cs` 가 다시 "동기화 도구"가 된다 — PR 은 기록이지 통과해야 하는 게이트가 아니다.
+
+근거: v3.25.0 이 도입한 PR-only 흐름이 **1순위 목적(전 레포 GitHub 동기화)을 막고 있었다.** 병합 전까지 변경은
+로컬 워킹트리에도, 다른 머신에도 없다 — 실측으로 라이브 메모리가 두 번 사라졌고(2026-08-02 17개 · 2026-08-04),
+7월부터 PR 3건이 열린 채 방치돼 Mac Mini 가 **26커밋 뒤처졌다.**
+
+원인은 목적의 전도였다. v3.25.0 계획 당시 **사용자 선택은 "PR + 자동 머지"**(= PR 을 기록으로 쓰기)였는데,
+Codex 협의에서 *"auto-merge 가 즉시 실행되면 PR 은 검토 단계가 아니라 기록용 포장"* 이라는 반박이 채택돼
+자동 머지가 비목표로 잘려나갔다. 그러나 **"기록용 포장"은 결함이 아니라 이 도구가 원한 것 그 자체였다** —
+`/cs` 는 코드 리뷰 도구가 아니라 여러 머신을 맞추는 동기화 도구다.
+
+### Changed (v3.27.0)
+
+- **`/cs` PR-only → PR-and-merge.** PR 을 만든 뒤 같은 실행 안에서 `gh pr merge --merge --delete-branch` 로
+  병합한다. 병합이 거부되면(브랜치 보호·필수 체크·충돌) PR 을 열어둔 채 `미병합` 으로 보고한다 — 기존 동작.
+- **되감기 해소.** 커밋은 sync 브랜치에 있으므로 `checkout <base>` 만으로 변경이 워킹트리에서 빠진다.
+  되감기의 원인은 `reset --hard` 가 아니라 **base 가 커밋을 못 받는 것**이었다. 병합 후 `fetch` 를 거쳐
+  base 를 원격 기준으로 맞추면 방금 올린 변경이 로컬에 그대로 남는다.
+- SKILL.md 의 "Merging is left to a human" 조항 폐기. 대신 실패 시 사람이 마무리하는 경로를 명시.
+
+### Added (v3.27.0)
+
+- **`LENS_SYNC_AUTO_MERGE=0`** — PR 을 검토 게이트로 쓰고 싶을 때 한 번만 열어두는 탈출구.
+  기존 `LENS_SYNC_PR=0`(PR 자체를 건너뛰고 base 직push)은 그대로 유지.
+
+## [3.26.0] - 2026-07-30
+
+`/cu` 고도화 — 아는 도구 3개 확인기에서 이 머신의 업데이트 관제로. 무확인 자동 실행 + 3단 위험도.
+계획: `docs/tasks/2026-07-30-cu-multi-source-autoupdate.md`.
+
+근거: 실측으로 `/cu` 가 **업데이트 대기 25건 중 0건을 보고**하고 있었다 — winget 설치 143개 중 19개, npm 글로벌 8개 중 6개가 낡은 채였고 VS Code 확장 40여 개는 존재조차 목록에 없었다. 못 찾은 게 아니라 **찾지 않았다**: `cu.py` 가 도구 이름을 손으로 적어둔 함수 3개(claude·codex·gh)를 부르는 구조라 목록에 없는 도구는 영원히 안 보였다. 여기에 플러그인 버전 표시 **오탐 2건**(agentmemory·insane-search — 최신인데 "업데이트 있음")까지 겹쳐 표 전체가 신뢰를 잃은 상태였다.
+
+### Breaking (v3.26.0)
+
+- **`/cu` 가 더 이상 묻지 않는다.** 매 실행마다 뜨던 `AskUserQuestion` multi-select 게이트를 제거하고, `auto` 등급 항목을 **확인 없이 즉시 실행**한다. 업데이트가 있다는 걸 알고 `/cu` 를 친 사용자에게 다시 목록을 띄워 클릭을 요구하는 것은 절차만 늘리는 일이었다. 보기만 하려면 `/cu scan`.
+- **3모드**: `/cu`(auto 전량) / `/cu all`(auto+hold) / `/cu scan`(스캔만).
+- **`cli:codex`·`cli:gh` 전용 스캐너 제거** — codex 는 `npm-global` 이, gh 는 `winget` 이 자동으로 잡는다. `cli-special` 에 남는 것은 `cli:claude`(전용 `claude update` 경로)와 `plugin:lens@CreetaCorp`(`/lens-upgrade` 위임) 2개뿐.
+- **스캔 출력이 배열 → 객체**: `{"items": [...], "source_errors": [...]}`. 항목에 `source`·`risk`·`hold_reason` 추가.
+
+### Added (v3.26.0)
+
+- **소스 단위 스캐너 7종** — winget / npm-global / vscode-ext / claude-plugin / cli-special / pip-global / brew(macOS). 패키지 매니저가 자기 목록을 열거하므로 **새 도구를 깔면 코드 수정 없이 목록에 들어온다**. 없는 소스는 조용히 빠진다(per-machine 원칙 유지).
+- **3단 위험도** — `auto`(무확인 실행) / `hold`(`/cu all` 로만) / `never`(`/cu all` 로도 안 됨). `never` 는 데이터 디렉터리 보유 SW(PostgreSQL·MySQL·MongoDB·Redis)·드라이버·winget 자신·pip 글로벌. **`/cu all` 오타 한 번으로 DB 마이그레이션이 일어나면 되돌릴 수 없다** — 그래서 `all` 아래 층을 뒀다(Pre-mortem P1).
+- **`never` 를 실행 경계에서 코드로 강제** — `never_reason()` + `cmd_upgrade` 진입부 게이트. `cu.sh upgrade winget:PostgreSQL.PostgreSQL.18` 을 직접 호출해도 실행 없이 exit 3 으로 거부한다. 분류기와 같은 정책 상수를 쓰는지 검사하는 단정까지 둬서 두 정책이 갈라지면 테스트가 잡는다.
+- **사전 스냅샷** — `scan --snapshot` 이 `~/.claude/lens/cu-last-scan.json` 에 실행 전 상태를 남긴다. 무확인 실행에서 "무엇이 어떤 버전에서 갔는지"를 사후에 재구성할 유일한 근거. 쓰기 실패는 경고가 아니라 **실패(exit 1)** — 감사 기록 없이 업그레이드가 진행되면 안 된다.
+- **승격 필요 항목 일괄 명령** — 비승격 셸에서는 위험해서가 아니라 *권한 때문에* 막히는 항목이 다수다(이 머신 실측 6건). winget 은 `--id` 중복을 거부하므로(exit 2) PowerShell `foreach` 루프 한 줄로 제시한다.
+- **테스트 68개** (`scripts/cu.test.py`, 신규) — 레포 관행(`lib/install-sync.test.js`)대로 의존성 없는 단독 실행. fixture 는 **실제 출력 캡처만** 사용한다(손으로 쓰면 컬럼 폭이 실물과 어긋나 "테스트는 통과하는데 파서는 깨지는" 최악의 조합이 된다).
+
+### Fixed (v3.26.0)
+
+- **플러그인 버전 오탐 2건** — 대부분의 마켓플레이스 manifest 에 `version` 필드가 없어 fallback 으로 저장소 HEAD SHA 를 "최신"으로 잡고, 이를 설치된 semver 와 비교했다. **성질이 다른 두 값이라 항상 불일치 = 무조건 "업데이트 있음"**. 해석 순서에 **마켓 클론의 `<source>/.claude-plugin/plugin.json`** 을 추가하고(핵심 수정), `compare_versions` 한 곳에 **형태 불일치 → `None`** 가드를 뒀다. agentmemory `0.9.28→0.9.28 False`, insane-search `0.13.0→0.13.0 False`.
+- **"버전 모름" 플러그인 2건** — 레지스트리 `version` 이 `'unknown'` 이면 `gitCommitSha` 로 대체. context7·playwright 가 SHA 대 SHA 비교로 정상 판정된다.
+- **winget 실패가 소스를 조용히 삭제** — `if rc != 0 and not out:` 이라 winget 이 비정상 종료하면서 stdout 에 진단문을 쓰면 성공으로 통과하고, 파싱할 표가 없어 결과가 빈 목록이 됐다 → 사용자에게는 "winget 최신". 판정 기준을 "stdout 유무"에서 **"행을 실제로 파싱했는가"** 로 교체.
+- **winget "올릴 것 없음"을 실패로 오분류** — winget 은 정상 상태에서도 0 이 아닌 코드로 끝낸다. **HRESULT 함정**: Python `subprocess` 는 32비트 원값(`0x8A15002B`=2316632107)을 받지만 셸은 하위 1바이트(43)만 보여준다 — 셸에서 잰 값을 상수로 쓰면 Python 경로에서 하나도 안 맞는다. 양쪽 표현을 모두 인정하고, winget 원시 코드를 **종료코드 규약(0/1/2/3)으로 사상**해 해석 불가한 값(43·59·2316632107)이 새어 나가지 않게 했다.
+- **소스 일시 장애로 그날 갱신이 통째로 날아감** — msstore REST API 오류(`0x8A15003B`)로 winget 5건이 전부 실패했고, 같은 명령 재시도로 통과했다. 재시도 1회 추가.
+- **비영어 로케일에서 0건이 조용히 나옴** — 헤더/요약줄 탐지가 영어 컬럼명 전용. 헤더 미발견을 `source_errors` 로 승격.
+- **CJK 패키지명 파싱** — winget 은 표시 폭으로 컬럼을 정렬하므로 한글 이름 행은 문자 인덱스가 어긋난다. 이 머신 출력에 실제로 한글 패키지명이 있어(`AVC 인코더 비디오 확장`) 실캡처로 표시폭 보정을 검증했다.
+- **`upgrade_targets` fail-open** — `mode != "default"` 였으므로 오타·빈 문자열 등 미지의 값이 전부 `hold`(런타임·시스템 구성요소)를 해제했다. 화이트리스트로 반전 — 판단 불가는 보수적으로.
+- **최신 항목까지 매번 재설치** — 스캔은 최신 여부와 무관하게 설치된 플러그인·CLI 를 전부 내보내므로, `risk` 만 보고 실행하면 무관한 항목 하나가 낡을 때 최신 플러그인 6건 + `cli:claude` 가 no-op 재설치됐다. `needs_update is False` 제외(단 `aggregate` 항목은 예외 — VS Code 일괄 갱신은 최신 조회 수단이 없어 항상 `null` 이지만 실행이 의도된 동작).
+- **`/cu scan` 이 실제로 업그레이드를 실행** — 절차가 3모드 공용인데 scan 에서 멈추는 분기가 없었다.
+- **소스 실패 시 "모두 최신"으로 종료** — 소스가 타임아웃했는데 나머지가 최신이면 `source_errors` 보고 전에 끝났다. 진실의 정반대를 보고하는 경로.
+- **사후 재스캔이 사전 스냅샷을 파괴** — 매 스캔이 같은 경로에 썼으므로, 필수 재스캔이 비교 대상 자체를 덮어썼다. `--snapshot` 명시 플래그로 분리.
+- **`/cu all` UAC 무한 대기** — `--disable-interactivity` 는 winget 내부 프롬프트만 막고 OS 의 권한 상승 대화상자는 못 막는다. 600초 상한 추가(R2 잔여 경로).
+- **드라이버가 `auto` 로 흐름** — `driver` 가 토큰 정확 일치라 `Intel.WirelessDriver`(토큰 `wirelessdriver`)를 놓쳤다. 접미사 일치로 변경. 단 `redis` ⊂ `vcredist` 오매칭 때문에 나머지 NEVER 키워드는 토큰 일치 유지.
+- **README 계약 불일치** — 공개 문서가 여전히 multi-select 를 약속하고 있었다. 3모드·3단 위험도·파괴적 변경 고지로 갱신.
+- **stderr 한글 mojibake** — `sys.stdout` 만 UTF-8 재설정하고 stderr 는 빠져 있었다.
+
 ## [3.25.0] - 2026-07-20
 
 계획 엔진 개편 — 기획서 품질 게이트 · 모델 배분 통제 · /cs PR 전환 · /cpp 정리.

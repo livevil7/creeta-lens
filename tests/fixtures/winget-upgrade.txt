@@ -1,0 +1,22 @@
+Name                                                               Id                              Version              Available            Source
+---------------------------------------------------------------------------------------------------------------------------------------------------
+App Installer                                                      Microsoft.AppInstaller          1.29.279.0           1.29.280.0           winget
+AWS Command Line Interface v2                                      Amazon.AWSCLI                   2.35.20.0            2.36.11              winget
+Futuremark SystemInfo                                              Futuremark.FuturemarkSystemInfo 5.91.1460.0          5.92.1497            winget
+Git                                                                Git.Git                         2.54.0               2.55.0.3             winget
+Microsoft Edge                                                     Microsoft.Edge                  150.0.4078.83        150.0.4078.105       winget
+Microsoft Teams                                                    Microsoft.Teams                 26106.1911.4707.3286 26183.1903.4892.4448 winget
+Microsoft Visual C++ 2015-2022 Redistributable (x64) - 14.44.35211 Microsoft.VCRedist.2015+.x64    14.44.35211.0        14.51.36247.0        winget
+Microsoft Visual C++ 2015-2022 Redistributable (x86) - 14.44.35211 Microsoft.VCRedist.2015+.x86    14.44.35211.0        14.51.36247.0        winget
+Node.js                                                            OpenJS.NodeJS.LTS               24.15.0              24.18.0              winget
+Notion 7.23.0                                                      Notion.Notion                   7.23.0               7.27.0               winget
+Orca                                                               StablyAI.Orca                   1.4.149              1.4.161              winget
+PostgreSQL 18                                                      PostgreSQL.PostgreSQL.18        18.4-1               18.4-2               winget
+Python 3.13.13 (64-bit)                                            Python.Python.3.13              3.13.13              3.13.14              winget
+QMK Toolbox 0.2.2                                                  QMK.QMKToolbox                  0.2.2                0.3.3                winget
+restic                                                             restic.restic                   0.18.1               0.19.1               winget
+RipGrep MSVC                                                       BurntSushi.ripgrep.MSVC         15.1.0               15.2.0               winget
+Tailscale                                                          Tailscale.Tailscale             1.98.4               1.98.10              winget
+Telegram Desktop                                                   Telegram.TelegramDesktop        7.0.5                7.0.6                winget
+WeChat                                                             Tencent.WeChat.Universal        4.1.11.23            4.1.12.26            winget
+19 upgrades available.

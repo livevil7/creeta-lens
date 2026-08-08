@@ -33,7 +33,7 @@ plugin.json의 "version" 필드 = 프로젝트의 공식 버전
 | `.claude-plugin/plugin.json` | `"version"` 필드 | **원천** |
 | `hooks/hooks.json` | `"description"` 문자열 | 참조 |
 | `hooks/session-start.js` | `systemMessage` 문자열 | 참조 |
-| `skills/c/SKILL.md` | frontmatter `description` | 참조 |
+| `skills/cc/SKILL.md` | frontmatter `description` | 참조 |
 | `skills/cc/SKILL.md` | frontmatter `description` | 참조 |
 | `skills/cp/SKILL.md` | frontmatter `description` | 참조 |
 | `lens.config.json` | `"version"` 필드 | 참조 |
@@ -284,7 +284,7 @@ export되는 함수에만 JSDoc 작성:
 [ ] 1. plugin.json "version" 업데이트
 [ ] 2. hooks.json "description" 버전 문자열 업데이트
 [ ] 3. session-start.js systemMessage 버전 문자열 업데이트
-[ ] 4. skills/c/SKILL.md description 버전 문자열 업데이트
+[ ] 4. skills/cc/SKILL.md description 버전 문자열 업데이트
 [ ] 5. skills/cc/SKILL.md description 버전 문자열 업데이트 (해당 시)
 [ ] 6. skills/cp/SKILL.md description 버전 문자열 업데이트 (해당 시)
 [ ] 7. lens.config.json "version" 업데이트

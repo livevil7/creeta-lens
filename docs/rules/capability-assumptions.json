@@ -2,17 +2,16 @@
   "schema_version": 1,
   "description": "Lens 기능이 가정하는 네이티브 공백 레지스트리. /crv 가 이 가정을 라이브 probe/web 으로 대조해 노후도(KEEP/THIN/OBSOLETE)를 판정한다. SoT=실제 SKILL.md/훅/lib. 행=네이티브 능력 단위(닫히면 affects_lens 의 Lens 기능이 THIN/OBSOLETE).",
   "method": "signal_method: probe=로컬 환경/CLI 점검(권장·무네트워크), web=공식 체인지로그, both. false_obsolete_risk=이 가정을 죽은 것으로 오판할 위험.",
-  "last_full_audit": "2026-06-05",
-  "audit_report": "docs/history/2026-06-05-lens-modernization-audit.md",
+  "last_full_audit": "2026-08-07",
+  "audit_report": "docs/history/2026-08-07-harness-thinning-audit.md",
   "capabilities": [
     {
       "id": "native-subagent-model-routing",
       "kind": "native-capability",
       "affects_lens": [
-        "skills/c/SKILL.md",
         "skills/cc/SKILL.md"
       ],
-      "purpose": "/c·/cc의 worker dispatch + 난이도 사다리 모델 배정(경량=haiku/중간=sonnet/최상위=TOP, v3.24+)을 네이티브 Task model enum + model: frontmatter + CLAUDE_CODE_SUBAGENT_MODEL이 대체",
+      "purpose": "/cc의 worker dispatch + 난이도 사다리 모델 배정(경량=haiku/중간=sonnet/최상위=TOP, v3.24+)을 네이티브 Task model enum + model: frontmatter + CLAUDE_CODE_SUBAGENT_MODEL이 대체",
       "assumed_native_gap": "네이티브가 작업별 모델 티어로 서브에이전트를 dispatch하지 못함",
       "gap_closed_signal": "claude agents --help / --agents JSON에 model 필드, Task tool model enum 존재 — 이미 닫힘(v2.1.x GA). 추가로 enum이 non-Anthropic까지 열리면 codex 통합 KEEP 근거 약화",
       "signal_method": "probe",
@@ -20,8 +19,8 @@
       "official_sources": [
         "https://code.claude.com/docs/en/release-notes"
       ],
-      "false_obsolete_risk": "Task model enum은 [sonnet,opus,haiku,fable](2026-07 확인)로 계속 자라며 순위 메타데이터가 없다 — 스킬의 '현재 fable' 예시 표기가 enum 최상위와 어긋나면 /crv가 개정 제안(v3.24 TOP 규칙). cross-vendor(codex) dispatch는 여전히 비네이티브 — /c·/cc 모델배정만 대체, codex 통합은 무관",
-      "last_reviewed": "2026-07-15"
+      "false_obsolete_risk": "Task model enum은 [sonnet,opus,haiku,fable](2026-08 확인)로 계속 자라며 순위 메타데이터가 없다 — 스킬의 '현재 fable' 예시 표기가 enum 최상위와 어긋나면 /crv가 개정 제안(v3.24 TOP 규칙). cross-vendor(codex) dispatch는 여전히 비네이티브 — /cc 모델배정만 대체, codex 통합은 무관. 네이티브에 예산/상한 정책은 없으므로 TOP 상한은 KEEP",
+      "last_reviewed": "2026-08-07"
     },
     {
       "id": "native-dynamic-workflows",
@@ -29,26 +28,26 @@
       "affects_lens": [
         "skills/cc/SKILL.md"
       ],
-      "purpose": "/cc 병렬 멀티에이전트 팬아웃+adversarial verify를 Dynamic Workflows(16동시/1000, agent()/parallel()/pipeline())가 코드-결정론으로 대체",
+      "purpose": "/cc 병렬 멀티에이전트 팬아웃+adversarial verify를 Dynamic Workflows(16동시/1000, agent()/parallel()/pipeline())가 코드-결정론으로 대체. 또한 Workflow 도구 설명이 오케스트레이션 규율(harness-rules §C)과 QA 패턴(§D)을 문장 단위로 보유",
       "assumed_native_gap": "네이티브가 병렬 서브에이전트 오케스트레이션+교차검증을 못 함",
       "gap_closed_signal": "v2.1.154+ 세션에서 'workflow'/ultracode 트리거 동작 + Max/Team on-by-default. 비-Max 박스에서도 가용해지면 /cc prose 팬아웃 잔여가치 추가 약화",
       "signal_method": "both",
-      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron/Monitor) 존재 여부 · Workflow 도구 설명에 pipeline/barrier·Adversarial verify·Completeness critic 문구 존재 여부",
       "official_sources": [
         "https://code.claude.com/docs/en/release-notes"
       ],
-      "false_obsolete_risk": "research-preview + plan-tier 게이트(Max/Team) — 비-Max/미트리거 세션에선 /cc prose 팬아웃이 유일 작동 경로. 모든 워커가 Anthropic이라 codex 이종검증은 미대체",
-      "last_reviewed": "2026-06-06"
+      "false_obsolete_risk": "research-preview + plan-tier 게이트(Max/Team) — 비-Max/미트리거 세션에선 /cc prose 팬아웃이 유일 작동 경로라 /cc 자체는 KEEP. 모든 워커가 Anthropic이라 codex 이종검증은 미대체",
+      "acted_v3.29": "규율 텍스트만 걷어냄 — /cc Phase 3.0 오케스트레이션 6항목 삭제, /ccp(QA 패턴 소비 스킬) 폐지. /cc 팬아웃 엔진 자체는 존치(게이트 리스크)",
+      "last_reviewed": "2026-08-07"
     },
     {
       "id": "native-goal-enforcement",
       "kind": "native-capability",
       "affects_lens": [
         "skills/cp/SKILL.md",
-        "skills/cc/SKILL.md",
-        "skills/c/SKILL.md"
+        "skills/cc/SKILL.md"
       ],
-      "purpose": "/c Supervisor+QA, /cc done차단 루프, /cp 목표강제를 네이티브 /goal(매 턴 Haiku 평가자 재판정, v2.1.139+)이 harness 레벨로 대체",
+      "purpose": "/cc Supervisor+QA·done차단 루프, /cp 목표강제를 네이티브 /goal(매 턴 Haiku 평가자 재판정, v2.1.139+)이 harness 레벨로 대체",
       "assumed_native_gap": "네이티브가 '빌더와 심판 분리, 완료조건 미달 시 계속 작업'을 못 함",
       "gap_closed_signal": "v2.1.139+ 세션에서 /goal 명령 + 매 턴 평가자 achieved 로그 동작 — 이미 닫힘. /goal이 transcript-only를 넘어 도구 검증까지 하면 /cc Phase6 QA 잔여가치도 약화",
       "signal_method": "probe",
@@ -80,20 +79,20 @@
       "id": "native-todowrite-background",
       "kind": "native-capability",
       "affects_lens": [
-        "skills/c/SKILL.md",
         "skills/cc/SKILL.md",
         "hooks/post-tool-task.js"
       ],
-      "purpose": "/c·/cc Monitor 폴링(5분 /loop)+진행추적을 네이티브 TodoWrite + background tasks(run_in_background, exit시 재호출)+TaskStop이 대체",
+      "purpose": "/cc Monitor 폴링(5분)+진행추적을 네이티브 TodoWrite + background tasks(완료 시 자동 재호출) + TaskOutput/TaskStop + Monitor 도구가 대체",
       "assumed_native_gap": "네이티브가 detached 실행 추적 + 세션 내 진행 렌더를 못 함",
-      "gap_closed_signal": "세션 도구표에 TodoWrite/TaskStop 존재 + Bash run_in_background 노출 — 이미 닫힘. Monitor 에이전트는 순수 오버헤드",
+      "gap_closed_signal": "세션 도구표에 TodoWrite/TaskStop/TaskOutput/Monitor 존재 + Agent 가 background 기본 + 완료 시 자동 재호출 + ScheduleWakeup 설명이 폴링을 명시적으로 금지 — 완전히 닫힘",
       "signal_method": "probe",
-      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "probe_hint": "세션 도구표에 Monitor/TaskOutput/ScheduleWakeup 존재 여부 · ScheduleWakeup 설명의 'polling is wasted' 문구 · Monitor 설명의 'silence is not success' 절",
       "official_sources": [
         "https://code.claude.com/docs/en/release-notes"
       ],
-      "false_obsolete_risk": "낮음 — Monitor 폴링은 결정론적 대체 가능. 단 background는 Bash 도구 프리미티브라 SessionStart 훅 런타임은 못 씀(hooks-dashboard 주의)",
-      "last_reviewed": "2026-06-06"
+      "false_obsolete_risk": "없음 — 2026-08-07 라이브 확인. 단 background는 Bash 도구 프리미티브라 SessionStart 훅 런타임은 못 씀(hooks-dashboard 주의). 진행보고 *의무* 자체는 사용자 룰이라 폐지 대상 아님 — 수행 주체만 본체로 이동",
+      "acted_v3.29": "완료 — 전담 Monitor 에이전트 폐지(harness-rules §4.6). 이 행은 2026-06-06에 이미 '순수 오버헤드'로 판정했으나 조치가 v3.29까지 밀려 있었다. 레지스트리 판정과 코드 사이의 지연이 최대 실패 모드임을 기록",
+      "last_reviewed": "2026-08-07"
     },
     {
       "id": "native-plugin-enumeration",
@@ -119,20 +118,19 @@
       "kind": "native-capability",
       "affects_lens": [
         "scripts/user-prompt-handler.js",
-        "lib/keyword-matcher.js",
-        "lib/plugin-registry.js",
-        "skills/crv/SKILL.md"
+        "hooks/session-start.js"
       ],
-      "purpose": "hooks-discovery 키워드 자동제안 + /c 추천을 네이티브 Skills auto-discovery(의미기반 self-invoke) + Skill tool + /slash가 대체",
+      "purpose": "hooks-discovery 키워드 자동제안 + 스킬 인벤토리 주입 + Suggestion Line 을 네이티브 Skills auto-discovery(의미기반 self-invoke) + Skill tool + 시스템프롬프트 스킬 목록이 대체",
       "assumed_native_gap": "네이티브가 요청에 맞는 스킬을 자동 발화/추천 못 함",
-      "gap_closed_signal": "세션 시스템프롬프트가 'invoke the relevant Skill tool' 강제 + Skill tool 정의 — 결과(맞는 스킬 발화)는 닫힘. 공식문서 'no algorithmic skill selection at code level'이 바뀌어 결정론 랭킹을 네이티브가 주면 추천기 완전 무력화",
+      "gap_closed_signal": "세션 시스템프롬프트가 'invoke the relevant Skill tool' 강제 + Skill tool 정의 + 전체 스킬 목록을 설명과 함께 직접 제공 — 닫힘. 공식문서 'no algorithmic skill selection at code level'이 바뀌어 결정론 랭킹을 네이티브가 주면 OVERRIDE 도 무력화",
       "signal_method": "both",
-      "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
+      "probe_hint": "시스템프롬프트에 'The following skills are available for use with the Skill tool' 목록 존재 여부 · Skill tool 정의 존재 여부",
       "official_sources": [
         "https://code.claude.com/docs/en/release-notes"
       ],
-      "false_obsolete_risk": "결정론적 ranked 추천 UX는 비네이티브이나 Lens 구현이 hollow(triggers:[], score=length) — 실질 우위 미미. /command nag-차단 OVERRIDE는 비네이티브 잔존",
-      "last_reviewed": "2026-06-06"
+      "false_obsolete_risk": "/command nag-차단 OVERRIDE 는 비네이티브 잔존 — 사용자가 /cp 라고 쳤을 때 되묻지 않고 즉시 Skill 도구를 때리게 하는 강제는 호스트가 주지 않는다. 이것만 남기고 나머지는 제거",
+      "acted_v3.29": "완료 — SessionStart 스킬표·Suggestion Line·Auto-Recommendation 섹션 제거(세션당 약 2K 토큰), lib/keyword-matcher.js·lib/plugin-registry.js·.lens-cache.json 삭제(고아화). 부수 발견: autoRecommend:false 조기 반환이 슬래시 OVERRIDE 까지 죽이고 있어 그 경로가 v3.13 이후 무동작이었다 — 핸들러를 OVERRIDE 전용으로 재작성하며 복구",
+      "last_reviewed": "2026-08-07"
     },
     {
       "id": "native-multirepo-git",
@@ -170,6 +168,43 @@
       ],
       "false_obsolete_risk": "멀티스코프 dedup·stash·자동롤백·origin교정(설치 origin=CreetaCorp vs 스크립트=livevil7 불일치)은 비네이티브 — 버전올리기만 위임 가능",
       "last_reviewed": "2026-06-06"
+    },
+    {
+      "id": "native-work-discipline",
+      "kind": "native-capability",
+      "affects_lens": [
+        "skills/cc/SKILL.md",
+        "docs/rules/harness-rules.md"
+      ],
+      "purpose": "워커 디스패치 프롬프트의 '작업 규율' 블록(정직 보고·완료 마킹 엄격·상태변경 전 증거·끝까지 실행)을 호스트 시스템 프롬프트가 직접 강제",
+      "assumed_native_gap": "하네스가 정직 보고·완료 판정·스코프 충실을 강제하지 못함",
+      "gap_closed_signal": "시스템 프롬프트에 'Report outcomes faithfully: if tests fail, say so with the output' · 'report completion only when fully done' · 'Before deleting or overwriting, look at the target' · 'Finish the whole task, not just easy parts' 존재 — 2026-08-07 라이브 확인, 닫힘",
+      "signal_method": "probe",
+      "probe_hint": "세션 시스템 프롬프트의 'Delivering work' 절 존재 여부 및 위 4문구",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "⚠️ 서브에이전트가 같은 시스템 프롬프트를 받는지는 확인되지 않았다 — harness-rules §1 예외 1의 전제('서브에이전트에서 준수가 약해진다')도 실측 근거가 없다. 양쪽 다 미확인이므로 워커 프롬프트에는 하네스가 알 수 없는 것(파이프라인 구조·비용)만 남기고, 규율 재복붙은 실측 전까지 되살리지 않는다",
+      "acted_v3.29": "워커 '작업 규율' 8줄 → Leader 향 보고 계약 2줄로 축약. Karpathy 4규칙 전문은 워커 프롬프트 1곳에만 존치(사용자 전역 지침이라 서브에이전트가 못 읽음)",
+      "last_reviewed": "2026-08-07"
+    },
+    {
+      "id": "native-code-review",
+      "kind": "native-capability",
+      "affects_lens": [
+        "skills/cc/SKILL.md"
+      ],
+      "purpose": "/ccp(Power Verify)의 적대적 다중검증·완결성 비평·수복 루프를 네이티브 /code-review + claude ultrareview(클라우드 멀티에이전트) + /security-review + /simplify 가 대체",
+      "assumed_native_gap": "네이티브가 코드리뷰를 멀티에이전트·적대적으로 못 함",
+      "gap_closed_signal": "`claude ultrareview --help` 가 최상위 커맨드로 존재('cloud-hosted multi-agent code review of the current branch (or a PR number / base branch)') + /code-review·/security-review·/simplify 스킬 노출 — 2026-08-07 실측 확인",
+      "signal_method": "probe",
+      "probe_hint": "claude ultrareview --help (EXIT 0?) · 세션 스킬 목록에 code-review/security-review/simplify 존재 여부",
+      "official_sources": [
+        "https://code.claude.com/docs/en/release-notes"
+      ],
+      "false_obsolete_risk": "네이티브 리뷰는 '코드 diff 판정'이지 '실제 실행으로 작동 증명(Playwright/curl)'이 아니다. 그 축은 /cc Phase 6 QA 가 계속 수행하므로 /ccp 폐지로 잃은 것은 중복분뿐. 실행 증명이 /cc QA 에서도 빠지면 이 판정을 재검토할 것",
+      "acted_v3.29": "/ccp 스킬 폐지(skills/ccp/ 삭제). /cc '다른 Skills와의 관계' 절에 네이티브 리뷰 경로 안내 추가",
+      "last_reviewed": "2026-08-07"
     },
     {
       "id": "codex-native-review-structured",

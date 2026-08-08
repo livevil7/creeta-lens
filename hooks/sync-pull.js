@@ -34,6 +34,39 @@ if (optIn !== "1" && optIn !== "true") {
   process.exit(0);
 }
 
+// ── 최소 간격 가드 (v3.28.0) ────────────────────────────────────────────────
+// SessionStart 는 대화형 세션만이 아니라 **헤드리스 `claude -p` 에도 붙는다**
+// (실측: Mac Mini 는 호출 1회에 sessionCount +1, 누적 20,027회). 자동화가 도는
+// 서버에서 이 훅을 켜면 파이프라인 실행마다 repo 수십 개를 fetch 하게 되어
+// 사실상 켤 수 없는 기능이 된다. 세션 종류를 추측하는 대신(환경 스니핑은
+// 하네스 버전에 쉽게 깨진다) **마지막 pull 이후 경과 시간**으로 자른다 —
+// 대화형에서 창을 여러 개 열 때의 중복 fetch 도 같이 사라진다.
+const intervalMin = Number(process.env.LENS_SYNC_PULL_INTERVAL_MIN ?? 30);
+const stampPath = path.join(os.homedir(), ".claude", "lens", ".last-auto-pull");
+if (Number.isFinite(intervalMin) && intervalMin > 0) {
+  try {
+    const last = fs.statSync(stampPath).mtimeMs;
+    const elapsedMin = (Date.now() - last) / 60000;
+    if (elapsedMin < intervalMin) {
+      log(
+        `skipped — ${Math.round(elapsedMin)}m since last auto-pull (min ${intervalMin}m; ` +
+        `LENS_SYNC_PULL_INTERVAL_MIN=0 to disable the guard, /cs pull is unaffected)`
+      );
+      process.exit(0);
+    }
+  } catch {
+    // 스탬프가 없으면 첫 실행 — 그대로 진행한다.
+  }
+  try {
+    fs.mkdirSync(path.dirname(stampPath), { recursive: true });
+    fs.writeFileSync(stampPath, new Date().toISOString());
+  } catch (err) {
+    // 스탬프를 못 남겨도 pull 자체는 막지 않는다 (fail-soft). 다만 그 경우
+    // 간격 제한이 무력해지므로 눈에 보이게 남긴다.
+    log(`interval stamp write failed (${err.message}) — guard inactive this run`);
+  }
+}
+
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, "..");
 const script = path.join(pluginRoot, "scripts", "git-sync-all.sh");
 

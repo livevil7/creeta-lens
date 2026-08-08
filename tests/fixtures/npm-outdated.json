@@ -1,0 +1,44 @@
+{
+  "@railway/cli": {
+    "current": "4.65.0",
+    "wanted": "5.30.1",
+    "latest": "5.30.1",
+    "dependent": "global",
+    "location": "C:\\Users\\user\\AppData\\Roaming\\npm\\node_modules\\@railway\\cli"
+  },
+  "@shopify/cli": {
+    "current": "3.94.3",
+    "wanted": "4.5.2",
+    "latest": "4.5.2",
+    "dependent": "global",
+    "location": "C:\\Users\\user\\AppData\\Roaming\\npm\\node_modules\\@shopify\\cli"
+  },
+  "mcporter": {
+    "current": "0.12.2",
+    "wanted": "0.12.3",
+    "latest": "0.12.3",
+    "dependent": "global",
+    "location": "C:\\Users\\user\\AppData\\Roaming\\npm\\node_modules\\mcporter"
+  },
+  "pyright": {
+    "current": "1.1.409",
+    "wanted": "1.1.411",
+    "latest": "1.1.411",
+    "dependent": "global",
+    "location": "C:\\Users\\user\\AppData\\Roaming\\npm\\node_modules\\pyright"
+  },
+  "undici": {
+    "current": "8.5.0",
+    "wanted": "8.9.0",
+    "latest": "8.9.0",
+    "dependent": "global",
+    "location": "C:\\Users\\user\\AppData\\Roaming\\npm\\node_modules\\undici"
+  },
+  "wrangler": {
+    "current": "4.93.0",
+    "wanted": "4.115.0",
+    "latest": "4.115.0",
+    "dependent": "global",
+    "location": "C:\\Users\\user\\AppData\\Roaming\\npm\\node_modules\\wrangler"
+  }
+}

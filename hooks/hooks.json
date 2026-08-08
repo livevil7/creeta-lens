@@ -1,5 +1,5 @@
 {
-  "description": "Lens v3.25.0 by Creeta - Task Execution Engine + Documentation Management + Multi-Repo Sync for Claude Code",
+  "description": "Lens v3.29.0 by Creeta - Task Execution Engine + Documentation Management + Multi-Repo Sync for Claude Code",
   "hooks": {
     "SessionStart": [
       {

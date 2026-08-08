@@ -40,6 +40,11 @@ else
     "$HOME/projects"
     "$HOME/Projects"
     "$HOME/git"
+    # 홈 바로 밑에 둔 repo 도 잡는다 (v3.28.0). 실측: Mac Mini 는 livevil-setting·
+    # livevil-research·namane-mkt·creeta-homepage 4개가 홈 직하라 스캔에서 통째로
+    # 빠져 있었다 — 그중 livevil-setting 은 Claude 파일 메모리가 사는 repo 다.
+    # 수집 루프가 .git 있는 1레벨만 담고 device:inode 로 dedup 하므로 겹쳐도 안전.
+    "$HOME"
     "$HOME/.claude/plugins/marketplaces"
   )
 fi
@@ -74,6 +79,7 @@ REPOS=("${_dedup[@]}")
 total=${#REPOS[@]}
 success=0
 failed=()
+missing_remote=()   # 원격이 사라진 repo — 고장이 아니라 상태 (v3.28.0)
 pulled=()
 pushed=()
 unchanged=()
@@ -107,12 +113,20 @@ for repo in "${REPOS[@]}"; do
 
   did_pull=false
   did_push=false
+  merged=false
   repo_err=""
 
   # ── PULL 단계 ─────────────────────────
   if [ "$ACTION" = "pull" ] || [ "$ACTION" = "sync" ]; then
-    # fetch
-    if ! git -C "$repo" fetch --quiet 2>&1 | head -5; then
+    # fetch — 원격이 사라진 repo 를 "실패" 와 분리한다 (v3.28.0).
+    # GitHub 에서 지워진 옛 repo 를 매번 실패로 쌓으면 진짜 문제가 노이즈에 묻히고
+    # 재시도 비용도 계속 든다. 실측: Mac Mini 36개 중 13개가 이 상태였다.
+    fetch_out=$(git -C "$repo" fetch --quiet 2>&1 | head -5); fetch_rc=$?
+    if [ "$fetch_rc" != "0" ]; then
+      if printf '%s' "$fetch_out" | grep -qiE 'repository not found|does not exist|could not read from remote repository'; then
+        missing_remote+=("$name")
+        continue
+      fi
       repo_err="fetch failed"
     else
       behind=$(git -C "$repo" rev-list --count HEAD..@{u} 2>/dev/null || echo "0")
@@ -150,8 +164,9 @@ for repo in "${REPOS[@]}"; do
       *)
         # ── PR-only 푸시 (v3.25) ──────────────────────────────────
         # 기본 브랜치로 직접 push 하지 않는다. 변경은 임시 브랜치로 옮겨
-        # PR 로 제안한다. 병합은 사람이 한다 (auto-merge 는 이번 범위 밖 —
-        # 즉시 자동 병합은 PR 을 검토 게이트가 아니라 기록용 포장으로 만든다).
+        # PR 로 제안하고 **같은 실행에서 병합한다** (v3.27). PR 은 "무엇을
+        # 올렸는지"의 기록이지 통과 게이트가 아니다 — 병합하지 않으면 base 가
+        # 커밋을 못 받아 로컬이 되감기고 다른 머신도 못 받는다(= 동기화 실패).
         #
         # 순서가 핵심: **커밋 전에** 브랜치를 만든다. 기본 브랜치에 먼저
         # 커밋하고 그 브랜치를 push 한 뒤 PR 을 만들면 비교할 변경이 남지
@@ -217,7 +232,27 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$branch" 2>/de
                       || repo_err="PR 생성 실패 (gh 인증/권한 확인)"
                   fi
                   if [ -z "$repo_err" ]; then
-                    pushed+=("$name (PR: $branch → $base_branch, 미병합)")
+                    # PR 은 "무엇을 올렸는지"의 기록이지 통과 게이트가 아니다 —
+                    # /cs 의 1순위 목적은 전 레포를 GitHub 에 동기화하는 것이다.
+                    # 병합하지 않으면 base 가 커밋을 못 받아 아래 checkout 에서
+                    # 로컬이 되감기고, 다른 머신도 변경을 못 받는다(= 동기화 실패).
+                    # 검토 게이트로 쓰려면 LENS_SYNC_AUTO_MERGE=0.
+                    if [ "${LENS_SYNC_AUTO_MERGE:-1}" != "0" ]; then
+                      if [ -z "$pr" ] || [ "$pr" = "null" ]; then
+                        pr=$( (cd "$repo" && gh pr list --head "$branch" --state open \
+                                 --json number --jq '.[0].number' 2>/dev/null) || true )
+                      fi
+                      if [ -n "$pr" ] && [ "$pr" != "null" ]; then
+                        if (cd "$repo" && gh pr merge "$pr" --merge --delete-branch >/dev/null 2>&1); then
+                          merged=true
+                        fi
+                      fi
+                    fi
+                    if $merged; then
+                      pushed+=("$name (PR #$pr → $base_branch, 병합됨)")
+                    else
+                      pushed+=("$name (PR: $branch → $base_branch, 미병합)")
+                    fi
                     did_push=true
                   fi
                 else
@@ -234,6 +269,11 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$branch" 2>/de
               # push 실패 시엔 되돌리지 않는다 (아직 원격에 없으므로).
               git -C "$repo" checkout -q "$base_branch" 2>/dev/null || true
               if [ -z "$repo_err" ]; then
+                if $merged; then
+                  # 병합됐으면 base 를 원격에서 당겨온다 — 방금 올린 변경이
+                  # 로컬 워킹트리에 그대로 남는다(되감기 없음).
+                  git -C "$repo" fetch -q "$upstream_remote" 2>/dev/null || true
+                fi
                 git -C "$repo" reset -q --hard "$upstream_remote/$base_branch" 2>/dev/null || true
               fi
             fi
@@ -273,6 +313,12 @@ if [ ${#pushed[@]} -gt 0 ]; then
     log "      \"동기화 완료\"가 아닙니다. gh pr list 로 확인 후 병합하세요."
   fi
 fi
+if [ ${#missing_remote[@]} -gt 0 ]; then
+  log ""
+  log "⚠️ 원격 없음 (${#missing_remote[@]}) — GitHub 에 저장소가 없습니다. 고장이 아니라 상태입니다:"
+  log "   $(printf '%s ' ${missing_remote[@]+"${missing_remote[@]}"})"
+  log "   로컬 전용 아카이브이거나 원격이 삭제·이름변경된 repo 입니다."
+fi
 if [ ${#failed[@]} -gt 0 ]; then
   log ""
   log "❌ 실패 (${#failed[@]}):"
@@ -304,8 +350,8 @@ if [ "$JSON_MODE" = 1 ]; then
   for x in ${failed[@]+"${failed[@]}"}; do
     case "$x" in *diverged*) diverged+=("$x") ;; *) real_failed+=("$x") ;; esac
   done
-  printf '{"action":"%s","total":%s,"success":%s,"pulled":%s,"pushed":%s,"unchanged":%s,"diverged":%s,"failed":%s}\n' \
+  printf '{"action":"%s","total":%s,"success":%s,"pulled":%s,"pushed":%s,"unchanged":%s,"diverged":%s,"missing_remote":%s,"failed":%s}\n' \
     "$ACTION" "$total" "$success" \
     "$(_json_arr ${pulled[@]+"${pulled[@]}"})" "$(_json_arr ${pushed[@]+"${pushed[@]}"})" \
-    "$(_json_arr ${unchanged[@]+"${unchanged[@]}"})" "$(_json_arr ${diverged[@]+"${diverged[@]}"})" "$(_json_arr ${real_failed[@]+"${real_failed[@]}"})"
+    "$(_json_arr ${unchanged[@]+"${unchanged[@]}"})" "$(_json_arr ${diverged[@]+"${diverged[@]}"})" \n    "$(_json_arr ${missing_remote[@]+"${missing_remote[@]}"})" "$(_json_arr ${real_failed[@]+"${real_failed[@]}"})"
 fi
