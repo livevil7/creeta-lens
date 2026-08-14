@@ -9,6 +9,7 @@
   "buildBoard": true,
   "autoCommitOnComplete": true,
   "baseBranch": { "Returns_ERP_v20": "staging", "namane-cms": "master" },
+  "syncPolicy": { "Returns_ERP_v20": "pr-manual" },
   "protectedBranches": { "namane-cms": ["main"] },
   "requireTaskBranch": false,
   "autoDeleteMergedBranch": true,
