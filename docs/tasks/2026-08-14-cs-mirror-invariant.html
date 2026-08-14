@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>/cs 미러 개편 · 계획</title>
+<meta name="lens:source" content="docs/tasks/2026-08-14-cs-mirror-invariant.md">
+<meta name="lens:source-hash" content="5657032dac3c">
+<meta name="lens:builder" content="lens-cp-html">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../_shared.css">
+</head>
+<body>
+
+<div class="rail"><div id="rail"></div></div>
+<div class="crumb"><span id="crumb-now">01</span> / <b id="crumb-total">8</b></div>
+
+<main class="deck">
+
+<section class="slide" id="cover">
+  <div class="page-no">01 / 8 · COVER</div>
+  <div class="meta">
+    <span>2026-08-14</span><span class="dot">·</span><span class="badge task">Task</span><span class="dot">·</span>
+    <span>grade: deep</span><span class="dot">·</span><span>creeta-lens · feat/cs-mirror-invariant → master</span>
+  </div>
+  <h1 class="h-title">/cs 미러 개편 — "런이 끝나면 클라우드가 곧 최신"을 불변식으로</h1>
+  <p class="lede">
+    /cs의 존재 이유는 <strong>미러</strong>다 — "병합을 하던 뭘 하던 모르겠고, 클라우드에 올려놓고 다른 컴에서 그대로 받는 것"(대표, 2026-08-14).
+    현행 설계는 PR 의식을 거치며 실패 지점마다 잔여물을 남기고, <strong>그 잔여물을 어떤 런도 회수하지 않는다.</strong>
+  </p>
+  <div class="hero">
+    <div class="num">6<span class="unit">개 열린 auto/agent PR · 13~28일 방치 (실측)</span></div>
+    <div class="caption">+ 병합 끝난 브랜치 14개(금일 수동 정리) + <strong>머지 실패 시 reset --hard 유실 기전이 현행 코드에 잔존</strong> + 미병합이 "성공 32/32"에 은닉.</div>
+  </div>
+  <div class="footer-meta"><span>creeta-lens / docs / tasks</span><span>2026-08-14-cs-mirror-invariant</span></div>
+</section>
+
+<section class="slide" id="why">
+  <div class="page-no">02 / 8 · WHY</div>
+  <h2 class="title">왜 삐걱대나 — 구조 진단</h2>
+  <p class="sub">Claude 3축 조사(코드·사고이력·파급) + Codex 독립 협의 — 진단 수렴.</p>
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi"><div class="l">근본 비대칭</div><div class="v warn">생성 자동 · 회수 수동</div><div class="desc">런마다 새 sync/타임스탬프 브랜치. 과거 PR·브랜치를 재조회하는 코드 경로 <strong>0</strong>. 중복 PR 검사는 cross-run에서 죽은 코드.</div></div>
+    <div class="kpi"><div class="l">유실 기전 잔존</div><div class="v warn">reset --hard</div><div class="desc">gh pr merge 실패에 else가 없어 repo_err 미설정 → 미병합인데도 로컬을 원격 base로 되감음. 2026-08-02 메모리 17개 소실과 동일 기전.</div></div>
+    <div class="kpi"><div class="l">성공의 거짓말</div><div class="v warn">미병합=pushed</div><div class="desc">병합 거부돼도 ✅ 성공으로 집계. --json은 stray 백슬래시-n으로 무효 JSON 출력(실측).</div></div>
+    <div class="kpi"><div class="l">전제의 철회</div><div class="v">PR 보장 ≠ 요구</div><div class="desc">v3.25 "PR 보장"은 사용자 원선택(PR+자동머지)을 Codex 반박이 뒤집은 것(v3.27 자인). 이번 발언으로 최종 철회 — 남은 목적은 미러뿐.</div></div>
+  </div>
+</section>
+
+<section class="slide" id="goal">
+  <div class="page-no">03 / 8 · GOAL</div>
+  <h2 class="title">목표 — 사람 언어</h2>
+  <ul class="list">
+    <li><strong>어느 컴퓨터에서든 /cs 한 번</strong>이면 작업 전부가 GitHub에 있고, 다른 컴퓨터는 받기만 하면 된다.</li>
+    <li>/cs가 만든 찌꺼기(열린 자동 PR·병합 끝난 브랜치)는 <strong>다음 런이 알아서 치운다.</strong></li>
+    <li>"성공"은 진짜 깨끗함을 뜻한다 — 올라가다 만 작업이 성공으로 집계되지 않는다.</li>
+  </ul>
+  <p class="sub" style="margin-top:18px"><strong>Done =</strong> 아무 레포나 지저분하게 만들고 /cs 한 번 → 다른 컴퓨터 pull만으로 그 작업이 보이고, GitHub에 열린 자동 PR·병합 잔여 브랜치가 없다.</p>
+  <p class="sub"><strong>비목표:</strong> prune 흡수(자기 sync/ 잔여물만 회수) · task/agent 브랜치 자동 머지(내용 미상 — 보고까지만) · /cp done·/cc 라이프사이클 변경.</p>
+</section>
+
+<section class="slide" id="plan">
+  <div class="page-no">04 / 8 · PLAN A</div>
+  <h2 class="title">Plan A — 3층 구조</h2>
+  <div class="kpi-grid" style="margin-top:24px">
+    <div class="kpi"><div class="l">L1 미러 기본</div><div class="v ok">직push 전환</div><div class="desc">LENS_SYNC_PR 기본 반전(한 글자). 실패 시 로컬에 커밋 잔존 → 다음 런 재시도(자기치유). sync/ 브랜치·머지·reset 자체가 사라짐. gh 무의존.</div></div>
+    <div class="kpi"><div class="l">L2 회수(reconcile)</div><div class="v ok">자기 잔여물</div><div class="desc">매 런: 열린 sync/ PR 머지+삭제, 병합증명 sync/ 브랜치 atomic 이중 lease 삭제. 미증명은 절대 보존.</div></div>
+    <div class="kpi"><div class="l">L3 불변식 보고</div><div class="v ok">성공 재정의</div><div class="desc">✅ = local==origin/base ∧ dirty 0 ∧ 열린 sync PR 0. 비-base 작업은 나이와 함께 노출(7일↑ 경고). --json 버그 수정.</div></div>
+    <div class="kpi"><div class="l">예외 게이트</div><div class="v warn">ERP=배포</div><div class="desc">Returns_ERP_v20은 syncPolicy=pr-manual — PR 생성까지만, 머지는 사람. config+upstream 이름 이중 방어. /cs가 처음으로 lens.config.json을 읽는다.</div></div>
+  </div>
+</section>
+
+<section class="slide" id="tasks">
+  <div class="page-no">05 / 8 · TASKS</div>
+  <h2 class="title">빌드레디 태스크 T1~T9</h2>
+  <ul class="list">
+    <li><strong>T1</strong> 미러 기본 전환 + 직push 강화(workflows 스코프 감지 이식)</li>
+    <li><strong>T2</strong> config 인식(baseBranch 대조 가드 · syncPolicy) — ERP 이중 방어</li>
+    <li><strong>T3</strong> task 브랜치 가드를 prose→스크립트로(10접두사 skip+보고)</li>
+    <li><strong>T4</strong> reconcile 신설 — sync/ PR 회수 + 증명 브랜치 lease 삭제</li>
+    <li><strong>T5</strong> 성공 재정의 · 머지실패=failed · reset을 merged에 종속 · --json 수정</li>
+    <li><strong>T6</strong> 비-base 작업 나이 보고(방치 에스컬레이션 — 5개 카운트 경고 대체)</li>
+    <li><strong>T7</strong> 시나리오 테스트 6종 신설(현재 0개 — bare 원격 fixture + gh 스텁)</li>
+    <li><strong>T8</strong> 문서·버전(v3.31.0 breaking, branch-lifecycle §3.2·§8 개정 + 결정 이력 병기)</li>
+    <li><strong>T9</strong> 양 머신 배포(해시 대조) + 부채 일소(PR 6·브랜치 4 — ERP·agent는 보고 후 대표 결정)</li>
+  </ul>
+</section>
+
+<section class="slide" id="safety">
+  <div class="page-no">06 / 8 · SAFETY</div>
+  <h2 class="title">지키는 안전장치 · 리스크</h2>
+  <ul class="list">
+    <li>base 문자 추정 금지(config→upstream→origin/HEAD) · ERP staging 게이트 · atomic 이중 lease · 미머지 CLOSED sync/ 브랜치 자동삭제 금지 — <strong>branch-lifecycle 조항 전부 유지</strong></li>
+    <li>force 계열 push 금지 — 미러는 ff 전제, 원격이 앞서면 거부→보고(멀티머신 경합 안전)</li>
+    <li>R1 ERP 오배포: config 부재 시에도 upstream 이름 하드가드 — 테스트 고정, 위반 1건이면 배포 중단</li>
+    <li>R2 미증명 삭제: 증명 실패=보존 기본값 — 모의에서 1건이라도 나오면 T4 롤백</li>
+    <li>R3 유실 기전: "머지 실패→로컬 보존" 시나리오를 테스트로 영구 고정</li>
+  </ul>
+</section>
+
+<section class="slide" id="verify">
+  <div class="page-no">07 / 8 · REVIEW</div>
+  <h2 class="title">검증 — EARS 7행</h2>
+  <ul class="list">
+    <li>① dirty→직push·sync/ 생성 0 &nbsp; ② 실패→로컬 커밋 보존(reset 금지) &nbsp; ③ 열린 sync PR→회수 또는 사유</li>
+    <li>④ ERP→직push 0·PR까지만 &nbsp; ⑤ task/agent 브랜치→건너뜀 &nbsp; ⑥ --json 마지막 줄 유효 JSON</li>
+    <li>⑦ 실워크스페이스 1회 → 레포별 불변식 ✅/사유 + 열린 sync PR 전수 0 (대표 확인)</li>
+    <li>수단: tests/test_git_sync.sh(신규, auto 6) + 32레포 실측 1회(manual 1)</li>
+  </ul>
+</section>
+
+<section class="slide" id="next">
+  <div class="page-no">08 / 8 · NEXT</div>
+  <h2 class="title">대안 검토 · 다음</h2>
+  <ul class="list">
+    <li><strong>기각 A</strong> PR-and-merge 유지+회수만 — 잔여물 생성 구조 존속, 철회된 전제에 종속</li>
+    <li><strong>기각 B</strong> 전면 직push — ERP 배포 사고 경로</li>
+    <li><strong>채택 C</strong> 미러 기본 + pr-manual 예외 + 회수 + 불변식</li>
+    <li><strong>Plan B</strong>(트리거: 셸 파싱 취약·gh 스텁 괴리 2회): "No Node" 원칙 개정, lib/git-branch.js 직접 사용</li>
+    <li>승인 → T1~T3 착수 → T7 테스트 → T8 문서 → T9 배포 + 부채 일소</li>
+  </ul>
+  <div class="footer-meta"><span>Claude 3축 조사 + Codex 협의 합성</span><span>2026-08-14</span></div>
+</section>
+
+</main>
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+const rail=document.getElementById('rail');
+const now=document.getElementById('crumb-now');
+slides.forEach((el)=>{const d=document.createElement('div');d.className='rail-dot';d.onclick=()=>el.scrollIntoView({behavior:'smooth'});rail.appendChild(d);});
+const dots=[...rail.children];
+slides.forEach((el)=>{
+  new IntersectionObserver((es)=>{es.forEach((e)=>{
+    if(e.isIntersecting){const i=slides.indexOf(e.target);
+      now.textContent=String(i+1).padStart(2,'0');
+      dots.forEach((d,j)=>d.classList.toggle('on',j===i));}
+  });},{threshold:0.5}).observe(el);
+});
+</script>
+</body>
+</html>
