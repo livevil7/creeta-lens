@@ -214,6 +214,18 @@ T2에서 셸 파싱이 config 확장(중첩 키)에 깨지거나, T4/T7에서 gh
 
 ## 진행상황
 - **작업 브랜치**: feat/cs-mirror-invariant (레포 `creeta-lens`, 생성 2026-08-14 23:4x KST, 시작 SHA `a55b41e`)
-- **마지막 업데이트**: 2026-08-14
-- **현재 경로**: Plan A — 실행 중 (/cc, Execute 승인 2026-08-14)
-- **재개 포인트**: W1(T1~T6 스크립트) → W2(T7 테스트)·W3(T8 문서) → T9 배포+부채
+- **마지막 업데이트**: 2026-08-15
+- **현재 경로**: Plan A — T1~T8 완료·검증 통과, T9(배포+부채 일소) 진행
+- **Goal 달성**: 3/3 ✓ (QA verified=true, auto 전 항목 — EARS7 실워크스페이스 런만 manual 잔여)
+- **재개 포인트**: T9 — 릴리즈(머지·태그 v3.31.0) → 양 머신 업그레이드 → 실런 1회 → 부채 PR 대표 결정
+
+### 편차 기록 (계획 ↔ 실제)
+- 테스트 6시나리오 → **10계열 88단언**으로 확대 (Codex 리뷰 high 5·med 3 반영: PR base 자격·gh 실패 fail-closed·split remote·merge queue 상태 확인·회수 후 로컬 ff — 계획에 없던 안전 보강)
+- reconcile ②를 "gh 무의존 동작" → **gh 부재/조회실패 시 삭제 보류(fail-closed)**로 강화 (Supervisor·Codex 합치 지적)
+- branch-lifecycle 개정 범위가 §3.2·§8 외 §2 표·§7 키 색인까지 — 목적 정합적 초과(Supervisor 판정: 위반 아님)
+- bump-version.sh가 수동 선행 bump와 충돌 → plugin.json 되돌린 후 정식 경로 재실행으로 해소
+
+### 실행 지표
+- **추가 질문 수**: 0 (실행 중 사용자 되물음 없음)
+- **편차 건수**: 4 (전부 상기 기록)
+- **게이트**: 통과 (구조 valid·차단질문 0·Supervisor 93 PASS·Codex FAIL→수정 반영 재검증·QA verified=true)

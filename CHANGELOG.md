@@ -20,7 +20,7 @@ base 밖에 있는 커밋은 다른 머신에 **도달하지 않으므로**, 잔
 - **task 브랜치 가드가 스크립트로 들어왔다.** `feat/ fix/ ops/ docs/ agent/ claude/ codex/ task/ feature/ backup/` 체크아웃이면 commit·push·회수를 전부 건너뛰고 `⏸️ task 브랜치` 로 보고한다(ff pull 은 수행). 지금까지 이 가드는 SKILL.md 산문(에이전트 지시)에만 있어서 **스크립트를 직접 돌리거나 cron 에 걸면 사라졌다.**
 - **base 밖 원격 브랜치를 나이와 함께 보고.** 레포별로 base 가 아닌 원격 브랜치를 마지막 커밋 나이와 함께 나열하고 7일 초과는 `⚠️ N일째 base 밖` 을 붙인다. 기존 "원격 브랜치 5개 초과" 카운트 경고(에이전트가 `ls-remote` 로 수동 수행)를 대체한다 — 개수는 방치를 못 가리키지만 나이는 가리킨다. fetch 된 ref 만 읽으므로 네트워크 왕복이 늘지 않는다.
 - **`--json` 에 `reclaimed`·`task_branch`·`policy_hold` 추가** — additive 로만. 기존 키와 순서는 불변이다.
-- **시나리오 테스트 신설** (`tests/test_git_sync.sh`) — 이 영역의 테스트는 0개였다. 로컬 bare 원격 fixture + `gh` 스텁으로 6시나리오: 미러 push / task 브랜치 skip / `pr-manual` 정책 / reconcile 회수·미증명 보존 / 머지 실패 시 로컬 보존 / `--json` 유효성.
+- **시나리오 테스트 신설** (`tests/test_git_sync.sh`) — 이 영역의 테스트는 0개였다. 로컬 bare 원격 fixture + `gh` 스텁으로 10계열 88단언: 미러 push / task 브랜치 skip / `pr-manual` 정책 / reconcile 회수·미증명 보존 / 머지 실패 시 로컬 보존 / `--json` 유효성 + 리뷰 보강분(gh 조회실패 fail-closed / split remote / PR base 자격 / merge queue). 변이 테스트로 각 단언의 회귀 탐지력을 실증.
 
 ### Fixed (v3.31.0)
 
