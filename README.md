@@ -1,4 +1,4 @@
-# Lens v3.30.0
+# Lens v3.31.0
 
 **Never wonder which plugin to use again.**
 
@@ -225,7 +225,7 @@ Every run writes a pre-upgrade snapshot to `~/.claude/lens/cu-last-scan.json` an
 | | `/cc` | `/cp` | `/cs` |
 |---|---|---|---|
 | Goal | Build it now, in parallel | Plan before executing | Sync every repo |
-| Output | Synthesized multi-agent output | Work plan document + execution | Pulled/pushed repos + PR record |
+| Output | Synthesized multi-agent output | Work plan document + execution | Mirrored repos + invariant report |
 | Speed | Slower (parallel agents) | Deliberate (plan → approve → execute) | Fast |
 | Use when | The work is clear and splits into independent pieces | You want to review before running | Switching machines |
 

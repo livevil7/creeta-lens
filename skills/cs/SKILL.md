@@ -300,4 +300,5 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 - Script: `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
 - Config: `lens.config.json` — `baseBranch`, `syncPolicy`
+- Tests: `tests/test_git_sync.sh` — 6 scenarios (mirror / task-branch skip / pr-manual / reconcile / loss-prevention / --json), local bare fixtures + gh stub, no network
 - Version: aligned with the Lens plugin version (currently 3.31.0)
