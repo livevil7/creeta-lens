@@ -185,45 +185,6 @@ for repo in "${REPOS[@]}"; do
     continue
   fi
 
-  # ── T6: 비-base 원격 브랜치 수집 (사람 리포트 전용) ──
-  # base 에 없는 작업은 다른 머신에 도달하지 않는다 — 나이와 함께 노출한다.
-  # fetch 된 refs 만 본다(네트워크 왕복 없음). base 추정: config → upstream
-  # (task/sync 브랜치 체크아웃이면 upstream 은 base 가 아니므로 origin/HEAD).
-  _t6_base=$(_cfg_get baseBranch "$name")
-  if [ -z "$_t6_base" ]; then
-    _t6_base="${upstream#*/}"
-    case "$_t6_base" in
-      feat/*|fix/*|ops/*|docs/*|agent/*|claude/*|codex/*|task/*|feature/*|backup/*|sync/*)
-        _t6_base=$(git -C "$repo" symbolic-ref -q "refs/remotes/${upstream%%/*}/HEAD" 2>/dev/null | sed 's#.*/##')
-        ;;
-    esac
-  fi
-  if [ -n "$_t6_base" ]; then
-    # 패턴은 glob 이 아니라 prefix — for-each-ref 의 `*` 는 슬래시를 넘지
-    # 않아 sync/x 같은 중첩 이름을 놓친다 (실측). prefix 는 하위 전부 매칭.
-    _t6_list=$(git -C "$repo" for-each-ref \
-      --format='%(refname:short) %(committerdate:unix)' \
-      "refs/remotes/${upstream%%/*}" 2>/dev/null || true)
-    _now_ts=$(date +%s)
-    if [ -n "$_t6_list" ]; then
-      while read -r _rn _ct; do
-        [ -n "$_rn" ] || continue
-        case "$_rn" in */*) ;; *) continue ;; esac   # origin/HEAD 의 short "origin" 제외
-        _short=${_rn#*/}
-        [ "$_short" = "$_t6_base" ] && continue
-        [ "$_short" = "HEAD" ] && continue
-        _days=$(( (_now_ts - ${_ct:-$_now_ts}) / 86400 ))
-        if [ "$_days" -gt 7 ]; then
-          nonbase+=("$name: $_short — ⚠️ ${_days}일째 base 밖")
-        else
-          nonbase+=("$name: $_short (${_days}일)")
-        fi
-      done <<EOF
-$_t6_list
-EOF
-    fi
-  fi
-
   # ── PUSH 단계 ─────────────────────────
   if [ "$ACTION" = "push" ] || [ "$ACTION" = "sync" ]; then
     # marketplace repos는 PULL-ONLY (push 건너뜀)
@@ -271,32 +232,54 @@ EOF
             #    — gh 가 기본 레포를 오인하면 남의 PR 이 "성공"으로 돌아온다).
             sync_pr_heads=""
             did_reclaim=0
-            if [ "$GH_OK" = 1 ]; then
-              gh_repo=$(git -C "$repo" remote get-url "$upstream_remote" 2>/dev/null \
-                | sed -n -e 's/\.git$//' -e 's#^git@github\.com:##p' -e 's#^https://github\.com/##p')
-              if [ -n "$gh_repo" ]; then
-                sync_pr_list=$(gh pr list --repo "$gh_repo" --state open \
-                  --json number,headRefName \
-                  --jq '.[] | select(.headRefName | startswith("sync/")) | "\(.number) \(.headRefName)"' \
-                  2>/dev/null </dev/null || true)
-                if [ -n "$sync_pr_list" ]; then
-                  while read -r _prn _prh; do
-                    [ -n "$_prn" ] || continue
-                    sync_pr_heads="$sync_pr_heads $_prh"
-                    if [ "$cfg_policy" = "pr-manual" ]; then
-                      hold_msg="${hold_msg:+$hold_msg; }sync PR #$_prn 대기 — 배포 게이트, 머지는 사람"
-                    elif [ "${LENS_SYNC_AUTO_MERGE:-1}" = "0" ]; then
-                      hold_msg="${hold_msg:+$hold_msg; }sync PR #$_prn 대기 — LENS_SYNC_AUTO_MERGE=0"
-                    elif gh pr merge "$_prn" --repo "$gh_repo" --merge --delete-branch >/dev/null 2>&1 </dev/null; then
+            # del_skip: ②(원격 sync/ 삭제)를 막는 fail-closed 사유. PR 유무를
+            # 모른 채 지우면 열린 PR 의 head 가 사라져 PR 이 닫힌다 (§7).
+            del_skip=""
+            gh_repo=$(git -C "$repo" remote get-url "$upstream_remote" 2>/dev/null \
+              | sed -n -e 's/\.git$//' -e 's#^git@github\.com:##p' -e 's#^https://github\.com/##p')
+            if [ -z "$gh_repo" ]; then
+              : # GitHub 레포가 아니다 — sync PR 이라는 개념이 없으므로 "미상" 도 아니다
+            elif [ "$GH_OK" = 0 ]; then
+              del_skip="gh 미설치 — PR 유무 미상"
+            else
+              # baseRefName 까지 받는다: **지금 체크아웃한 base 로 가는 PR 만**
+              # 회수 대상이다. base 가 다른 PR 을 자동머지하면 배포 게이트가
+              # 통째로 우회된다 (ERP 가 main 에 있을 때 staging 행 PR. §1.2)
+              sync_pr_list=$(gh pr list --repo "$gh_repo" --state open \
+                --json number,headRefName,baseRefName \
+                --jq '.[] | select(.headRefName | startswith("sync/")) | "\(.number) \(.headRefName) \(.baseRefName)"' \
+                2>/dev/null </dev/null); gh_list_rc=$?
+              if [ "$gh_list_rc" != 0 ]; then
+                # 조회 실패는 "PR 없음" 과 구분한다 — 상태 미상이면 지우지 않는다
+                del_skip="PR 상태 조회 불가(gh exit $gh_list_rc)"
+              elif [ -n "$sync_pr_list" ]; then
+                while read -r _prn _prh _prb; do
+                  [ -n "$_prn" ] || continue
+                  # 열린 PR 의 head 는 base 자격과 무관하게 ② 삭제 대상에서 제외
+                  sync_pr_heads="$sync_pr_heads $_prh"
+                  if [ "$_prb" != "$base_branch" ]; then
+                    hold_msg="${hold_msg:+$hold_msg; }sync PR #$_prn base 불일치(PR→${_prb:-미상}, 현재 $base_branch) — 수동 확인"
+                  elif [ "$cfg_policy" = "pr-manual" ]; then
+                    hold_msg="${hold_msg:+$hold_msg; }sync PR #$_prn 대기 — 배포 게이트, 머지는 사람"
+                  elif [ "${LENS_SYNC_AUTO_MERGE:-1}" = "0" ]; then
+                    hold_msg="${hold_msg:+$hold_msg; }sync PR #$_prn 대기 — LENS_SYNC_AUTO_MERGE=0"
+                  elif gh pr merge "$_prn" --repo "$gh_repo" --merge --delete-branch >/dev/null 2>&1 </dev/null; then
+                    # exit 0 ≠ 병합 완료 — merge queue 는 QUEUED 로도 0 을 낸다.
+                    # 실제 state 가 MERGED 일 때만 회수로 집계한다.
+                    _prstate=$(gh pr view "$_prn" --repo "$gh_repo" --json state \
+                      --jq .state 2>/dev/null </dev/null || true)
+                    if [ "$_prstate" = "MERGED" ]; then
                       reclaimed+=("$name PR #$_prn 병합·회수")
                       did_reclaim=1
                     else
-                      rec_fail="${rec_fail:+$rec_fail; }⚠️ sync PR #$_prn 회수 불가(충돌 등) — 수동 확인"
+                      hold_msg="${hold_msg:+$hold_msg; }sync PR #$_prn 병합 대기(state=${_prstate:-미상}) — 다음 런 재확인"
                     fi
-                  done <<EOF
+                  else
+                    rec_fail="${rec_fail:+$rec_fail; }⚠️ sync PR #$_prn 회수 불가(충돌 등) — 수동 확인"
+                  fi
+                done <<EOF
 $sync_pr_list
 EOF
-                fi
               fi
             fi
 
@@ -306,16 +289,42 @@ EOF
             #    진전됐으면 push 전체가 거부된다(재시도·force 금지).
             #    미증명·미머지는 절대 삭제하지 않는다 (§3.2 — CLOSED 미머지
             #    PR 의 브랜치 보존).
-            if [ "$ACTION" = "push" ] || [ "$did_reclaim" = 1 ]; then
-              # sync 액션은 PULL 단계가 방금 fetch 했다 — push 단독 실행과
-              # ①의 회수 직후만 tracking ref 를 갱신한다.
-              git -C "$repo" fetch -q "$upstream_remote" 2>/dev/null || true
+            # sync 액션은 PULL 단계가 방금 fetch 했다 — push 단독 실행·회수
+            # 직후, 그리고 **잔여 sync/* 가 남아 있을 때만** 다시 fetch 한다.
+            # --prune 이 핵심: 사람이 PR 을 머지하고 head 를 지웠는데 stale 한
+            # origin/sync/* 트래킹 ref 가 남아 있으면, ②의 lease 가 존재하지
+            # 않는 원격 ref 를 상대로 영구히 거부된다.
+            if [ "$ACTION" = "push" ] || [ "$did_reclaim" = 1 ] \
+               || [ -n "$(git -C "$repo" for-each-ref --count=1 --format='%(refname)' \
+                            "refs/remotes/$upstream_remote/sync/" 2>/dev/null)" ]; then
+              git -C "$repo" fetch --prune -q "$upstream_remote" 2>/dev/null || true
             fi
+
+            # 회수한 병합분을 로컬 base 로 당겨온다. 이게 없으면 sync 런이
+            # 자기가 방금 회수한 커밋 때문에 behind 로 끝나 불변식이 자가 실패한다.
+            # (실패해도 여기서 멈추지 않는다 — 불변식 판정이 잡아준다)
+            if [ "$did_reclaim" = 1 ] && [ "$branch" = "$base_branch" ] \
+               && [ -z "$(git -C "$repo" status --porcelain 2>/dev/null)" ]; then
+              git -C "$repo" merge --ff-only -q "@{u}" >/dev/null 2>&1 \
+                || rec_fail="${rec_fail:+$rec_fail; }회수 후 로컬 base ff 실패 — 원격과 갈라짐, 수동 확인"
+            fi
+
             base_sha=$(git -C "$repo" rev-parse -q --verify "refs/remotes/$upstream_remote/$base_branch" 2>/dev/null || echo "")
+            # split remote(fetch URL ≠ push URL)면 우리가 본 refs 와 지울 대상이
+            # 다른 서버일 수 있다 — 지우지 않는다 (§7 fail-closed).
+            if [ -z "$del_skip" ]; then
+              _u_fetch=$(git -C "$repo" remote get-url "$upstream_remote" 2>/dev/null)
+              _u_push=$(git -C "$repo" remote get-url --push "$upstream_remote" 2>/dev/null)
+              [ "$_u_fetch" = "$_u_push" ] || del_skip="split remote(fetch≠push URL)"
+            fi
             if [ -n "$base_sha" ]; then
               for _sbref in $(git -C "$repo" for-each-ref --format='%(refname)' "refs/remotes/$upstream_remote/sync/*" 2>/dev/null); do
                 _sbname=${_sbref#refs/remotes/$upstream_remote/}
                 case " $sync_pr_heads " in *" $_sbname "*) continue ;; esac
+                if [ -n "$del_skip" ]; then
+                  rec_fail="${rec_fail:+$rec_fail; }$_sbname 삭제 보류 — $del_skip"
+                  continue
+                fi
                 _sb_sha=$(git -C "$repo" rev-parse -q --verify "$_sbref" 2>/dev/null) || continue
                 # 병합 증명 2단 (§5): ① 조상 → ② patch 동등 (git cherry)
                 _proven=0
@@ -334,6 +343,29 @@ EOF
                   else
                     rec_fail="${rec_fail:+$rec_fail; }$_sbname 삭제 보류 — 원격 진전(lease 거부), 다음 런 재판정"
                   fi
+                fi
+              done
+
+              # ③ 로컬 잔여 sync/* — 이전 런이 중단되면 로컬에만 남는다. 원격과
+              #    같은 2단 증명(조상 → patch 동등)을 통과한 것만 지운다. 증명이
+              #    끝난 브랜치라 -D 를 쓴다. 미증명·체크아웃 중은 보존·보고.
+              for _lb in $(git -C "$repo" for-each-ref --format='%(refname:short)' refs/heads/sync/ 2>/dev/null); do
+                if [ "$_lb" = "$branch" ]; then
+                  hold_msg="${hold_msg:+$hold_msg; }로컬 $_lb 보존 — 체크아웃 중"
+                  continue
+                fi
+                _lb_sha=$(git -C "$repo" rev-parse -q --verify "refs/heads/$_lb" 2>/dev/null) || continue
+                _lproven=0
+                if git -C "$repo" merge-base --is-ancestor "$_lb_sha" "$base_sha" 2>/dev/null; then
+                  _lproven=1
+                elif _lcherry=$(git -C "$repo" cherry "$base_sha" "$_lb_sha" 2>/dev/null); then
+                  printf '%s\n' "$_lcherry" | grep -q '^+' || _lproven=1
+                fi
+                if [ "$_lproven" = 1 ]; then
+                  git -C "$repo" branch -D "$_lb" >/dev/null 2>&1 \
+                    && reclaimed+=("$name 로컬 $_lb 삭제(병합 증명)")
+                else
+                  hold_msg="${hold_msg:+$hold_msg; }로컬 $_lb 보존 — 병합 미증명"
                 fi
               done
             fi
@@ -412,6 +444,7 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$sync_branch" 
                         # 머지 여부: 기본은 같은 런에서 병합(잔여물 0). pr-manual
                         # 은 머지를 시도하지 않는다 — 배포 게이트, 머지는 사람.
                         do_merge=1
+                        merge_queued=0
                         [ "${LENS_SYNC_AUTO_MERGE:-1}" = "0" ] && do_merge=0
                         [ "$cfg_policy" = "pr-manual" ] && do_merge=0
                         if [ "$do_merge" = 1 ]; then
@@ -421,7 +454,15 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$sync_branch" 
                           fi
                           if [ -n "$pr" ] && [ "$pr" != "null" ]; then
                             if (cd "$repo" && gh pr merge "$pr" --merge --delete-branch >/dev/null 2>&1); then
-                              merged=true
+                              # exit 0 ≠ 병합 완료 — merge queue 는 QUEUED 로도 0 을
+                              # 낸다. state 가 MERGED 일 때만 "병합됨" 으로 집계한다.
+                              _prstate=$( (cd "$repo" && gh pr view "$pr" --json state \
+                                             --jq .state 2>/dev/null </dev/null) || true )
+                              if [ "$_prstate" = "MERGED" ]; then
+                                merged=true
+                              else
+                                merge_queued=1
+                              fi
                             else
                               # T5②: 병합 실패를 조용히 pushed 로 집계하지 않는다
                               repo_err="PR #$pr 병합 실패 — 수동 확인 필요 (변경은 sync 브랜치·원격 PR 에 보존)"
@@ -433,6 +474,8 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$sync_branch" 
                         if [ -z "$repo_err" ]; then
                           if $merged; then
                             pushed+=("$name (PR #$pr → $base_branch, 병합됨)")
+                          elif [ "$merge_queued" = 1 ]; then
+                            hold_msg="${hold_msg:+$hold_msg; }PR #$pr 병합 대기(state=${_prstate:-미상}) — 다음 런 재확인"
                           elif [ "$cfg_policy" = "pr-manual" ]; then
                             hold_msg="${hold_msg:+$hold_msg; }PR $sync_branch → $base_branch 생성 — 배포 게이트, 머지는 사람"
                           else
@@ -457,8 +500,10 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$sync_branch" 
                   git -C "$repo" checkout -q "$base_branch" 2>/dev/null || true
                   if [ -z "$repo_err" ] && $merged; then
                     # 병합됐으면 base 를 원격에서 당겨온다 — 방금 올린 변경이
-                    # 로컬 워킹트리에 그대로 남는다(되감기 없음).
-                    git -C "$repo" fetch -q "$upstream_remote" 2>/dev/null || true
+                    # 로컬 워킹트리에 그대로 남는다(되감기 없음). --prune 은 방금
+                    # --delete-branch 로 사라진 sync/ head 의 트래킹 ref 를 지운다
+                    # (아래 T6 목록에 "base 밖 브랜치" 로 남지 않게).
+                    git -C "$repo" fetch --prune -q "$upstream_remote" 2>/dev/null || true
                     git -C "$repo" reset -q --hard "$upstream_remote/$base_branch" 2>/dev/null || true
                   fi
                 fi
@@ -468,6 +513,47 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$sync_branch" 
         fi
         ;;
     esac
+  fi
+
+  # ── T6: 비-base 원격 브랜치 수집 (사람 리포트 전용) ──
+  # base 에 없는 작업은 다른 머신에 도달하지 않는다 — 나이와 함께 노출한다.
+  # 수집은 PUSH·회수 **뒤에** 한다 — 이번 런이 방금 회수·삭제한 브랜치가 목록에
+  # 남으면 "방치" 로 오인된다 (회수 fetch 의 --prune 이 트래킹 ref 를 정리한다).
+  # fetch 된 refs 만 본다(네트워크 왕복 없음). base 추정: config → upstream
+  # (task/sync 브랜치 체크아웃이면 upstream 은 base 가 아니므로 origin/HEAD).
+  _t6_base=$(_cfg_get baseBranch "$name")
+  if [ -z "$_t6_base" ]; then
+    _t6_base="${upstream#*/}"
+    case "$_t6_base" in
+      feat/*|fix/*|ops/*|docs/*|agent/*|claude/*|codex/*|task/*|feature/*|backup/*|sync/*)
+        _t6_base=$(git -C "$repo" symbolic-ref -q "refs/remotes/${upstream%%/*}/HEAD" 2>/dev/null | sed 's#.*/##')
+        ;;
+    esac
+  fi
+  if [ -n "$_t6_base" ]; then
+    # 패턴은 glob 이 아니라 prefix — for-each-ref 의 `*` 는 슬래시를 넘지
+    # 않아 sync/x 같은 중첩 이름을 놓친다 (실측). prefix 는 하위 전부 매칭.
+    _t6_list=$(git -C "$repo" for-each-ref \
+      --format='%(refname:short) %(committerdate:unix)' \
+      "refs/remotes/${upstream%%/*}" 2>/dev/null || true)
+    _now_ts=$(date +%s)
+    if [ -n "$_t6_list" ]; then
+      while read -r _rn _ct; do
+        [ -n "$_rn" ] || continue
+        case "$_rn" in */*) ;; *) continue ;; esac   # origin/HEAD 의 short "origin" 제외
+        _short=${_rn#*/}
+        [ "$_short" = "$_t6_base" ] && continue
+        [ "$_short" = "HEAD" ] && continue
+        _days=$(( (_now_ts - ${_ct:-$_now_ts}) / 86400 ))
+        if [ "$_days" -gt 7 ]; then
+          nonbase+=("$name: $_short — ⚠️ ${_days}일째 base 밖")
+        else
+          nonbase+=("$name: $_short (${_days}일)")
+        fi
+      done <<EOF
+$_t6_list
+EOF
+    fi
   fi
 
   if [ -n "$repo_err" ]; then
@@ -569,7 +655,9 @@ if [ ${#nonbase[@]} -gt 0 ]; then
 fi
 if [ "$GH_OK" = 0 ] && [ "$ACTION" != "pull" ]; then
   log ""
-  log "⚠️ gh 미설치 — 열린 sync PR 회수(T4①)를 건너뜀. 미러 push 는 정상 동작."
+  log "⚠️ gh 미설치 — 회수 ①(열린 sync PR 병합) ②(원격 sync/ 브랜치 삭제) 모두 건너뜀."
+  log "   PR 유무를 모르는 채로 지우면 열린 PR 의 head 가 사라지므로 지우지 않습니다(fail-closed)."
+  log "   미러 push 는 gh 무의존이라 정상 동작합니다."
 fi
 hr
 
