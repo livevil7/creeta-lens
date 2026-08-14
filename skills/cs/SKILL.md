@@ -1,13 +1,13 @@
 ---
 name: "cs"
-description: "Lens Sync — Multi-repo git synchronizer. Fetches all repos under the workspace and fast-forward pulls. Outgoing work is committed to a throwaway sync/ branch, opened as a PR for the record, and merged in the same run so every machine actually gets it; fail-closed if gh is unavailable. Run /cs to sync everything; /cs pull or /cs push for one direction."
+description: "Lens Sync — Multi-repo git synchronizer. Mirrors the workspace to GitHub: fast-forward pulls incoming work, commits outgoing work on the base branch and pushes it, and reclaims the sync/ branches and PRs earlier runs left behind. A run ends with the cloud holding exactly what this machine has. Run /cs to sync everything; /cs pull or /cs push for one direction."
 argument-hint: "[pull|push|sync] (default: sync)"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.30.0 — Multi-repo git synchronizer. Pulls fast-forward; outgoing work goes to a `sync/` branch, becomes a PR, and is merged in the same run. Fail-soft across repos, fail-closed on PR failure. | MIT |
+| cs | Lens Sync v3.31.0 — Multi-repo git synchronizer. Mirrors every repo to GitHub: ff-pull in, commit + direct push out, reclaim its own `sync/` residue, and report success as an invariant (local == origin/base, nothing dirty, no open sync PR). | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,13 +17,15 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.30.0**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.31.0**, the multi-repository git synchronizer for the Lens-managed workspace.
 
-`/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — most logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
+`/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — all of the logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
 ## Why `/cs` exists
 
 The user works across a family of git repos on multiple machines (Windows, macOS, Linux). Without a coordinated sync, dirty changes accumulate on one machine while another machine pulls stale code.
+
+**The purpose is the mirror.** In the owner's words (2026-08-14): *"병합을 하던 뭘 하던 그건 모르겠고, 깔끔하게 클라우드에 올려놓고 다른 컴에서 그대로 받아 작업"* — put it in the cloud cleanly, take it down on the next machine. When a run ends, the cloud is current. That is the whole product.
 
 `/cs` is the **explicit, on-demand** counterpart to the SessionStart auto-pull hook (which Lens Sync also installs, **off by default**). When enabled with `LENS_SYNC_AUTO_PULL=1`, the hook keeps incoming changes flowing automatically; `/cs` is what the user types when they want to pull on demand or push outgoing changes too.
 
@@ -31,83 +33,122 @@ The user works across a family of git repos on multiple machines (Windows, macOS
 
 For every git repo discovered under the workspace roots:
 
-1. `git fetch` (silent)
+1. `git fetch` (silent). A remote that no longer exists is a **state**, not a failure — reported separately and skipped.
 2. If `behind > 0` and `ahead == 0` → `git pull --ff-only`
-3. If `dirty` or `ahead > 0` → **PR-and-merge flow** (v3.27, see below) — never a direct push to the base branch
+3. List remote branches that are **not** the base branch, with their age (report only — see below)
+4. **Reclaim** this tool's own residue: open `sync/` PRs and merge-proven `sync/` branches left by earlier runs
+5. If `dirty` or `ahead > 0` → **mirror**: commit on the base branch and push it (v3.31 default)
+6. Judge the repo against the **invariant**, not against "did some command run"
 
 Diverged repos (both ahead and behind) are left untouched and reported as "manual resolve required". This protects the user from accidental merges.
 
-## PR-and-merge push (v3.27)
+## Mirror push (v3.31 — the default)
 
-**`/cs` exists to get every repo onto GitHub.** The PR is the *record* of what went up — not a gate the sync has to pass. Outgoing work goes onto a throwaway branch, becomes a PR, and is merged in the same run:
+Outgoing work is committed **on the base branch** and pushed straight there. No side branch, no PR, no `gh`.
+
+```
+git add -A
+git commit -m "chore: auto-sync <date>"     ← on the base branch
+git push <remote> HEAD                       ← fast-forward only, never forced
+```
+
+| Behaviour | Why |
+| --- | --- |
+| **Fast-forward or nothing** | The push carries no `--force` of any kind. If another machine pushed first, git refuses and the repo is reported as failed — that refusal is the safety property, not a bug. |
+| **Failure leaves the commit local** | Nothing is reset, stashed, or moved. The work sits on the local base branch and the **next run pushes it** once the divergence is resolved. The mirror path is self-healing because it never puts the commit anywhere the user cannot see. |
+| **No `reset --hard` on this path** | It does not exist here. The 2026-08-02 / 2026-08-04 loss mechanism (commit lives on a side branch, `checkout base` takes it out of the tree, `reset --hard` rewinds) has no code path in the mirror. |
+| **`gh` is not required** | Mirroring is pure git. `gh` is used only for reclaiming open `sync/` PRs and for the legacy PR mode; when it is missing, the mirror still works and the report says which step was skipped. |
+| **`.github/workflows` detected** | The `gh`/PAT token usually has no `workflow` scope, so GitHub rejects those pushes. Detected up front and reported as the reason instead of a bare "push failed". |
+| **base = the branch's own upstream** | Not the repo default. `lens.config.json`'s `baseBranch` overrides it, and a mismatch (config says `staging`, you are on `main`) **skips the push** rather than guessing. |
+
+## Reconcile — `/cs` cleans up after itself
+
+Every earlier design left residue: an open auto-sync PR, a `sync/` branch whose PR was merged, a branch nobody dared delete. Measured on 2026-08-14: 6 open auto-sync/agent PRs (13–28 days old) and 14 merged-but-undeleted branches. **No run ever came back for them.** Now every run does, for its own `sync/` namespace only:
+
+| Step | Rule |
+| --- | --- |
+| **Open `sync/` PRs** | Merged with `gh pr merge --merge --delete-branch` and counted as `♻️ 회수`. Under `syncPolicy: pr-manual` (or `LENS_SYNC_AUTO_MERGE=0`) it is **reported, not merged** — a human decides. A merge that fails (conflict, branch protection) becomes a failure line, never a silent success. |
+| **Remote `sync/*` with no open PR** | Deleted **only when the merge is proven**: `merge-base --is-ancestor` first, then patch equality (`git cherry`) for squash/rebase merges. Unproven means keep — `docs/rules/branch-lifecycle.md` §3.2 (a `sync/` PR closed unmerged still carries the only copy of that change). |
+| **Deletion carries an atomic double lease** | `push --atomic --force-with-lease=<base>:<sha> --force-with-lease=<branch>:<sha>` — the §7.1 contract. If either the base or the branch moved since the judgement, the whole push is refused and the branch survives to be re-judged next run. No retry, no force. |
+| **Scope** | `sync/` only. `/cs` never touches `feat/`·`fix/`·`ops/`·`docs/`·`agent/` branches or anyone else's PRs. Cleaning those up is still `scripts/prune_branches.py` plus a human. |
+| **PR lookup is repo-pinned** | `gh pr list --repo OWNER/REPO`. Without pinning, `gh` picks its own default repo and returns **another repo's PRs as a success** (§7.1, reproduced). |
+
+## Success is an invariant, not a step count
+
+A repo counts as ✅ only when all of this holds after the run:
+
+- local base tip **==** `origin/<base>` tip (`ahead == 0`, and `behind == 0` on a full `sync`)
+- working tree **clean** (`dirty == 0`)
+- **no open `sync/` PR** left for that repo
+
+Anything else lands in a named bucket — `❌ 실패`, `🔒 정책 보류`, `⏸️ task 브랜치` — and is **not** added to the success count. This is why the report is trustworthy: "성공 32/32" now means the cloud actually matches. Previously a failed merge fell through to the `pushed` list and a run could report 32/32 while work sat unmerged in a PR.
+
+## Task branches are off-limits
+
+`/cs` has no notion of "the task I am working on right now" — it sweeps whatever is dirty into one commit. On a task branch that produces a commit full of unrelated work (measured: a `chore: auto-sync` PR mixing changes from several different tasks).
+
+- **Prefixes `feat/`, `fix/`, `ops/`, `docs/`, `agent/`, `claude/`, `codex/`, `task/`, `feature/`, `backup/` are task branches.** `/cs` does not commit on them, does not push them, does not repackage them, and never `reset --hard`s them. They belong to whoever is running that task, and their commits need real messages (`docs/rules/branch-lifecycle.md` §2).
+- **Fast-forward pulling a task branch is still fine.** Only the commit/push/reclaim half is skipped.
+- **The guard now lives in the script** (v3.31). It used to be prose here, which meant the guard vanished the moment anyone ran `git-sync-all.sh` directly or from cron. The agent no longer has to pre-check branches; the script reports them under `⏸️ task 브랜치 — commit·push 건너뜀`.
+
+When a repo shows up in that bucket with outgoing work, tell the user which repo and which branch, and let them commit it themselves with a real message.
+
+## Repo policy — `syncPolicy`
+
+`lens.config.json` carries two per-repo keys the script reads (plain shell parsing, no Node/jq):
+
+| Key | Effect |
+| --- | --- |
+| `baseBranch.<repo>` | The repo's base. If the checked-out branch is not it, the push is **skipped** with `base 불일치` rather than pushed to the wrong place. |
+| `syncPolicy.<repo>` = `"pr-manual"` | **Never mirrors.** Outgoing work goes to a `sync/` branch and a PR is opened — and stopped there. Merging is a human act. Reported under `🔒 정책 보류` with the reminder that other machines do not have the change yet. |
+
+`Returns_ERP_v20` is the one repo carrying `pr-manual`, because merging into `staging` **is a deployment** (`branch-lifecycle.md` §1.2). That guard is doubled: even with `lens.config.json` missing or unparseable, a branch or upstream named `staging` forces `pr-manual`. A config file cannot be the only thing standing between `/cs` and a production deploy.
+
+## Legacy PR-and-merge mode (opt-in)
+
+⚠️ **`LENS_SYNC_PR` reversed meaning in v3.31.** It used to default to `1` (PR mode) with `0` as the escape hatch. Now the default is `0` (mirror) and **`LENS_SYNC_PR=1` opts into the legacy PR-and-merge flow**. An explicitly exported `LENS_SYNC_PR=1` from an older setup will silently keep the old behaviour — that is intentional, but check for it if a repo keeps producing `sync/` branches.
+
+The legacy path (also used by `pr-manual` repos) still works exactly as v3.27 described:
 
 ```
 create branch sync/<date>-<time>   ← BEFORE committing
   → commit there
   → push -u
   → gh pr create --base <upstream branch>
-  → gh pr merge --merge --delete-branch      ← default
-  → checkout back to base, fetch, reset --hard to origin/<base>
+  → gh pr merge --merge --delete-branch      ← unless LENS_SYNC_AUTO_MERGE=0 or pr-manual
+  → checkout back to base; fetch + reset --hard ONLY if the merge succeeded
 ```
 
-**Order is the whole trick.** Committing to the base branch first and *then* pushing it leaves nothing to compare, so no PR can be opened. The branch must be cut before the commit.
+- **Order is the whole trick.** Committing to the base branch first and *then* pushing it leaves nothing to compare, so no PR can be opened. The branch must be cut before the commit.
+- **`reset --hard` is conditional now.** It runs only when the merge is confirmed. If the merge failed, the local tree is left alone and the change stays on the `sync/` branch and its PR — the old unconditional rewind is what made changes look deleted locally.
+- **fail-closed without `gh`.** On this path only, a missing or unauthenticated `gh` is a failure: `/cs` does **not** fall back to a direct base-branch push. For a `pr-manual` repo that fallback would be a deployment. (The mirror path has no such dependency, so the default flow never hits this.)
+- `LENS_SYNC_AUTO_MERGE` applies to **this path only** — it has no meaning for the mirror, which has no PR to hold open.
+- **PR body stays dumb.** Changed-file list only. Adding LLM diff analysis would make git sync depend on auth, cost, and model availability. The script stays pure POSIX shell.
 
-**Why the merge is not optional (v3.27).** The commit lives on the side branch, so `checkout <base>` alone takes those changes *out of the working tree* — they vanish locally until something puts them on the base branch. Only the merge does that. Without it the run ends with the change on neither the local tree nor any other machine, which is the opposite of syncing. v3.25–3.26 shipped without the merge and produced exactly that: memory files disappearing locally (2026-08-02, 2026-08-04) and PRs sitting open for weeks while other machines fell 26 commits behind.
+## Branches outside base, by age
 
-| Behaviour | Why |
-| --- | --- |
-| **Merged by default** | A sync tool that stops until a human clicks Merge is not syncing. `LENS_SYNC_AUTO_MERGE=0` restores the review-gate behaviour for one run. |
-| **Merge failure is reported, not fatal** | If the merge is refused (branch protection, required checks, conflict) the PR stays open and the run reports `미병합` — the old behaviour. Nothing is lost; a human finishes it. |
-| **fail-closed** | If `gh` is missing, unauthenticated, or PR creation fails, `/cs` reports a failure. It never falls back to a direct base-branch push — that would silently break the PR guarantee. |
-| **base = the branch's own upstream** | Not the repo default. `Returns_ERP_v20` sits on `staging`, where `staging → main` promotion is a separate, deploy-critical procedure. Targeting `main` here would be a production incident. |
-| **duplicate PRs avoided** | An open PR with the same head is reused instead of opening another. |
-| **`.github/workflows` detected** | The `gh` token has no `workflow` scope, so GitHub rejects those pushes. Detected up front and reported as the reason. |
-| **unmerged ≠ synced** | If a merge does not go through, the report warns explicitly: until the PR merges, other machines (Mac Mini and friends) do **not** have the change. Never report that as "sync complete". |
-| **PR body stays dumb** | Changed-file list only. Adding LLM diff analysis would make git sync depend on auth, cost, and model availability — a sync tool must not break for those reasons. The script stays pure POSIX shell. |
-
-**Escape hatches**: `LENS_SYNC_AUTO_MERGE=0` leaves PRs open for human review. `LENS_SYNC_PR=0` skips the PR entirely and pushes straight to the base branch.
-
-## Task branches are off-limits
-
-`/cs` has no notion of "the task I am working on right now" — it sweeps whatever is dirty into one commit. On a task branch that produces a PR full of unrelated work (measured: a `chore: auto-sync` PR mixing changes from several different tasks).
-
-- **Branches prefixed `feat/`, `fix/`, `ops/`, `docs/` are task branches.** `/cs` does not repackage them onto a `sync/` branch, does not commit on top of them, and never `reset --hard`s them. They belong to whoever is running that task, and their commits need real messages.
-- **`sync/` is for out-of-plan dirty changes only** — stray edits that belong to no task (machine-local config tweaks, files touched by tooling). That is the entire remit of the `sync/<date>-<time>` flow.
-- **Fast-forward pulling a task branch is still fine.** Only the commit/PR/reset half is skipped.
-
-**How the agent enforces this** (the guard lives here, not in the script — `git-sync-all.sh` is deliberately left alone):
-
-1. Before any run that can commit (`/cs`, `/cs push`), check each repo's current branch:
-   ```
-   git -C <repo> rev-parse --abbrev-ref HEAD
-   ```
-2. If a repo is on a task branch **and** is dirty or ahead, do **not** let the commit path run over it. Run `/cs pull` instead and report those repos as `task 브랜치 — 건너뜀 (담당자가 직접 커밋)`.
-3. Proceed with the full `sync`/`push` run only when no repo is on a task branch with outgoing work, or when the user explicitly overrides after seeing the list.
-
-## Branch count warning (on exit)
-
-After reporting the sync result, count remote branches per repo:
+At the end of a run the script lists every remote branch that is not the repo's base, with the age of its last commit; anything over 7 days is flagged `⚠️ N일째 base 밖`:
 
 ```
-git -C <repo> ls-remote --heads origin | wc -l
+🌿 base 밖 원격 브랜치 (3) — base 에 없는 작업은 다른 머신에 도달하지 않습니다:
+   • livevil-research: ops/pre-renewal-macmini-20260719 — ⚠️ 27일째 base 밖
 ```
 
-Any repo with **more than 5** remote branches gets a warning line, because `sync/` and task branches accumulate silently and stale branches make it unclear which one is live:
+This replaces the old "more than 5 remote branches" count (which the agent had to run by hand with `ls-remote`). Age points at neglect directly; a count does not — a repo with three branches from June is worse off than one with six from this morning. It is read from already-fetched refs, so it costs no extra network round-trip.
+
+Report only. **`/cs` deletes nothing but its own merge-proven `sync/` branches** — everything else is `scripts/prune_branches.py`'s job, and it asks before removing anything:
 
 ```
-⚠️ 브랜치 과다: <repo> (원격 N개 > 5) — 정리:
-   git -C <repo> fetch origin --prune
-   python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py" --repo <repo> --remote origin
+git -C <repo> fetch origin --prune
+python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py" --repo <repo> --remote origin
 ```
-
-Report only. `/cs` never deletes branches itself — pruning is `scripts/prune_branches.py`'s job and it asks before removing anything.
 
 When you do point someone at that script, three things about it matter:
 
 | | |
 |---|---|
 | **Judgement is the default** | Without `--apply` it deletes nothing. `--apply` removes only the two merge-proven verdicts — never `아카이브 검토`, `유지`, `unknown`, a repo's default branch, an open PR's head, or **a ref carrying an integration-branch name that is not the base**. That last one covers `namane-cms`'s residual `origin/main`: pinning the base to `master` made `main` look like an ordinary prunable branch, and it is proven merged, so it classified as deletable — but `docs/rules/branch-lifecycle.md` §4.2 leaves that deletion to the repo owner. Protection comes from config `protectedBranches` plus a name fallback (`main`/`master`/any `baseBranch` value). |
-| **`--apply` is fail-closed without `gh`** | Open-PR protection needs `gh`. If `gh` is missing, unauthenticated, or failing, `--apply` **aborts** for that repo rather than risk deleting a live PR's head — the same posture as `/cs`'s own PR-only rule. A reply that reaches the query cap (200) counts as a failed check too, because the heads beyond it were never seen. `--delete-without-pr-check` overrides it, and it exists so that override is a deliberate, visible act. Judgement-only runs still complete with a warning. |
+| **`--apply` is fail-closed without `gh`** | Open-PR protection needs `gh`. If `gh` is missing, unauthenticated, or failing, `--apply` **aborts** for that repo rather than risk deleting a live PR's head. A reply that reaches the query cap (200) counts as a failed check too, because the heads beyond it were never seen. `--delete-without-pr-check` overrides it, and it exists so that override is a deliberate, visible act. Judgement-only runs still complete with a warning. |
 | **The protected default branch follows the remote you chose** | It is read from `refs/remotes/<remote>/HEAD`, not hard-wired to `origin`. Under `--remote upstream` with a base like `staging`, that remote's own `main` is an ancestor of the base and would otherwise classify as deletable — reproduced, and the old code did delete it. If that HEAD cannot be resolved the tool does not know which branch the remote treats as default, so `--apply` is blocked: run `git remote set-head <remote> --auto` and rerun. There is no override for this one. |
 | **Merge proof is content, not just patch-ids** | A multi-commit squash rewrites N patches into one, so `git cherry` still shows them as live; the branch is re-proven merged only when a merge simulation's tree equals the base tree. The reverse also holds: **`git cherry` never enumerates merge commits**, so zero unmerged patches is not proof on its own — content that arrived only in a merge commit (a conflict resolution) would otherwise be deleted as "merged". Unprovable means keep. |
 | **Deletion carries a lease** | Deletion is tied to the SHA the judgement was made on. If another machine advanced the branch in the meantime, git refuses and the script reports `원격이 진전됨 — 삭제 거부, fetch 후 재판정 필요`. Run `git fetch origin --prune` first so the judgement is not made on a stale ref. |
@@ -124,6 +165,8 @@ Auto-detected from `$HOME` (no hardcoded user/machine paths), overridable via `G
 
 `$HOME` resolves correctly on macOS, Linux, and Windows (Git Bash), so the same defaults work everywhere. If your workspace lives elsewhere, set `GIT_ROOTS="/path/one /path/two"` before invoking.
 
+Repos under `.claude/plugins/marketplaces/` are **pull-only** — they are upstream copies, never pushed.
+
 ## How to invoke
 
 User typing `/cs`, `/cs pull`, or `/cs push` triggers this skill. The agent should:
@@ -137,17 +180,17 @@ User typing `/cs`, `/cs pull`, or `/cs push` triggers this skill. The agent shou
    ```
 3. Capture the report and present it to the user.
 
-The script is portable shell. It uses only `git`, `awk`, `printf`, and standard POSIX utilities. No Node, no Python, no platform-specific glue.
+The script is portable shell. It uses only `git`, `awk`, `printf`, and standard POSIX utilities. No Node, no Python, no platform-specific glue. `gh` is optional and used only for `sync/` PR reclaim and the legacy PR mode.
 
 ## Modes
 
 | Action | What runs | When to use |
 |--------|-----------|-------------|
-| `/cs` (no arg) | pull + branch + commit + PR + merge | normal workflow — incoming pulled, outgoing recorded as a PR and merged |
-| `/cs pull` | pull only | start of a session, just want incoming changes |
-| `/cs push` | branch + commit + PR + merge | finish a sprint, get everything outgoing onto GitHub |
+| `/cs` (no arg) | pull + reclaim + commit + mirror push + invariant check | normal workflow — incoming pulled, outgoing mirrored, residue reclaimed |
+| `/cs pull` | pull only (plus the base-branch age report) | start of a session, just want incoming changes |
+| `/cs push` | reclaim + commit + mirror push + invariant check | finish a sprint, get everything outgoing onto GitHub |
 
-`sync` is identical to running `pull` then `push` back-to-back, but in a single repo traversal.
+`sync` is identical to running `pull` then `push` back-to-back, but in a single repo traversal. On `push` alone the invariant ignores `behind` — a push-only run never promised to pull.
 
 ## Output
 
@@ -164,13 +207,21 @@ The skill should display the script's output verbatim — it already produces a 
 📥 Pulled (M):
    • repo (+commits)
 📤 Pushed (M):
-   • repo (+commits)
+   • repo (+commits, mirror)
+♻️ 회수 (M) — 이전 런이 남긴 sync/ 잔여물:
+   • repo PR #12 병합·회수
+🔒 정책 보류 (M) — 머지는 사람이 결정합니다:
+   • Returns_ERP_v20: PR sync/... → staging 생성 — 배포 게이트, 머지는 사람
+⏸️ task 브랜치 — commit·push 건너뜀 (M) — /cc·사람 소유:
+   • repo (feat/x)
 ○ 변경 없음 (K): repo1 repo2 ...
 ❌ 실패 (J):
    • repo: <reason>
+🌿 base 밖 원격 브랜치 (M) — base 에 없는 작업은 다른 머신에 도달하지 않습니다:
+   • repo: branch — ⚠️ N일째 base 밖
 ```
 
-After invocation, summarize in 1–2 sentences if any repos diverged or failed; otherwise just confirm the count.
+After invocation, summarize in 1–2 sentences. Lead with anything in `❌ 실패` or `🔒 정책 보류`; a repo in either bucket is **not** synced, and saying "sync complete" over it is the failure this tool was rebuilt to stop.
 
 For a machine-readable result (e.g. when chaining into follow-up automation), add `--json`:
 
@@ -178,17 +229,26 @@ For a machine-readable result (e.g. when chaining into follow-up automation), ad
 <bash> "${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh" ${ACTION:-sync} --json
 ```
 
-In `--json` mode the human report goes to **stderr** and the **last stdout line** is a JSON object: `{action,total,success,pulled[],pushed[],unchanged[],diverged[],failed[]}`. Parse that line; surface `diverged`/`failed` first (they need manual attention), don't bury them under the unchanged list.
+In `--json` mode the human report goes to **stderr** and the **last stdout line** is a single JSON object:
+
+```
+{action,total,success,pulled[],pushed[],unchanged[],diverged[],missing_remote[],failed[],reclaimed[],task_branch[],policy_hold[]}
+```
+
+`reclaimed`, `task_branch`, and `policy_hold` are new in v3.31 and **additive** — existing keys and their order are unchanged. Parse the last line; surface `diverged`/`failed`/`policy_hold` first (they need manual attention), don't bury them under the unchanged list. (v3.31 also fixed a stray argument that made this line print as two invalid-JSON lines.)
 
 ## Auto-commit policy
 
 When `/cs` auto-commits dirty trees, it uses:
 
 - Author: The user's configured git identity (via `git config user.name` and `user.email`)
-- Message: `chore: auto-sync YYYY-MM-DD` (single-line), committed on a `sync/<date>-<time>` branch — never on the base branch
+- Message: `chore: auto-sync YYYY-MM-DD` (single-line)
+- Branch: **the base branch itself** on the mirror path; a throwaway `sync/<date>-<time>` branch only under the legacy PR mode or `pr-manual`
 - Stages: `git add -A` (everything not gitignored)
 
 This is intentional. The user runs `/cs` knowing it will pick up whatever is in the working tree. If you (the agent) want to commit only specific files with a specific message, do not invoke `/cs` — use `git` directly.
+
+`/cs` adds no secret filters of its own; `.gitignore` is the contract, because some repos in this workspace version their config deliberately.
 
 ## Failure handling
 
@@ -198,10 +258,14 @@ Common failure modes and what they mean:
 
 | Symptom | Cause | What the user should do |
 |---------|-------|--------------------------|
+| `push 실패 (원격이 앞서면 ff 거부 — pull 후 재실행). 로컬 커밋 보존됨` | Another machine pushed first; the mirror never forces | Run `/cs pull` (or resolve the divergence), then `/cs push`. The commit is safe on the local base branch |
 | `diverged (ahead=N behind=M)` | Both local and remote moved | Resolve manually with rebase or merge |
+| `불변식 미충족(dirty=N ahead=M)` | The run ended with the cloud still not matching | Read the accompanying failure line for the repo; nothing was lost, it just is not mirrored yet |
+| `base 불일치(현재 X, config Y) — push 건너뜀` | Checked out something other than the configured base | Check out the configured base, or fix `baseBranch` in `lens.config.json` |
 | `pull failed` | Local working tree blocks fast-forward | Stash or commit, then re-run `/cs` |
-| `push failed` | Auth or network | Re-run `/cs push` after fixing |
-| `gh 미설치 — PR 생성 불가` | No `gh`, or unauthenticated | Install/authenticate `gh`. `/cs` deliberately does **not** fall back to a direct push |
+| `⚠️ sync PR #N 회수 불가(충돌 등)` | An old auto-sync PR cannot merge cleanly | Open the PR and finish it by hand; the change is preserved there |
+| `<branch> 삭제 보류 — 원격 진전(lease 거부)` | Another machine moved the ref between judgement and delete | Nothing to do — the next run re-judges it. Never force |
+| `gh 미설치 — PR 생성 불가` | Legacy PR mode or a `pr-manual` repo, without `gh` | Install/authenticate `gh`. On these paths `/cs` deliberately does **not** fall back to a direct push. The mirror path does not need `gh` |
 | `push 거부 — .github/workflows` | Token lacks `workflow` scope | Push those files manually, or re-scope the token |
 | `fetch failed` | Remote unreachable | Check network or remote URL |
 | listed under `⚠️ 원격 없음` | The remote repo no longer exists on GitHub (deleted or renamed) | **Not a failure — a state.** v3.28 reports these separately and skips them instead of retrying every run. Measured: 13 of 36 repos on the Mac Mini. Fix the remote or move the folder out of the workspace if you want it gone from the report |
@@ -218,19 +282,22 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 
 ## When NOT to use /cs
 
-- **Mid-edit unfinished work**: `/cs push` will commit your in-progress edits with a chore message. Either finish the edit and use a real commit, or stash before invoking.
-- **Mid-task on a task branch**: `feat/`·`fix/`·`ops/`·`docs/` branches are skipped by policy (see "Task branches are off-limits"). Commit that work yourself with a real message — do not route it through `/cs`.
-- **Branches you do not want pushed**: `/cs` pushes the current branch of each repo. If a repo is on a feature branch you are not ready to share, switch to your default branch first.
+- **Mid-edit unfinished work**: `/cs push` will commit your in-progress edits with a chore message **onto the base branch** and push it. Either finish the edit and use a real commit, or stash before invoking.
+- **Mid-task on a task branch**: the ten task prefixes are skipped by the script (see "Task branches are off-limits"). Commit that work yourself with a real message — do not route it through `/cs`.
+- **A branch you do not want on the base**: `/cs` mirrors the checked-out base branch of each repo. If you are somewhere you do not want shared, that is what the task-branch guard is for; anything else, switch first.
 - **Repos with sensitive untracked files**: `git add -A` adds everything not in `.gitignore`. Make sure your `.gitignore` is up to date before running.
 
 ## Relationship to other Lens skills
 
 - `/cc` (parallel execution) is about *running tasks*. `/cs` is about *synchronizing source code state*.
 - `/cp` writes plan documents. `/cs` does not touch documents — it just syncs whatever is on disk.
+- `/cp done` owns integrating a finished task branch into base. `/cs` deliberately has no such command — one owner per job.
 - The SessionStart auto-pull (opt-in via `LENS_SYNC_AUTO_PULL=1`) is a passive partner of `/cs`. They share the same `git-sync-all.sh` script.
+- Branch rules (prefixes, base resolution, merge proof, atomic lease) are defined once in `docs/rules/branch-lifecycle.md`. This skill follows it; it does not restate it.
 
 ## Implementation pointer
 
 - Script: `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
-- Version: aligned with the Lens plugin version (currently 3.30.0)
+- Config: `lens.config.json` — `baseBranch`, `syncPolicy`
+- Version: aligned with the Lens plugin version (currently 3.31.0)
