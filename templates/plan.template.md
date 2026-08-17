@@ -11,7 +11,7 @@ parent: null
 refs: []
 ---
 
-<!-- markdownlint-disable MD003 MD024 -- placeholder template; Plan A/B intentionally share subheaders -->
+<!-- markdownlint-disable MD003 MD024 MD060 -- placeholder template; Plan A/B intentionally share subheaders, and the inventory table header holds unexpanded {tokens} of varying width -->
 
 # Work Plan / {header_task}
 
@@ -33,6 +33,17 @@ refs: []
 **{header_done}:**
 
 > {done_definition}
+
+## 📋 {header_inventory}
+
+<!-- v3.32 coverage ledger. Row count is decided by the research phases, never by
+     this example. Every discovered item resolves to a place in the plan or to a
+     written reason for exclusion — checked by validatePlanCoverage(). -->
+
+| # | {header_inv_item} | {header_inv_source} | {header_inv_where} | {header_inv_status} |
+|---|---|---|---|---|
+
+{inventory_rows}
 
 ## {header_plan_a}
 
