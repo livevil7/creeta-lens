@@ -4,7 +4,9 @@
 # =============================================
 # 용도: Dropbox처럼 모든 기기에서 자동 sync
 # 호출: git-sync-all.sh [pull|push|sync]
-#   pull : 모든 repo fetch + fast-forward pull (behind 해소)
+#   pull : 모든 repo fetch --prune + fast-forward (behind 해소).
+#          체크아웃된 브랜치는 pull, 같은 이름의 원격을 추적하는 **다른 로컬
+#          브랜치도** 체크아웃 없이 ff 한다 (v3.33.0 — HEAD 만 보던 사각지대).
 #   push : 모든 repo 자동 commit + push (dirty, ahead 해소)
 #   sync : pull + push (기본값)
 #
@@ -152,7 +154,14 @@ for repo in "${REPOS[@]}"; do
     # fetch — 원격이 사라진 repo 를 "실패" 와 분리한다 (v3.28.0).
     # GitHub 에서 지워진 옛 repo 를 매번 실패로 쌓으면 진짜 문제가 노이즈에 묻히고
     # 재시도 비용도 계속 든다. 실측: Mac Mini 36개 중 13개가 이 상태였다.
-    fetch_out=$(git -C "$repo" fetch --quiet 2>&1 | head -5); fetch_rc=$?
+    #
+    # --prune (v3.33.0): 원격에서 사라진 브랜치의 트래킹 ref 를 매 런 정리한다.
+    # 없으면 죽은 ref 가 영구히 남고, 그게 upstream 인 로컬 브랜치는 0/0 으로
+    # 보여 "최신" 으로 오인된다 — 뒤처짐을 가리는 기전이다. 실측(2026-08-18):
+    # 8개 repo 에 39개가 쌓여 있었고, snapholo 는 그 때문에 로컬 base 가
+    # 226커밋 뒤처진 것이 매 런 보이지 않았다. 회수 경로(아래)도 이미 같은
+    # 이유로 자체 --prune 을 하고 있었다 — 여기서 하면 그쪽은 no-op 이 된다.
+    fetch_out=$(git -C "$repo" fetch --prune --quiet 2>&1 | head -5); fetch_rc=$?
     if [ "$fetch_rc" != "0" ]; then
       if printf '%s' "$fetch_out" | grep -qiE 'repository not found|does not exist|could not read from remote repository'; then
         missing_remote+=("$name")
@@ -163,18 +172,53 @@ for repo in "${REPOS[@]}"; do
       behind=$(git -C "$repo" rev-list --count HEAD..@{u} 2>/dev/null || echo "0")
       ahead=$(git -C "$repo" rev-list --count @{u}..HEAD 2>/dev/null || echo "0")
 
+      # ── 체크아웃 안 된 로컬 브랜치 따라잡기 (v3.33.0) ──────────
+      # v3.32 까지 pull 은 `@{u}` — 즉 **HEAD 의 upstream 하나**만 봤다.
+      # 그래서 체크아웃돼 있지 않은 브랜치는 영원히 뒤처진다. 실측(2026-08-18):
+      #   Returns_ERP_v20  staging 체크아웃 → 로컬 main 194커밋 뒤
+      #   snapholo         task 브랜치 체크아웃 → 로컬 main 226커밋 뒤
+      # 둘 다 매 런 "변경 없음" 으로 보고됐다. ERP 는 staging→main 승격이
+      # 배포 절차라, 194커밋 낡은 로컬 main 위에서 승격하면 사고다.
+      #
+      # 체크아웃을 바꾸지 않고 ff 한다 — `fetch <remote> <br>:<br>` 는 워킹트리를
+      # 건드리지 않고 non-current 브랜치만 전진시키며, ff 가 아니면 git 이 거부한다.
+      # 조건 3개를 모두 만족할 때만: ① 같은 이름의 원격 브랜치를 추적 ② 고유커밋
+      # 0 ③ 뒤처짐 있음. ①이 없으면 `feat/x → origin/main` 처럼 다른 이름을
+      # 추적하는 브랜치가 base 복제본이 되어버린다(실측된 실제 배선이다).
+      # 다른 워크트리가 점유한 브랜치는 git 이 거부하므로 조용히 건너뛴다.
+      ff_names=""
+      while IFS='|' read -r _lb _lu; do
+        [ -n "$_lu" ] || continue
+        [ "$_lb" != "$branch" ] || continue
+        [ "$_lu" = "${_lu%%/*}/$_lb" ] || continue
+        git -C "$repo" rev-parse --verify -q "$_lu" >/dev/null 2>&1 || continue
+        _lahead=$(git -C "$repo" rev-list --count "$_lu".."$_lb" 2>/dev/null || echo "1")
+        _lbehind=$(git -C "$repo" rev-list --count "$_lb".."$_lu" 2>/dev/null || echo "0")
+        [ "$_lahead" = "0" ] && [ "$_lbehind" != "0" ] || continue
+        if git -C "$repo" fetch -q "${_lu%%/*}" "$_lb:$_lb" 2>/dev/null; then
+          ff_names="${ff_names:+$ff_names, }$_lb +$_lbehind"
+        fi
+      done < <(git -C "$repo" for-each-ref --format='%(refname:short)|%(upstream:short)' refs/heads)
+
       if [ "$behind" != "0" ]; then
         if [ "$ahead" != "0" ]; then
           repo_err="diverged (ahead=$ahead behind=$behind, 수동 해결 필요)"
         else
           # fast-forward 안전
           if git -C "$repo" pull --ff-only --quiet 2>&1; then
-            pulled+=("$name (+$behind)")
+            pulled+=("$name (+$behind${ff_names:+, $ff_names})")
+            ff_names=""      # 위 항목에 이미 실렸다 — 중복 집계 금지
             did_pull=true
           else
             repo_err="pull failed"
           fi
         fi
+      fi
+      # HEAD 는 최신인데 다른 로컬 브랜치만 뒤처져 있던 경우. v3.32 까지
+      # 이걸 "변경 없음" 으로 보고한 것이 위 실측 2건을 가린 사각지대다.
+      if [ -n "$ff_names" ]; then
+        pulled+=("$name ($ff_names)")
+        did_pull=true
       fi
     fi
   fi

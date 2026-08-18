@@ -1,13 +1,13 @@
 ---
 name: "cp"
-description: "Lens Plan v3.32.0 — Planning engine with three grades (fast/standard/deep) + documentation lifecycle. Grade is chosen by risk, not length: fast=easily reversible, standard=multi-component or user-facing, deep=hard to reverse (deploy/data/multi-system) with build-ready specs and required Codex review. Specify explicitly as `/cp fast|standard|deep <task>` or let it auto-judge. Auto-detects: plan, complete & record history, organize docs."
+description: "Lens Plan v3.33.0 — Planning engine with three grades (fast/standard/deep) + documentation lifecycle. Grade is chosen by risk, not length: fast=easily reversible, standard=multi-component or user-facing, deep=hard to reverse (deploy/data/multi-system) with build-ready specs and required Codex review. Specify explicitly as `/cp fast|standard|deep <task>` or let it auto-judge. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[fast|standard|deep] [task description]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cp | Lens Plan v3.32.0 — 계획 엔진 · 3등급(fast/standard/deep). 등급은 분량이 아니라 **위험도**로 정한다. deep = 빌드레디·되묻기 0 (구 `/cpp` 흡수). | MIT |
+| cp | Lens Plan v3.33.0 — 계획 엔진 · 3등급(fast/standard/deep). 등급은 분량이 아니라 **위험도**로 정한다. deep = 빌드레디·되묻기 0 (구 `/cpp` 흡수). | MIT |
 
 Triggers: plan, work plan, plan first, planning, document, spec, specification, requirements,
 기획, 기획서, 계획, 계획서, 작업계획, 문서화, 요구사항, 스펙, 기획 문서, 정리, 문서 정리, 완료,
@@ -18,7 +18,7 @@ power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Plan v3.32.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.33.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 

@@ -559,6 +559,70 @@ t_eq    "S10 원격 base 무변경"                       "$BASE_TIP" "$(git -C 
 t_true  "S10 대기 상태가 보고 버킷에 남는다"          bucket_has_any "$RUN_JSON" mqueue policy_hold failed
 t_eq    "S10 success 0 (대기는 ✅ 아님)"              "0" "$(jnum "$RUN_JSON" success)"
 
+# =============================================
+# S11 다중 브랜치 따라잡기 (v3.33.0) — 체크아웃 안 된 로컬 브랜치도 ff
+# 회귀 대상: v3.32 까지 pull 은 `@{u}`(HEAD 의 upstream) 하나만 봤다.
+# 실측 2건(2026-08-18): Returns_ERP_v20 로컬 main 194커밋 뒤, snapholo 226커밋 뒤.
+# =============================================
+scenario "S11 다중 브랜치: 체크아웃 안 된 master 도 따라잡고, 워킹트리는 건드리지 않는다"
+FX=$(new_fx s11multi) || die "fixture 생성 실패"
+mkrepo "$FX" multibr master || die "S11 repo 생성 실패"
+W="$FX/work/multibr"; B="$FX/remotes/multibr.git"
+
+# 작업자는 side 브랜치에 있고, master 는 체크아웃돼 있지 않다
+git -C "$W" checkout -qb side && git -C "$W" push -qu origin side || die "S11 side 준비 실패"
+
+# 다른 머신이 origin/master 를 2커밋 전진시킨다
+git clone -q "$B" "$FX/other" || die "S11 clone 실패"
+git -C "$FX/other" config user.email other@lens.local
+git -C "$FX/other" config user.name  "other machine"
+printf 'a\n' > "$FX/other/a"; git -C "$FX/other" add -A; git -C "$FX/other" commit -qm a
+printf 'b\n' > "$FX/other/b"; git -C "$FX/other" add -A; git -C "$FX/other" commit -qm b
+git -C "$FX/other" push -q origin master || die "S11 원격 전진 실패"
+
+# 다른 **이름**의 원격을 추적하는 브랜치 — 따라잡기 대상이 아니다.
+# (실측 배선: snapholo 의 feat/holo-price-on-screen → origin/main)
+git -C "$W" branch mimic && git -C "$W" branch -q --set-upstream-to=origin/master mimic \
+  || die "S11 mimic 준비 실패"
+
+MASTER_BEFORE=$(git -C "$W" rev-parse master)
+MIMIC_BEFORE=$(git -C "$W" rev-parse mimic)
+HEAD_BEFORE=$(git -C "$W" rev-parse HEAD)
+
+run_cs "$FX" pull --json
+
+t_eq   "S11 로컬 master 가 원격 master 까지 따라잡힘" \
+       "$(git -C "$B" rev-parse refs/heads/master)" "$(git -C "$W" rev-parse master)"
+t_ne   "S11 실제로 전진했다 (따라잡기 전과 다름)"     "$MASTER_BEFORE" "$(git -C "$W" rev-parse master)"
+t_eq   "S11 체크아웃 브랜치 불변 (side 그대로)"        "side" "$(git -C "$W" rev-parse --abbrev-ref HEAD)"
+t_eq   "S11 워킹트리 HEAD 불변"                        "$HEAD_BEFORE" "$(git -C "$W" rev-parse HEAD)"
+t_eq   "S11 워킹트리 clean (체크아웃 부작용 0)"        "" "$(git -C "$W" status --porcelain)"
+t_eq   "S11 다른 이름 추적 브랜치는 손대지 않는다"     "$MIMIC_BEFORE" "$(git -C "$W" rev-parse mimic)"
+t_true "S11 pulled 버킷에 집계된다 (변경없음 아님)"    bucket_has "$RUN_JSON" pulled multibr
+
+# =============================================
+# S12 prune (v3.33.0) — 원격에서 사라진 브랜치의 트래킹 ref 정리
+# 죽은 ref 가 남으면 그걸 upstream 삼은 로컬 브랜치가 0/0 = "최신" 으로 오인된다.
+# 실측(2026-08-18): 8개 repo 39개 누적.
+# =============================================
+scenario "S12 prune: 원격에서 사라진 브랜치의 트래킹 ref 를 매 런 정리한다"
+FX=$(new_fx s12prune) || die "fixture 생성 실패"
+mkrepo "$FX" prunefx master || die "S12 repo 생성 실패"
+W="$FX/work/prunefx"; B="$FX/remotes/prunefx.git"
+
+git -C "$W" push -q origin master:refs/heads/dead-branch || die "S12 원격 브랜치 준비 실패"
+git -C "$W" fetch -q origin || die "S12 fetch 실패"
+t_true "S12 준비: 트래킹 ref 가 존재한다" \
+       git -C "$W" rev-parse -q --verify refs/remotes/origin/dead-branch
+git -C "$B" update-ref -d refs/heads/dead-branch || die "S12 원격 삭제 실패"
+
+run_cs "$FX" pull --json
+
+t_false "S12 사라진 원격의 트래킹 ref 가 정리됐다" \
+        git -C "$W" rev-parse -q --verify refs/remotes/origin/dead-branch
+t_true  "S12 살아있는 원격 ref 는 보존된다" \
+        git -C "$W" rev-parse -q --verify refs/remotes/origin/master
+
 # ── 요약 ──
 printf '\n────────────────────────────────────────\n'
 if [ "$FAILED" -eq 0 ]; then

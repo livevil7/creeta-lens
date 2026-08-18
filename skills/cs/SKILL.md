@@ -7,7 +7,7 @@ user-invocable: true
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.32.0 — Multi-repo git synchronizer. Mirrors every repo to GitHub: ff-pull in, commit + direct push out, reclaim its own `sync/` residue, and report success as an invariant (local == origin/base, nothing dirty, no open sync PR). | MIT |
+| cs | Lens Sync v3.33.0 — Multi-repo git synchronizer. Mirrors every repo to GitHub: ff-pull in, commit + direct push out, reclaim its own `sync/` residue, and report success as an invariant (local == origin/base, nothing dirty, no open sync PR). | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,7 +17,7 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.32.0**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.33.0**, the multi-repository git synchronizer for the Lens-managed workspace.
 
 `/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — all of the logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
@@ -33,14 +33,36 @@ The user works across a family of git repos on multiple machines (Windows, macOS
 
 For every git repo discovered under the workspace roots:
 
-1. `git fetch` (silent). A remote that no longer exists is a **state**, not a failure — reported separately and skipped.
+1. `git fetch --prune` (silent). A remote that no longer exists is a **state**, not a failure — reported separately and skipped.
 2. If `behind > 0` and `ahead == 0` → `git pull --ff-only`
-3. List remote branches that are **not** the base branch, with their age (report only — see below)
-4. **Reclaim** this tool's own residue: open `sync/` PRs and merge-proven `sync/` branches left by earlier runs
-5. If `dirty` or `ahead > 0` → **mirror**: commit on the base branch and push it (v3.31 default)
-6. Judge the repo against the **invariant**, not against "did some command run"
+3. **Catch up every other local branch** that tracks a same-named remote branch, without changing the checkout (v3.33)
+4. List remote branches that are **not** the base branch, with their age (report only — see below)
+5. **Reclaim** this tool's own residue: open `sync/` PRs and merge-proven `sync/` branches left by earlier runs
+6. If `dirty` or `ahead > 0` → **mirror**: commit on the base branch and push it (v3.31 default)
+7. Judge the repo against the **invariant**, not against "did some command run"
 
 Diverged repos (both ahead and behind) are left untouched and reported as "manual resolve required". This protects the user from accidental merges.
+
+### Only the checked-out branch used to be pulled (fixed in v3.33)
+
+Through v3.32 the pull step read `@{u}` — the upstream of **HEAD**, and nothing else. A branch that was not checked out never advanced, no matter how many times `/cs` ran, and the repo reported `변경 없음` while doing it. Two measured cases on 2026-08-18:
+
+| repo | checked out | stale local branch |
+| --- | --- | --- |
+| `Returns_ERP_v20` | `staging` | `main` **194 commits** behind |
+| `snapholo` | a `docs/` task branch | `main` **226 commits** behind |
+
+The ERP one is the dangerous shape: `staging → main` promotion is a deploy procedure, and promoting on top of a 194-commit-stale local `main` is an incident.
+
+The catch-up is `git fetch <remote> <branch>:<branch>` — it never touches the working tree, and git refuses anything that is not a fast-forward. Three conditions must all hold:
+
+- the branch tracks a **same-named** remote branch — otherwise `feat/x → origin/main` (a real, measured wiring) would quietly become a copy of the base
+- it has **no unique commits** of its own
+- it is actually behind
+
+Branches held by another worktree are refused by git and skipped silently. A repo whose HEAD was already current but whose other branches moved is now reported under `📥 Pulled`, not `변경 없음`.
+
+**`--prune` on every fetch** closes the other half. Without it, a remote-tracking ref for a deleted branch lives forever, and any local branch pointing at it reads `0/0` — "up to date" — which is precisely what hid the two cases above. Measured: **39 dead refs across 8 repos**. The reclaim path already ran its own `--prune` for the same reason; that call is now a no-op.
 
 ## Mirror push (v3.31 — the default)
 
@@ -301,4 +323,4 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
 - Config: `lens.config.json` — `baseBranch`, `syncPolicy`
 - Tests: `tests/test_git_sync.sh` — 10 scenario families, 88 assertions (mirror / task-branch skip / pr-manual / reconcile / loss-prevention / --json + review hardening: gh-failure fail-closed / split remote / PR base qualify / merge queue), local bare fixtures + gh stub, no network
-- Version: aligned with the Lens plugin version (currently 3.32.0)
+- Version: aligned with the Lens plugin version (currently 3.33.0)

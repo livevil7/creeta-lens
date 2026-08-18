@@ -7,7 +7,7 @@ user-invocable: true
 
 | name | description | license |
 |------|-------------|---------|
-| ci | Creeta Install v3.32.0 — per-user plugin manifest ↔ actual install-state synchronizer. Installs missing managed plugins, removes only explicitly-excluded ones (backup + per-item confirm), reports foreign plugins read-only. Self-protecting: never uninstalls Lens. | MIT |
+| ci | Creeta Install v3.33.0 — per-user plugin manifest ↔ actual install-state synchronizer. Installs missing managed plugins, removes only explicitly-excluded ones (backup + per-item confirm), reports foreign plugins read-only. Self-protecting: never uninstalls Lens. | MIT |
 
 Triggers: /ci, install sync, sync install, 설치 동기화, 동기화, 설치목록 동기화, 플러그인 동기화,
 インストール同期, 安装同步, 插件同步, sincronizar instalación, synchroniser installation, Installation synchronisieren
