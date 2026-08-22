@@ -203,7 +203,7 @@
         "https://code.claude.com/docs/en/release-notes"
       ],
       "false_obsolete_risk": "네이티브 리뷰는 '코드 diff 판정'이지 '실제 실행으로 작동 증명(Playwright/curl)'이 아니다. 그 축은 /cc Phase 6 QA 가 계속 수행하므로 /ccp 폐지로 잃은 것은 중복분뿐. 실행 증명이 /cc QA 에서도 빠지면 이 판정을 재검토할 것",
-      "acted_v3.29": "/ccp 스킬 폐지(skills/ccp/ 삭제). /cc '다른 Skills와의 관계' 절에 네이티브 리뷰 경로 안내 추가",
+      "acted_v3.29": "/ccp 스킬 폐지(skills/ccp/ 삭제). /cc 에 네이티브 리뷰 경로 안내 추가 (v3.34 에서 해당 절 삭제 — README.md 가 같은 안내를 더 정확히 보유)",
       "last_reviewed": "2026-08-07"
     },
     {

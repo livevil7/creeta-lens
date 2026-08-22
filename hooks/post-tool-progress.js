@@ -71,7 +71,7 @@ const CONTINUITY_MS = REPORT_INTERVAL_MS * 3;
 
 // Tools that CAN spawn background work. Membership alone proves nothing — an async
 // launch has to be evidenced per call (see isBackgroundSignal).
-const SPAWN_TOOLS = new Set(['Task', 'Agent']);
+const SPAWN_TOOLS = new Set(['Task', 'Agent', 'Workflow']);
 // Async-launch phrasing in the spawn tool's own return text. Same discrimination as
 // hooks/post-tool-task.js isAsyncLaunch() (실측 2026-07-25: an async launch returns
 // "Async agent launched successfully." + "The agent is working in the background.").

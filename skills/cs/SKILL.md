@@ -7,7 +7,7 @@ user-invocable: true
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.33.0 — Multi-repo git synchronizer. Mirrors every repo to GitHub: ff-pull in, commit + direct push out, reclaim its own `sync/` residue, and report success as an invariant (local == origin/base, nothing dirty, no open sync PR). | MIT |
+| cs | Lens Sync v3.34.0 — Multi-repo git synchronizer. Mirrors every repo to GitHub: ff-pull in, commit + direct push out, reclaim its own `sync/` residue, and report success as an invariant (local == origin/base, nothing dirty, no open sync PR). | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,7 +17,7 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.33.0**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.34.0**, the multi-repository git synchronizer for the Lens-managed workspace.
 
 `/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — all of the logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
@@ -323,4 +323,4 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
 - Config: `lens.config.json` — `baseBranch`, `syncPolicy`
 - Tests: `tests/test_git_sync.sh` — 10 scenario families, 88 assertions (mirror / task-branch skip / pr-manual / reconcile / loss-prevention / --json + review hardening: gh-failure fail-closed / split remote / PR base qualify / merge queue), local bare fixtures + gh stub, no network
-- Version: aligned with the Lens plugin version (currently 3.33.0)
+- Version: aligned with the Lens plugin version (currently 3.34.0)

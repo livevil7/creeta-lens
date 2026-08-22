@@ -1,5 +1,5 @@
 {
-  "description": "Lens v3.33.0 by Creeta - Task Execution Engine + Documentation Management + Multi-Repo Sync for Claude Code",
+  "description": "Lens v3.34.0 by Creeta - Task Execution Engine + Documentation Management + Multi-Repo Sync for Claude Code",
   "hooks": {
     "SessionStart": [
       {
@@ -36,7 +36,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Task",
+        "matcher": "Task|Agent|Workflow",
         "hooks": [
           {
             "type": "command",
@@ -48,12 +48,22 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Task",
+        "matcher": "Task|Agent|Workflow",
         "hooks": [
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-task.js",
             "timeout": 3000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-plan-doc.js",
+            "timeout": 5000
           }
         ]
       },
