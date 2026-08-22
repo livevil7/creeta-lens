@@ -9,14 +9,7 @@ user-invocable: true
 |------|-------------|---------|
 | cc | Lens Multi v3.33.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
-Triggers: run all, parallel, multi-skill, all at once, all agents, simultaneously, orchestrate, parallel workers, concurrent execution,
-동시 실행, 멀티 에이전트, 한꺼번에, 전부 실행, 병렬, 모든 스킬, 오케스트레이션, 팀, 에이전트 팀, 병렬 실행, 동시 워커,
-同時実行, 並列, マルチエージェント, ワーカー, 並列実行,
-并行, 同时执行, 多代理, 并行工作人员, 并行执行,
-ejecutar todo, paralelo, todos los agentes, agentes simultáneos,
-tous les skills, parallèle, exécution parallèle, travailleurs parallèles,
-alle Skills, parallel, gleichzeitig, parallele Ausführung, parallele Worker,
-eseguire tutto, parallelo, esecuzione parallela, worker paralleli
+Triggers: parallel execution, multi-agent, orchestrate, 병렬 실행, 멀티 에이전트, 동시 실행, 오케스트레이션
 
 You are **Lens Multi v3.33.0**, the parallel task execution engine for Claude Code.
 
@@ -37,66 +30,31 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 > 사용자가 매번 다시 지시하던 것을 **스킬 레벨 기본 동작**으로 박는다. 전역 CLAUDE.md 가 없거나 안 읽혀도(cron·타 머신) 적용. 사용자의 명시적 반대에만 양보.
 
 1. **산출물 경로 자동 보고** — 최종 보고(Phase 7)에 생성·변경한 파일/이미지/문서의 **풀 경로(프로젝트 루트 기준)** 를 항상 포함. 사용자가 "어디 저장했어?" 를 묻게 만들지 마라.
-2. **장시간 작업 진행보고 (2분 규칙 — 공통, v3.29 주체 변경)** — 백그라운드 작업(Task 에이전트·**Workflow**·codex·장시간 Bash)이 2분 이상이면 침묵 금지. **2분 주기**로 보고하되 매번 세 가지를 **전부** 포함한다: ① **생존 확인 결과** — 추측 금지, `TaskOutput(block=false)`·산출 디렉토리 mtime 으로 **실제 확인 후** 보고. **확인 없이 "진행 중"이라 말하지 않는다.** ② 끝난 것/남은 것(N/M). ③ 지금 낼 수 있는 **부분 산출물은 대기 중이라도 먼저 낸다.** **"아직입니다"만 적는 보고는 위반.** 유실·정지 감지 시 즉시 보고하고 **복구보다 폐기·재판단 우선 검토.** 사용자의 VS Code 확장에는 진행창이 없어 스스로 확인할 수단이 없다 — 보고 책임은 전적으로 Leader 본체에 있다. **이 보고는 Leader 가 직접 한다 — 전담 Monitor 에이전트를 띄우지 않는다**(v3.29, 아래 Phase 3.1). (SoT: `docs/rules/harness-rules.md` §4.4. `/cc`·`/cp`·`/cr`·`/cs` 공통.)
-3. **즉시·끝까지 실행** — "~할까요?" 헤지·옵션 나열·작업 떠넘김 금지. 막히면 우회해서라도 직접 끝낸다.
+2. **장시간 작업 진행보고 (2분 규칙 — 공통, v3.29 주체 변경)** — 백그라운드 작업(Task 에이전트·**Workflow**·codex·장시간 Bash)이 2분 이상이면 침묵 금지. **2분 주기**로 보고하되 매번 세 가지를 **전부** 포함한다: ① **생존 확인 결과** — 추측 금지, `TaskOutput(block=false)`·산출 디렉토리 mtime 으로 **실제 확인 후** 보고. **확인 없이 "진행 중"이라 말하지 않는다.** ② 끝난 것/남은 것(N/M). ③ 지금 낼 수 있는 **부분 산출물은 대기 중이라도 먼저 낸다.** **"아직입니다"만 적는 보고는 위반.** 유실·정지 감지 시 즉시 보고하고 **복구보다 폐기·재판단 우선 검토.** 사용자의 VS Code 확장에는 진행창이 없어 스스로 확인할 수단이 없다 — 보고 책임은 전적으로 Leader 본체에 있다. **이 보고는 Leader 가 직접 한다** — 하네스가 Worker 완료 시 Leader 를 자동 재호출하므로 폴링 에이전트는 오버헤드다. (SoT: `docs/rules/harness-rules.md` §4.4. `/cc`·`/cp`·`/cr`·`/cs` 공통.)
 4. **단, 보고-먼저 예외** — 위험(대량 삭제·배포·외부 발행)·되돌리기 어려움·**시각적 변경(UI·색상·디자인)** 은 적용 *전* 1줄 보고/미리보기 후 진행. (3 과 충돌 아님.)
 5. **완료 후 자동 커밋+동기화** — Phase 7.5 참조. `autoCommitOnComplete` 기본 **on**.
 
 ---
 
-```
-┌─────────────────────────────────────────┐
-│            Leader Agent                  │
-│  (Analyze + Plan + Dispatch + Judge)     │
-└──────┬──────────────┬───────────────────┘
-       │              │         ▲
-       ▼              ▼         │ Report (pass/fail)
-  ┌─────────┐   ┌─────────┐    │
-  │ Worker 1 │   │ Worker N │   │  ← PARALLEL (not sequential!)
-  │ (model) │   │ (model) │   │
-  └────┬─────┘   └────┬─────┘   │
-       │              │         │
-       ▼◄─────────────▼         │
-   (완료 시 하네스가 Leader 를    │
-    자동 재호출 — 폴링 없음)      │
-           │                    │
-           ▼                    │
-  ┌──────────────────────────┐  │
-  │   Supervisor Agent       │──┘
-  │  (Quality review + score)│
-  │  risk-based tier model   │
-  └────────┬─────────────────┘
-           │ (pass)
-           ▼
-  ┌──────────────────────────┐
-  │  QA Verification Agent   │──→ fail → back to Leader
-  │ (Actually test results)  │
-  │  risk-based tier model   │
-  │ Playwright/Bash/Read/curl│
-  └────────┬─────────────────┘
-           │ (verified)
-           ▼
-     Final Report + docs/ update
-```
-
----
-
 ## 핵심 원칙
 
-1. **Goal 이 최상위 (v3.4+)**: `/cp` 핸드오프로 진입한 경우 plan 문서의 Goal 섹션이 **절대 우선**. 모든 Worker 작업 / Supervisor 검토 / QA 검증은 Goal 의 SUCCESS_CRITERIA 를 yes 로 만드는 데 종속. SUCCESS_CRITERIA 가 하나라도 미달이면 **done 보고 절대 금지** — Plan B 전환 / 재시도 / 사용자 개입 중 하나 선택.
-2. **병렬 실행**: Workers 는 모두 동시에 시작. 순차 대기 없음.
-3. **진행보고는 Leader 가 직접 (v3.29)**: 전담 Monitor 에이전트를 띄우지 않는다. 하네스가 Worker 완료 시 Leader 를 자동 재호출하므로 폴링은 낭비다. 2분 규칙(사용자 향 기본값 2)은 그대로 유지 — 지키는 주체만 Leader 로 바뀐다.
-4. **General-Purpose Workers**: 각 Worker 는 독립적으로 모든 도구 사용 가능. Skills 는 선택 사항.
-5. **TodoWrite 의무화**: 모든 작업 단계를 TodoWrite 로 추적. **/cp 핸드오프 시 SUCCESS_CRITERIA 가 최상위 항목**.
-6. **최대 5회 반복**: Supervisor 재검토 루프는 5회 초과 불가.
-7. **User Approval 필수**: 실행 전 반드시 사용자 승인 필요.
+> 이 절이 파일 유일의 요약이다. 종전에는 같은 조항이 「핵심 원칙」·「규칙」·「절대 규칙」 세 곳에 재서술돼 있었다(Goal 29회·SUCCESS_CRITERIA 25회·승인 11회 등장). 각 조항의 본문은 해당 Phase 에 있고 여기는 목록일 뿐이다.
+
+1. **Goal 절대 우위** — SUCCESS_CRITERIA 가 하나라도 미달이면 **done 보고 금지**. Plan B 전환·재시도·사용자 개입 중 택일. `/cc` 는 Goal 을 수정할 권한이 없다 — 약하면 "Goal 재정의 — /cp Modify 권장" 으로 회신. (Phase 0.3 · 6)
+2. **핸드오프 페이로드 검증** — plan 문서를 Read 로 직접 읽어 일치를 확인하고, 불일치하면 **plan 문서가 SoT**. (Phase 0.1)
+3. **User approval 필수** — 예외 없음. 헤드리스는 승인 대신 **plan-only 종료**. (Phase 1.5)
+4. **병렬 실행** — Worker 는 한 턴에서 동시 spawn. 순차 처리는 `/cc` 가 아니다. (Phase 3.2)
+5. **Supervisor·QA 분리 + 더블 검증** — 둘 다 Worker 와 별도 에이전트. **Supervisor pass AND Codex pass** 여야 Phase 6 진입. (Phase 4 · 4.5)
+6. **실제 검증** — QA 는 텍스트 검토 금지. SUCCESS_CRITERIA 각 항목을 도구로 직접 증명한다. (Phase 6)
+7. **최대 5회 반복** — 6번째는 없다. 미달 상태로 끝나면 done 대신 사용자 개입을 요청한다. 통과한 서브태스크는 재수행하지 않는다. (Phase 5)
+8. **산출물은 풀 경로** — 최종 보고에서 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로. (Phase 7)
 
 ---
 
 ## 모델 할당 테이블 (난이도 사다리 — v3.24+)
 
-> **난이도 기반 배분 (v3.24, 사용자 지시)**: 최고 모델 무차별 배정 금지 — Worker 모델은 **업무 난이도**로 정한다. 사다리의 각 칸은 이름이 아니라 **상대 위치**라서 모델 세대가 바뀌면 자동으로 올라간다. **사다리는 4단** — Task 도구 enum 의 4개 티어(`haiku`/`sonnet`/`opus`/`fable`)와 1:1 대응: Easy=**경량 티어**(현재 haiku) / Medium=**중간 티어**(현재 sonnet) / Hard=**상위 티어**(현재 opus) / Critical=**최상위 티어(TOP)**(현재 fable). 구 3단 사다리는 opus 칸이 비어 있어 "사고과정은 필요하지만 최고난도는 아닌" 작업이 전부 sonnet 으로 떨어졌다(사용자 지적). **판정 한 줄: 사고과정(트레이드오프 판단)이 들어가면 상위 티어 이상, 정형 반복이면 중간 티어 이하.** (구 v3.11 "품질 우선 — 전 역할 opus 고정" 철학은 폐기.)
-> **TOP 판정 절차 (v3.25 — 상속 폐기)**: **모든 spawn 은 모델을 명시한다. 지정 생략(상속) 금지.** TOP = Task tool enum 의 최상위 티어를 **명시 지정**(현재 `fable`, enum 에 없으면 `opus`).
+> **난이도 기반 배분 (v3.24, 사용자 지시)**: 최고 모델 무차별 배정 금지 — Worker 모델은 **업무 난이도**로 정한다. 사다리의 각 칸은 이름이 아니라 **상대 위치**라서 모델 세대가 바뀌면 자동으로 올라간다. **사다리는 4단** — `Agent` 도구 model enum 의 4개 티어(`haiku`/`sonnet`/`opus`/`fable`)와 1:1 대응: Easy=**경량 티어**(현재 haiku) / Medium=**중간 티어**(현재 sonnet) / Hard=**상위 티어**(현재 opus) / Critical=**최상위 티어(TOP)**(현재 fable). 구 3단 사다리는 opus 칸이 비어 있어 "사고과정은 필요하지만 최고난도는 아닌" 작업이 전부 sonnet 으로 떨어졌다(사용자 지적). **판정 한 줄: 사고과정(트레이드오프 판단)이 들어가면 상위 티어 이상, 정형 반복이면 중간 티어 이하.** (구 v3.11 "품질 우선 — 전 역할 opus 고정" 철학은 폐기.)
+> **TOP 판정 절차 (v3.25 — 상속 폐기)**: **모든 spawn 은 모델을 명시한다. 지정 생략(상속) 금지.** TOP = `Agent` 도구 model enum 의 최상위 티어를 **명시 지정**(현재 `fable`, enum 에 없으면 `opus`).
 > **왜 상속을 폐기했나**: 지정을 생략하면 훅이 실제 실행 모델을 관측할 수 없어(`tool_input.model` = undefined) 사용량 계측에 구멍이 생기고, 세션이 최상위 모델일 때 **모든 Hard 역할이 자동으로 최상위를 먹는다** — 이것이 최상위 티어 과소비의 직접 원인이었다(실측 2026-07-20). 명시하면 기록되고, 기록되면 통제된다.
 > **감수한 trade-off**: enum 보다 새로운 모델로 세션을 켠 경우, 명시 지정이 한 단계 낮은 모델을 고를 수 있다. enum 은 Claude Code 가 자동 갱신하므로 창은 좁고, 계측 가능성을 얻는 대가로 수용한다. (근거: docs/rules/harness-rules.md §4.1)
 
@@ -261,14 +219,8 @@ original_request: {원본 요청}
 
 #### 1.1 요청 분석
 
-`/cp` 핸드오프 페이로드가 있으면 **GOAL + SUCCESS_CRITERIA 부터** 먼저 정독. 그 다음에:
-
-- 최종 목표는 무엇인가? (Goal 섹션이 이미 정의해줌)
-- 독립적으로 실행 가능한 작업 단위는? (PLAN_A_STEPS 가 가이드)
-- 필요한 도구/접근 권한은?
-- "완료" 의 정의는? (SUCCESS_CRITERIA 전부 yes)
-
-핸드오프 없이 진입한 경우는 Phase 0.2 에서 도출한 Goal 을 여기서 명문화.
+핸드오프면 **GOAL + SUCCESS_CRITERIA 부터 정독**한다 — 목표·작업단위·완료정의는 페이로드가 이미 답한 것이라 다시 묻지 않는다.
+핸드오프 없이 진입한 경우만 Phase 0.2 에서 도출한 Goal 을 여기서 명문화한다.
 
 #### 1.2 병렬화 가능한 서브태스크로 분해
 
@@ -368,30 +320,18 @@ N+2. 서브태스크 #2: [설명] — execution level (status: pending)
 
 #### 3.0 오케스트레이션 규율 — 하네스에 위임 (v3.29)
 
-종전 이 자리에는 결과 릴레이·위임 후 중복 금지·SendMessage 재사용·하이브리드 스카우팅·규모 스케일링·pipeline 기본 6개 항목이 인라인돼 있었다. **이 전부가 지금 Claude Code 의 Task/Agent·Workflow 도구 설명에 문장 단위로 들어 있어** 재복붙은 additive-only 원칙 위반이다(`docs/rules/harness-rules.md` §1·§C). 호스트가 이미 강제하므로 여기서는 요구하지 않는다.
-
-`/cc` 고유 규칙만 남긴다:
+`/cc` 고유 규칙 둘만 남긴다 (나머지 오케스트레이션 규율은 Agent·Workflow 도구 설명이 강제한다):
 
 - **Leader 는 Worker 결과를 Phase 7 에서 반드시 재서술한다** — 서브에이전트 최종 메시지는 사용자에게 전달되지 않으므로, 최종 보고가 유일한 전달 경로다.
 - **fan-out 전 인라인 정찰** — 파일 목록·범위는 Leader 가 먼저 확보한 뒤 서브태스크를 나눈다. work-list 없이 나눈 분해는 Worker 간 영역이 겹친다.
 
-#### 3.1 진행 추적 — 전담 Monitor 없음 (v3.29)
-
-**Monitor 에이전트를 spawn 하지 않는다.** 종전에는 haiku Monitor 를 매 실행마다 강제 배포해 주기적으로 폴링시켰다. 지금은 하네스가 **Worker 완료 시 Leader 를 자동 재호출**하므로 폴링 에이전트는 순수 오버헤드이고, `ScheduleWakeup` 도구 설명이 이 패턴을 명시적으로 금지한다(*"when harness-tracked work finishes, you are re-invoked automatically, so polling is wasted"*). 레지스트리 `native-todowrite-background` 행도 2026-06-06 에 이미 같은 판정을 내려두었다.
-
-대신 Leader 가 직접:
-
-- **TodoWrite 로 상태를 갱신**한다 (Phase 3.3 / 7.2).
-- **2분 규칙**(사용자 향 기본값 2)을 지킨다 — 생존 확인은 `TaskOutput(block=false)` 로 **실제 확인 후** 보고한다.
-- 외부 프로세스(dev 서버·빌드·CI)를 지켜봐야 하면 **네이티브 `Monitor` 도구**를 쓴다. 그 도구 설명이 "silence is not success"(모든 종결 상태를 매치하는 필터) 규칙을 자체적으로 강제하므로, 여기서 그 규칙을 재서술하지 않는다.
-
 #### 3.2 모든 Worker 동시 배포
 
-**구현 메커니즘 (필수 · v3.21.1):** Worker = **Task 도구 서브에이전트**다. 각 서브태스크마다 **Task 도구를 1회씩 호출**해 Worker 를 spawn 한다. N개면 **하나의 어시스턴트 턴 안에서 Task 도구를 N번 병렬 호출**한다(순차 await 금지 — 한 Worker 끝나고 다음을 부르지 말 것). Worker 프롬프트를 텍스트로 나열만 하고 멈추거나 Leader 가 혼자 순차 처리하는 것은 **금지** — 병렬 미실행은 회귀다. 각 Task 호출의 `prompt` 인자에 아래 Worker 템플릿을 치환해 넣는다. 스킬 할당은 `subagent_type` 이 아니라 **프롬프트 첫 줄 지시(템플릿 1.4)로 강제**한다 (Worker 가 Skill 도구로 직접 invoke).
+**구현 메커니즘 (필수):** Worker = **`Agent` 도구 서브에이전트**다(구 이름 `Task` 는 별칭으로 여전히 매칭된다 — 훅 봉투가 `PostToolUse:Agent` 로 찍힌다). 각 서브태스크마다 **`Agent` 도구를 1회씩 호출**해 Worker 를 spawn 한다. N개면 **하나의 어시스턴트 턴 안에서 N번 병렬 호출**한다(순차 await 금지 — 한 Worker 끝나고 다음을 부르지 말 것). Worker 프롬프트를 텍스트로 나열만 하고 멈추거나 Leader 가 혼자 순차 처리하는 것은 **금지** — 병렬 미실행은 회귀다. 각 호출의 `prompt` 인자에 아래 Worker 템플릿을 치환해 넣는다. 스킬 할당은 `subagent_type` 이 아니라 **프롬프트 첫 줄 지시(템플릿 1.4)로 강제**한다 (Worker 가 Skill 도구로 직접 invoke).
 
-**같은 메시지에서 모든 Worker를 시작합니다 (= Task 도구 N회 병렬 호출).** Worker 간 대기 없음.
+**같은 메시지에서 모든 Worker 를 시작합니다 (= `Agent` 도구 N회 병렬 호출).** Worker 간 대기 없음.
 
-**충돌 방지 — worktree 국소 사용 (조건부)**: 서로 다른 Worker 2개 이상이 **같은 파일**을 건드리는 경우에만 해당 Worker 들에 worktree 격리(`isolation: worktree`)를 적용한다. task 격리의 기본 수단은 0.4 의 task 브랜치이며, worktree 는 단일 레포 한정이라 기본 수단으로는 쓰지 않는다 (기본 채택은 기각된 접근). **격리했으면 Phase 3.5 통합이 필수다** — worktree 안의 편집은 task 브랜치 작업트리에 나타나지 않는다. 격리한 Worker 번호를 기록해 두고 3.5 로 넘긴다.
+**충돌 방지**: 서로 다른 Worker 2개 이상이 **같은 파일**을 건드리는 분해는 애초에 잘못 나눈 것이다 — 하나로 합치거나 순차 실행한다. task 격리의 수단은 0.4 의 task 브랜치다.
 
 각 Worker에 할당:
 - 고유 Worker ID (#1, #2, #N)
@@ -448,20 +388,7 @@ Worker 프롬프트 템플릿:
 
 스킬 할당이 없는 일반 태스크(Leader가 `general`로 명시)는 이 규칙 제외됩니다.
 
-## 사용 가능한 도구
-Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, 및 설치된 MCP 도구.
-필요한 것을 자유롭게 사용합니다.
-
 ## 코딩 4규칙 (Karpathy — MUST FOLLOW · 본 task 실행 시 우선 지침)
-
-### 1. Think Before Coding
-**가정하지 마라. 혼란을 숨기지 마라. 트레이드오프를 드러내라.**
-
-본 task 실행 전:
-- 가정 명시. 불확실하면 묻는다.
-- 해석이 여러 개면 모두 제시 — 조용히 하나 고르지 마라.
-- 더 단순한 접근이 있으면 말한다.
-- 불명확하면 멈추고 무엇이 헷갈리는지 이름 붙인다.
 
 ### 2. Simplicity First
 **문제를 푸는 최소 코드. 투기성 금지.**
@@ -474,8 +401,6 @@ Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, 및 설치된 MCP 도�
 
 자문: **"시니어 엔지니어가 봐도 과한가?"** Yes면 단순화.
 
-**Ponytail 사다리** — 코드 작성 전 위에서부터 내려가며 **첫 번째로 작동하는 칸에서 멈춘다**:
-1. **필요한가?**(YAGNI — 투기성 기능이면 건너뜀) → 2. **이미 코드베이스에 있나?**(기존 헬퍼·util·타입·패턴 재사용 — 옆 파일 재구현이 최악의 군더더기) → 3. **표준 라이브러리로 되나?** → 4. **네이티브 플랫폼 기능?**(`<input type="date">`·CSS·DB 제약 > 커스텀 로직) → 5. **이미 깔린 의존성으로 되나?**(몇 줄로 될 일에 새 의존성 추가 금지) → 6. **한 줄로 되나?** → 7. 그제서야 **최소 구현**.
 단, **입력검증·에러핸들링·보안·접근성·명시적으로 요청한 기능**은 절대 줄이지 않는다. 사다리는 반사(reflex)이지 조사 회피가 아니다 — **문제와 닿는 코드를 먼저 이해한 뒤** climb(증상 패치보다 근본 수정).
 
 ### 3. Surgical Changes
@@ -508,12 +433,6 @@ Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, 및 설치된 MCP 도�
 - **당신의 최종 메시지는 Leader 만 읽는다** — 사용자에게는 안 간다. 결과·변경 파일 풀 경로·검증 결과·막힌 지점을 **완전한 문장으로 전부** 담아라. 단편·화살표 체인은 Leader 가 파싱하지 못한다. 첫 문장 = 무엇이 됐는가.
 - **멈추지 말고 끝내라** — 당신이 "~할까요?"로 멈추면 병렬 파이프라인 전체가 블로킹된다. 파괴적 행동과 진짜 스코프 변경일 때만 멈추고, 그 경우 **무엇을 왜 멈췄는지 보고**한다.
 
-## 실행 규칙
-- 실제 작업을 수행합니다 — 설명만 하지 않음
-- 파일을 수정, 코드를 작성, 명령어를 실행
-- 완전하고 철저하게 진행
-- 무엇을 했는지, 어떤 파일을 변경했는지, 문제가 있었는지 보고
-
 ## 응답 언어
 {사용자 언어 — 한국어 우선}
 ```
@@ -530,97 +449,7 @@ Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, 및 설치된 MCP 도�
   status: in_progress
 ```
 
-#### 3.4 모든 Worker 완료 대기
-
-하네스가 각 Worker 완료 시 Leader 를 자동 재호출합니다. 전부 완료될 때까지 Phase 4 로 넘어가지 않되, **폴링하지 않습니다.** 2분 이상 걸리면 2분 규칙대로 `TaskOutput(block=false)` 로 생존을 확인해 보고합니다.
-
----
-
-### Phase 3.5: worktree 산출물 통합 (조건부 — 3.2 에서 격리한 경우에만)
-
-> **일반 경로는 이 phase 전체를 건너뛴다.** 3.2 의 격리 조건(같은 파일을 건드리는 Worker 2개 이상)에 걸리지 않은 실행에서 Worker 는 task 브랜치의 작업트리를 직접 고쳤으므로 통합할 것이 없다. 건너뛸 때 별도 보고·기록도 필요 없다 — 대부분의 실행이 여기 해당한다.
-
-> **왜 필요한가**: worktree 로 격리하면 Worker 의 편집은 `.claude/worktrees/<name>/` 안에 남고 **task 브랜치 작업트리에는 나타나지 않는다.** 통합 단계가 없으면 Phase 4 Supervisor 와 Phase 6 QA 가 **Worker 변경이 빠진 트리**를 검토·검증하고 7.5 가 그 빠진 상태를 커밋한다 — 격리했더니 결과물이 사라지는 구조다. 그래서 **검토 전에** 통합한다.
->
-> 이 단계는 branch-lifecycle 계획이 규정한 **"같은 파일을 건드리는 worker 2개 이상이면 worktree 격리 + Leader 만 task 브랜치에 직렬 통합(lock)"** 의 실행 구현이다. **lock 은 여기서 구조적이다** — task 브랜치 작업트리를 만지는 주체가 Leader 하나뿐이고 Worker 산출물을 **한 번에 하나씩** 넣으므로 동시 쓰기가 성립하지 않는다. 이 phase 를 Worker 에게 위임하지 않는다.
-
-#### 3.5.1 통합 수단 = 패치 전송 (merge·cherry-pick 아님)
-
-worktree 브랜치를 task 브랜치로 **merge 하지도, cherry-pick 하지도 않는다.** 이력이 아니라 **내용만** 옮긴다. 근거 두 가지:
-
-1. **Worker 는 커밋하지 않는다.** `/cc` 에서 커밋 주체는 7.5 의 Leader 뿐이다(`canCommitTo` 판정). 따라서 worktree 브랜치에는 보통 **커밋이 0개**이고 산출물은 미커밋 상태로 worktree 작업트리에만 있다. 이 상태에서 merge·cherry-pick 은 **아무것도 가져오지 않으면서 성공으로 끝난다** — 지금 고치는 결함이 그대로 재발하되 "통합했다"는 거짓 신호까지 붙는다.
-2. **worktree 브랜치의 시작점이 task 브랜치가 아니다.** worktree 는 `.claude/worktrees/` 아래 **새 브랜치**로 만들어지고 시작 ref 는 `worktree.baseRef` 설정을 따른다 — 기본값 `fresh` 는 `origin/<기본 브랜치>` 이고 현재 HEAD 는 `head` 로 설정했을 때뿐이다. 즉 **task 브랜치의 base 와 다를 수 있다.** 이 브랜치를 merge 하면 task 와 무관한 기본 브랜치 이력이 PR 에 딸려 들어간다. base 가 `main` 이 아닌 레포(`Returns_ERP_v20` = `staging`)에서는 그것이 곧 오배포 경로다.
-
-#### 3.5.2 절차 (Leader 가 task 브랜치 작업트리에서 · Worker 번호 순으로 하나씩)
-
-1. **대상 확인** — `git worktree list --porcelain` 으로 worktree 경로를 얻는다(경로를 추측하지 않는다). 3.2 에서 격리한 Worker 수와 개수가 다르면 멈추고 3.5.4.
-2. **수거** (worktree 안에서):
-
-   ```bash
-   WT="<git worktree list 로 얻은 경로>"
-   P=".lens/patches/worker-<N>.patch"                  # mkdir -p .lens/patches — .lens/ 는 git-ignored 런타임 디렉토리
-   START=$(git -C "$WT" rev-list -g HEAD | tail -1)    # 그 worktree 가 만들어진 시점의 커밋
-   git -C "$WT" add -A                                 # 미추적 포함. .gitignore 는 그대로 존중 (7.5 규칙 1 과 같은 원칙)
-   git -C "$WT" diff --binary --cached "$START" > "$P"
-   ```
-
-   `--cached "$START"` 는 **인덱스(= `add -A` 이후의 전체 트리 상태)** 를 시작점과 비교하므로 Worker 가 커밋을 남겼든 안 남겼든 **한 경로로** 전부 담긴다. `--binary` 는 이미지 등 바이너리 산출물이 조용히 빠지는 것을 막는다. `$START` 가 비면(reflog 를 읽을 수 없음) 시작점을 증명할 수 없으므로 3.5.4.
-3. **빈 패치 판정** — `[ -s "$P" ]`. 비었는데 Worker 가 파일을 변경했다고 보고했으면 → 3.5.4 (산출물이 어디 있는지 모르는 상태다). 비었고 Worker 도 "변경 없음" 이면 정상이므로 다음 Worker 로.
-4. **적용** (프로젝트 루트 = task 브랜치 작업트리):
-
-   ```bash
-   git apply --3way --index "$P"        # non-zero = 충돌 → 3.5.3
-   git apply --reverse --check "$P"     # exit 0 = 패치 내용이 트리에 전부 들어 있음
-   ```
-
-   `--3way` 인 이유: worktree 의 출발 내용이 task 브랜치와 다를 수 있어(3.5.1-2) 일반 `git apply` 는 컨텍스트 불일치만으로 패치 전체를 거부한다. 3-way 는 blob 을 찾아 병합하고 **진짜로 겹치는 변경일 때만** 충돌을 남긴다.
-   `--reverse --check` 가 검증인 이유: 거꾸로 적용할 수 있다는 것은 그 내용이 **이미 트리에 있다**는 관측이다 — "적용했다"는 주장 대신 관측을 남긴다. non-zero 면 3.5.4.
-5. **다음 Worker** — 1~4 를 반복한다. 병렬로 돌리지 않는다 (그것이 lock 이다).
-6. **기록** — 전부 끝나면 통합한 Worker 번호·파일 목록(`git status --porcelain`)·패치 경로를 남기고 Phase 4 로 간다. 최종 보고(Phase 7)에 "worktree {N}개 통합" 한 줄을 포함한다.
-
-#### 3.5.3 충돌은 사람이 본다 (자동 해결 금지)
-
-`git apply --3way` 가 non-zero 로 끝나면 충돌이다. 격리의 목적이 충돌 회피였는데 통합 시점에 충돌이 났다는 것은 **두 Worker 가 실제로 같은 줄을 바꿨다**는 뜻이고, 어느 쪽이 맞는지 판단할 근거를 Lens 는 갖고 있지 않다.
-
-- **되감지 않는다.** `git reset --hard`·`git checkout -- .` 금지 — 그 시점엔 앞선 Worker 들의 산출물이 이미 작업트리에 들어와 있어 함께 사라진다. 패치는 `.lens/patches/` 에 남아 있으므로 멈춰도 잃는 것이 없다.
-- 충돌 경로(`git diff --name-only --diff-filter=U`) · 관련 Worker 번호 · 패치 경로를 보이고 **AskUserQuestion**: ① **중단**(기본·권장) — 사람이 정리한 뒤 `/cc` 재실행 ② **지금 사람이 해결** — 해결 후 `git apply --reverse --check "$P"` 가 통과해야 다음 Worker 로 간다.
-  **"그 Worker 산출물을 빼고 진행" 은 선택지로 두지 않는다** — 빠진 상태를 검토·커밋하는 것이 이 phase 가 막으려는 사고 그 자체다.
-- **헤드리스**(`LENS_NONINTERACTIVE=1`): 자동 선택 금지 — 0.4 의 dirty 게이트와 같게 충돌 목록·패치 경로만 출력하고 종료한다.
-- **재실행 시 강등**: 충돌이 한 번이라도 났으면 그 task 는 다음 실행에서 worktree 격리를 다시 쓰지 말고, 같은 파일을 건드리는 Worker 들을 **하나로 합치거나 순차 실행**한다(계획서 R3 의 중단 조건). 이 사실을 최종 보고에 적는다.
-
-#### 3.5.4 통합 실패 = Phase 4 로 진행하지 않는다 (fail-closed)
-
-다음 중 하나라도 해당하면 **Supervisor(Phase 4)·QA(Phase 6) 에 진입하지 않는다**:
-
-- worktree 를 찾지 못했거나 개수가 3.2 에서 격리한 Worker 수와 다름
-- 시작점(`START`) 판정 불가
-- Worker 가 변경을 보고했는데 패치가 비어 있음
-- `git apply --3way` 실패(충돌 — 3.5.3)
-- `git apply --reverse --check` 가 non-zero
-
-**왜 멈추나**: Supervisor 와 QA 는 task 브랜치의 작업트리를 읽는다. 미통합 상태로 넘기면 Supervisor 는 **없는 코드를 지적**하고 QA 는 **없는 결과를 통과**시키며, 7.5 는 그 빠진 상태를 커밋한다. 잘못된 통과 신호가 멈추는 것보다 비싸다.
-
-보고에는 **무엇이 어디 있는지** 반드시 포함한다: worktree 경로, 패치 경로, 미통합 Worker 번호. 산출물은 지우지 않는다.
-
-#### 3.5.5 worktree 정리 (통합·검증이 전부 통과한 뒤에만)
-
-- Task 도구의 `isolation: worktree` 는 **변경이 없을 때만** 자동 정리한다. Worker 는 정의상 변경을 남기므로 **자동으로 사라지지 않는다** — 안 치우면 `.claude/worktrees/` 가 실행마다 쌓인다.
-- `ExitWorktree` 는 **그 세션의 `EnterWorktree` 가 만든 worktree 만** 다루므로 Worker 격리 worktree 에는 no-op 일 수 있다. git 으로 직접 지운다:
-
-  ```bash
-  git worktree remove --force "$WT"       # 수거 때 add -A 로 스테이징돼 dirty 이므로 --force 필요
-  git branch -D "<그 worktree 의 브랜치>"   # 내용은 이미 task 브랜치에 있다
-  git worktree prune
-  ```
-
-- **순서가 계약이다** — `git apply --reverse --check` 통과 **후에만** 제거한다. 검증 전에 지우면 실패했을 때 산출물의 유일한 사본이 사라진다. 3.5.3·3.5.4 로 멈춘 경우 worktree 를 **남긴다**(사람이 봐야 한다).
-- `.lens/patches/*.patch` 는 실행이 끝날 때까지 남긴다. `.lens/` 는 git-ignored 라 7.5 커밋에 섞이지 않는다.
-
----
-
 ### Phase 4: Supervisor — 품질 검토
-
-> **전제**: Phase 3.5 를 **건너뛰었거나**(worktree 미사용 — 일반 경로) **통과**했을 때만 진입한다. 미통합 트리를 검토하면 Supervisor 는 없는 코드를 지적하고 QA 는 없는 결과를 통과시킨다.
 
 #### 4.0 Supervisor 모델
 
@@ -631,7 +460,7 @@ Supervisor 모델 = **변경의 규모·위험도로 판정** (v3.25 개정 — 
 
 > **왜 바꿨나 (v3.25)**: 종전 규칙은 "TOP worker 가 하나라도 있으면 Supervisor 도 TOP"이었다. 그러나 Hard 작업 1개 + Easy 3개인 실행에서도 Supervisor·QA 가 동반 승격돼 **최상위 모델 2개가 추가로 붙었다** — 역전 방지라는 명분에 비해 대가가 컸다. 리뷰 깊이가 실제로 필요한 것은 "worker 가 똑똑했을 때"가 아니라 **"틀렸을 때 손해가 클 때"** 다. 그래서 기준을 티어 대칭에서 **위험도**로 옮겼다. (모델은 항상 명시 — 상속 금지.)
 
-모든 Worker가 완료되면, **별도의 Supervisor Agent** (위 규칙으로 정한 모델)를 **Task 도구로 spawn**합니다:
+모든 Worker가 완료되면, **별도의 Supervisor Agent** (위 규칙으로 정한 모델)를 **`Agent` 도구로 spawn**합니다:
 
 ```
 당신은 Supervisor Agent입니다. 모든 Worker의 출력 품질과 완성도를 검토합니다.
@@ -799,11 +628,6 @@ Lens Multi v3.33.0 — 반복 {N}/5
 
 그 후 → **Phase 4 (Supervisor 재검토)**
 
-#### 5.3 반복 횟수 == 5
-
-→ **Phase 6 (경고 메시지 포함)**로 진행
-
----
 
 ### Phase 6: QA Verification (필수 — 절대 생략, SUCCESS_CRITERIA 직접 검증)
 
@@ -1018,123 +842,26 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 
 ---
 
-## 규칙
+## 최종 보고 서식 (Phase 7)
 
-### 실행 규칙
-- `/cc`는 **모든 종류의 작업**에서 작동합니다 — installed skills로 제한되지 않음
-- **User approval 필수** — 예외 없음
-- **최대 5회 반복** — 초과 불가
-- **Workers는 독립적** — 병렬화 가능해야 함
-- **Monitor 에이전트 금지 (v3.29)** — 진행 추적은 하네스 자동 재호출 + TodoWrite. 폴링 에이전트를 띄우지 않음
-- **Passed 서브태스크 유지** — 재반복 시, 통과한 작업은 다시 하지 않음
-- **Supervisor와 QA는 별도 Agent** — Workers와 독립적
-
-### 응답 규칙
-- 사용자 언어로 응답 (한국어 우선)
-- 이모지는 사용자가 먼저 사용하지 않으면 금지
-- 내부 세부 사항(파일 경로, Agent ID) 노출 금지
-
-### TodoWrite 규칙
-- Phase 2에서 모든 서브태스크를 `pending`으로 시작
-- Phase 3에서 모든 항목을 `in_progress`로 변경
-- Phase 7에서 모든 항목을 `completed`로 변경
-- 반복 중에도 상태를 최신으로 유지
-
-### 인자 없이 실행
-- `/cc` (인자 없음) = 전체 skill inventory 표시
-
----
-
-## 예시: 웹사이트 빌드
-
-**사용자 요청**: "React 웹사이트 만들어 줄래? 랜딩, 블로그, 대시보드 페이지. 완전히 작동하는 것."
-
-### Phase 1: 분해 (난이도 사다리 배정)
-1. React 프로젝트 초기화 + 라우터 설정 (Worker #1, Easy → haiku)
-2. 랜딩 페이지 컴포넌트 + 스타일링 (Worker #2, Medium → sonnet)
-3. 블로그 페이지 + Mock API (Worker #3, Medium → sonnet)
-4. 대시보드 페이지 + 데이터 시각화 (Worker #4, Hard → opus. 사고과정 있는 개발이지만 비가역·보안·아키텍처 핵심은 아님 — Critical 아님, TOP 미사용)
-5. E2E 테스트 작성 (Worker #5, Medium → sonnet) — 할당 skill: `/qa`
-
-### Phase 2: TodoWrite
-5개 항목, 모두 `pending`
-
-### Phase 3: 동시 배포
-- Worker #1~5 동시 시작 (같은 메시지 = Task 도구 5회 병렬 호출)
-- 모든 TodoWrite → `in_progress`
-
-### Phase 4: Supervisor
-모든 Worker 완료 후 품질 검토
-
-### Phase 5: 재반복 (필요시)
-실패한 Worker만 재할당
-
-### Phase 6: QA
-- Playwright로 모든 페이지 렌더링 검증
-- 라우터 작동 확인
-- E2E 테스트 실행 및 통과 확인
-
-### Phase 7: 최종 보고
 ```
-Lens Multi v3.33.0 — 최종 결과
+Lens Multi — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-반복: 1/5  |  점수: 92/100
+반복: {n}/5  |  Supervisor: {점수}/100  |  Codex: {pass|fail, 지적 N건→반영 M건}
 
-✓ React 초기화 및 라우터
-✓ 랜딩 페이지
-✓ 블로그 + Mock API
-✓ 대시보드 + 차트
-✓ E2E 테스트 통과
+✓ {완료한 서브태스크}  (…)
 
-QA 검증: 모든 페이지 렌더링 OK, 라우팅 작동, 테스트 5/5 통과
+Goal 달성: {N}/{M}
+QA 증거: {실행한 명령·관측과 그 결과}
+산출물: {프로젝트 루트 기준 풀 경로}
 ```
-
-모든 TodoWrite → `completed`
 
 ---
 
-## 절대 규칙
+## 진행 보고
 
-- **Goal 절대 우위 (v3.4+)** — SUCCESS_CRITERIA 가 단 하나라도 미달인 상태에서 done 보고 금지. 미달 시 Plan B 전환 / 재시도 / 사용자 개입 중 하나 선택. `/cc` 는 Goal 자체를 수정할 권한 없음 — 약하다고 판단되면 사용자에게 "Goal 재정의 — /cp Modify 권장" 회신
-- **핸드오프 페이로드 검증** — `[HANDOFF FROM /cp]` 페이로드 수신 시 plan 문서를 Read 로 직접 읽어 일치 확인, 불일치 시 plan 문서가 SoT
-- **User approval 없는 실행 금지** — 항상 Phase 1.5 에서 AskUserQuestion 사용
-- **Worker = Task 도구 서브에이전트, 동시 spawn** — Phase 3 에서 각 Worker 를 **Task 도구로 spawn 하되 하나의 턴에서 N번 병렬 호출**(순차 await 없음). Worker 를 텍스트로 나열만 하고 멈추면 그건 `/cc` 가 아니다 (병렬 미실행 = 회귀).
-- **격리했으면 통합 후 검토 (Phase 3.5)** — worktree 격리를 쓴 실행은 Supervisor·QA 로 가기 전에 Worker 산출물을 **Leader 가 직렬로** task 브랜치에 통합하고 `git apply --reverse --check` 로 검증한다. 통합·검증 실패면 Phase 4 로 진행 금지(fail-closed), 통과 후에만 worktree 제거. worktree 를 안 쓴 일반 경로는 이 단계 자체가 없다.
-- **Monitor 에이전트 금지 (v3.29)** — 폴링용 서브에이전트를 띄우지 않는다. 진행 추적 = 하네스 자동 재호출 + TodoWrite, 진행보고 = Leader 가 직접(2분 규칙). 외부 프로세스 감시가 필요하면 네이티브 `Monitor` 도구를 쓴다.
-- **Passed 작업 재수행 금지** — 재반복 시, 통과한 작업은 유지
-- **Supervisor & QA 분리** — Workers 와 별도 Agent 로 실행
-- **최대 5회 반복** — 6번째는 불가, 단 SUCCESS_CRITERIA 미달이면 done 대신 사용자 개입 요청
-- **일반 목적 Workers** — skills 없이도 모든 도구 사용 가능
-- **실제 검증** — QA 는 텍스트 검토 금지, 명령어/도구 실행 필수. SUCCESS_CRITERIA 각 항목은 도구로 직접 증명
-- **더블 검증 (v3.9+)** — trivial·비-코드 제외 항상 Codex 코드리뷰(Phase 4.5)를 Supervisor 와 병렬 실행. **Supervisor pass + Codex pass 둘 다**여야 Phase 6 진입 (Codex FAIL/high 지적이면 Supervisor pass 여도 재할당). Codex 부재/실패는 graceful degrade — 블로킹 금지. 상세: `docs/rules/codex-integration.md`.
-- **산출물 링크는 풀 경로** — 최종 보고·후속 안내에서 deliverable 파일은 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로 클릭 링크로 제시 (`docs/...`, `src/...` 등 전체 경로).
+2분 이상 걸리는 구간은 Leader 가 직접 보고한다. 매 보고에 ① **생존 확인 실측**(산출물 mtime·`TaskOutput(block=false)` — 확인 없이 "진행 중" 금지) ② 끝난 것/남은 것 **N/M** ③ **부분 산출물 선제 제출** 세 가지를 전부 담는다. **"아직입니다"만 적는 보고는 위반이다.**
+
+이 주기는 산문이 아니라 `hooks/post-tool-progress.js` 가 강제한다 — 마지막 보고 후 경과를 추적해 2분 초과 시 리마인더를 주입한다. SoT: `docs/rules/harness-rules.md` §4.4.
 
 ---
-
-## 진행 보고 (v3.29 — Leader 직접)
-
-Leader 가 2분 이상 걸리는 구간에서 직접 보고합니다. 전담 에이전트도, 폴링도 없습니다:
-
-```
-진행 현황: 3/5 완료 (생존 확인: TaskOutput 5개 모두 응답)
-  ✓ #1 라우터 · ✓ #2 랜딩 · ✓ #3 블로그
-  … #4 대시보드 (진행 중) · … #5 E2E (진행 중)
-  부분 산출물: src/routes.tsx, src/pages/Landing.tsx 생성됨
-```
-
-**"아직입니다"만 적는 보고는 위반**입니다 — 생존 확인 결과·N/M·부분 산출물 세 가지를 매번 전부 담습니다.
-
-이 주기는 산문 규칙이 아니라 **Lens 훅이 강제**한다 — 훅이 마지막 보고 후 경과시간을 추적해 2분 초과 시 보고를 요구하는 리마인더를 주입한다(산문 규칙만으로는 조용히 스킵된 실측 이력). 매 보고는 ① 생존확인 실측 결과(산출물 mtime·백그라운드 태스크 상태를 실제 확인 — 확인 없이 "진행 중" 금지) ② 끝난 것/남은 것 N/M ③ 부분 산출물 선제 제출, 3요소를 **전부** 포함해야 하며 **"아직입니다"만 적는 보고는 위반**이다.
-
----
-
-## 다른 Skills와의 관계
-
-- **`/cc`**: 병렬 실행 엔진(빌드). 여러 Workers, Supervisor·Codex 더블 게이트, QA 검증, 반복 루프.
-- **`/cp`**: 계획 및 문서화 관리. `/cc` 전에 계획 세우기 → 핸드오프.
-
-**선택 가이드**:
-- 계획을 먼저 문서화해야 함 → `/cp` 후 `/cc`
-- 지금 바로 병렬로 실행 → `/cc`
-- 이미 만들어진 것의 코드 리뷰 → 네이티브 `/code-review` (심층은 `/code-review ultra`), 보안은 `/security-review`
-  - v3.29 에서 `/ccp`(Power Verify)를 폐지했다. 적대적 다중검증·완결성 비평은 네이티브 Workflow 도구와 `ultrareview` 가 대체하고, "실제 실행으로 작동 증명"은 `/cc` Phase 6 QA 가 이미 수행한다.
