@@ -162,6 +162,24 @@ function main() {
     // just-completed agent's status (and any error) so the orchestrator/Supervisor
     // sees failures without having to cat .lens/agent-dashboard.json. Keep it terse;
     // emphasize errors, stay quiet-ish on routine success.
+    // Skill-invocation audit (v3.34). The dispatch template makes the worker
+    // open with `Skill invoked: {name}` when a skill was assigned, and the
+    // Supervisor fails the subtask if that line is missing. Both halves were
+    // prose. The contract is worth keeping — transcripts carry 590 real
+    // `Skill invoked: ui-ux-pro-max` lines, and it is the only thing enforcing
+    // the owner's hard rule that any visual work goes through ui-ux-pro-max —
+    // but the check ran only if the Supervisor remembered to look. Here it is
+    // mechanical: the prompt says a skill was required, so the report must say
+    // it ran. Advisory, because a worker can legitimately report a blocker
+    // before reaching its first action.
+    const promptText = String(input?.tool_input?.prompt || '');
+    const requiredSkill = (promptText.match(/필수 실행 스킬[\s\S]{0,200}?할당된 스킬:\s*`?([\w-]+)`?/) || [])[1];
+    const skillAudit = requiredSkill && requiredSkill !== 'general'
+      && !/Skill invoked:\s*`?[\w-]+/.test(responseText(input))
+      ? ` ⚠️ 이 Worker 에는 필수 스킬 \`${requiredSkill}\` 이 할당됐는데 보고에 \`Skill invoked: ${requiredSkill}\` 이 없다`
+        + ` — 스킬을 건너뛴 정황이다. Supervisor 채점에서 해당 서브태스크를 fail 로 두고 재할당하라.`
+      : '';
+
     const finalStatus = agent?.status || status;
 
     // Unobserved background launches must poison every "everything is finished"
@@ -175,15 +193,15 @@ function main() {
 
     let additionalContext;
     if (finalStatus === 'error') {
-      additionalContext = `[Lens] sub-agent "${agent?.name || description || 'task'}" FAILED${errorMsg ? `: ${String(errorMsg).slice(0, 200)}` : ''}. Dashboard: ${summary.running} running / ${launched} ${LAUNCHED_STATUS} / ${summary.done} done / ${summary.error} error.`;
+      additionalContext = `[Lens] sub-agent "${agent?.name || description || 'task'}" FAILED${errorMsg ? `: ${String(errorMsg).slice(0, 200)}` : ''}. Dashboard: ${summary.running} running / ${launched} ${LAUNCHED_STATUS} / ${summary.done} done / ${summary.error} error.` + skillAudit;
     } else if (summary.error > 0) {
-      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ⚠️ ${summary.error} earlier agent(s) errored — check before declaring done. ${summary.running} still running.${launchedNote}`;
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ⚠️ ${summary.error} earlier agent(s) errored — check before declaring done. ${summary.running} still running.${launchedNote}` + skillAudit;
     } else if (summary.running > 0) {
-      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done. ${summary.running} still running, ${summary.done} done.${launchedNote}`;
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done. ${summary.running} still running, ${summary.done} done.${launchedNote}` + skillAudit;
     } else if (launched > 0) {
-      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ${summary.done} observed complete, 0 running — NOT "all complete".${launchedNote}`;
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ${summary.done} observed complete, 0 running — NOT "all complete".${launchedNote}` + skillAudit;
     } else {
-      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). All ${summary.done} agents complete.`;
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). All ${summary.done} agents complete.` + skillAudit;
     }
 
     const response = {
