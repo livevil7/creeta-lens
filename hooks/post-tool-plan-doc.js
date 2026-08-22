@@ -32,7 +32,11 @@ const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '.
 const { installFailSoftHandlers, readJsonInput, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('post-tool-plan-doc');
 
-const { validatePlanCoverage, validatePlanStructure } = require(path.join(PLUGIN_ROOT, 'lib', 'plan-manager'));
+const {
+  validatePlanCoverage,
+  validatePlanStructure,
+  findRelatedDocs,
+} = require(path.join(PLUGIN_ROOT, 'lib', 'plan-manager'));
 
 // Plan documents only. History entries have a different skeleton by design, and
 // rules/ is not a plan at all — checking either would produce noise on every edit.
@@ -69,6 +73,23 @@ function main() {
 
   if (isLegacy(content)) return writeJson({});
 
+  // Prior work on the same subject. This is the one thing here that serves the
+  // original reason the skills exist — "앞뒤 상황, 과거 히스토리, 문서를 꼼꼼히
+  // 보게 하려고" — and it was the thinnest part of both: /cp spent five bullets
+  // on it, /cc one, and neither names docs/history/ anywhere. The list is cheap
+  // to produce and impossible to skip; opening the documents is still a choice.
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  let related = [];
+  try {
+    related = findRelatedDocs(projectRoot, path.basename(filePath, '.md'), { exclude: filePath });
+  } catch {
+    related = []; // discovery is a courtesy — never let it break the gate report
+  }
+  const priorWork = related.length
+    ? ` 같은 주제의 기존 문서 ${related.length}건: ${related.map(r => r.file).join(' · ')}.`
+      + ` 계획을 굳히기 전에 열어보고, 겹치거나 이미 결정된 것이 있으면 📋 인벤토리에 반영하라.`
+    : '';
+
   const structure = validatePlanStructure(content, grade(content));
   const coverage = validatePlanCoverage(content);
   if (structure.valid && coverage.valid) {
@@ -79,7 +100,7 @@ function main() {
         hookEventName: 'PostToolUse',
         additionalContext:
           `[Lens] 계획서 게이트 통과 — 커버리지: 인벤토리 ${coverage.total}건 → 포함 ${coverage.included} / 제외 ${coverage.excluded}. ` +
-          `승인 화면에 이 카운트를 그대로 표시하라.`,
+          `승인 화면에 이 카운트를 그대로 표시하라.` + priorWork,
       },
     });
   }
@@ -103,7 +124,7 @@ function main() {
       additionalContext:
         `[Lens] 계획서 ${path.basename(filePath)} 가 게이트를 통과하지 못한다. ${parts.join(' · ')}. ` +
         `승인을 요청하기 전에 고쳐라 — 이 검사는 /cp Phase 5.0 과 /cc 실행 진입에서 다시 돈다. ` +
-        `(차단하지 않는다: 진행 중인 계획서 대다수가 이 원장 도입 전에 쓰였다.)`,
+        `(차단하지 않는다: 진행 중인 계획서 대다수가 이 원장 도입 전에 쓰였다.)` + priorWork,
     },
   });
 }
