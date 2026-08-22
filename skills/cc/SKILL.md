@@ -503,41 +503,29 @@ Supervisor 모델 = **변경의 규모·위험도로 판정** (v3.25 개정 — 
 
 ### Phase 4.5: Codex 코드리뷰 (병렬 더블 검증 — trivial 제외 항상)
 
-> Claude Supervisor 와 **병렬로**, Codex 가 이번 반복의 코드 변경을 독립 리뷰한다. Claude 혼자 놓치는 버그·엣지케이스를 이종 모델로 더블 검증. **Supervisor pass + Codex pass 둘 다**여야 Phase 6 진입. 상세 호출 규칙: `docs/rules/codex-integration.md` §8.5.
+> Claude Supervisor 와 **병렬로**, Codex 가 이번 반복의 코드 변경을 독립 리뷰한다. 이종 모델이라 Claude 혼자 놓치는 버그·엣지케이스를 잡는다. **Supervisor pass + Codex pass 둘 다**여야 Phase 6 진입.
 
-**적용 범위**: trivial (오타·한 줄 수정) 또는 비-코드 작업(조사·문서만) 은 skip. 그 외 모든 코드 변경 적용.
+**적용 범위**: trivial(오타·한 줄) 또는 비-코드 작업(조사·문서만)은 skip. 그 외 모든 코드 변경.
 
-1. **Codex 감지** — 3단계 fallback. 부재 시 "Codex 미설치 — Supervisor 단독 검토" 플래그 후 Phase 5 진행 (게이트는 Supervisor 단독, 나머지 동일).
-2. **Codex 리뷰 호출 (구조화·git-aware — v3.13+ 권장)** — Codex 가 작업트리를 **직접 읽으므로 수동 diff 주입 불필요**. Supervisor Agent 와 병렬이 되도록 **백그라운드**(Bash `run_in_background: true`)로, **프로젝트 루트에서** 실행:
+**호출 — 한 줄이다 (v3.34).** 배관(감지 3단 fallback · 모델 resolver · 스키마 · 구버전 폴백 · 타임아웃)은 전부 스크립트가 갖는다. Supervisor 와 병렬이 되도록 **백그라운드**(Bash `run_in_background: true`)로, **프로젝트 루트에서**:
 
 ```bash
-SCHEMA=$(mktemp /tmp/codex_schema_XXXXXX.json)
-printf '%s' '{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","fail"]},"high_findings":{"type":"array","items":{"type":"string"}}},"required":["verdict","high_findings"]}' > "$SCHEMA"
-RES=$(mktemp /tmp/codex_review_XXXXXX.json)
-# 모델 resolver (codex-integration.md §4 ①) — 순위표 1등 동적 선택, 이름 하드코딩 금지
-CODEX_MODEL=$(node -e "const p=require('path'),os=require('os');const d=require(p.join(os.homedir(),'.codex','models_cache.json'));const m=d.models.filter(x=>x.visibility==='list'&&x.supported_in_api!==false).sort((a,b)=>(a.priority??99)-(b.priority??99))[0];if(!m||!m.slug)process.exit(1);console.log(m.slug)" 2>/dev/null) || CODEX_MODEL=""
-MODEL_ARG=(); if [ -n "$CODEX_MODEL" ]; then MODEL_ARG=(-m "$CODEX_MODEL"); else echo "⚠️ 모델 resolver 실패 — codex config 기본 모델로 진행"; fi
-timeout 180 "$CODEX_BIN" exec review --uncommitted \
-  "${MODEL_ARG[@]}" -c model_reasoning_effort=high -c service_tier=fast \
-  --output-schema "$SCHEMA" --ephemeral --json > "$RES" 2>/dev/null
-# 결과: $RES 의 최종 메시지에 {"verdict","high_findings"} JSON
-# 깊이=high (전체 diff=대규모 → xhigh 폭증 회피) · 180초 초과(exit 124)면 degrade. 상세: codex-integration.md §4·§7.
+OUT="$(mktemp)"; bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-review.sh" --mode review --out "$OUT"
 ```
 
-  ⚠️ **반드시 `codex exec review`** (bare `codex review` 는 `--output-schema`/`--ephemeral` 미노출). `$CODEX_BIN` 은 §2 감지값. 상세: `docs/rules/codex-integration.md` §8.5.
+> 종전에는 이 자리에 40줄짜리 인라인 bash(mktemp 2개·인라인 node resolver·스키마 파일·4단계 폴백)가 있었고 Leader 가 매번 손으로 재현해야 했다. 실측 결과 그 레시피는 트랜스크립트 3,065개에서 **7회**, `/cc` 실행 안에서는 **0회** 쓰였다 — 반면 codex 자체는 **661회** 불렸다. 안 쓰인 것은 도구가 아니라 무거운 레시피였다.
 
-3. **판정** — `$RES` 의 구조화 출력에서 `verdict == "fail"` **또는** `high_findings` 비어있지 않으면 **FAIL**. (awk PASS/FAIL 휴리스틱·`[high]` 텍스트 파싱 불필요 — 스키마가 강제.)
+**종료 코드로 분기한다:**
 
-4. **Fallback (구버전 codex)** — `codex exec review` 미지원이면 §4 자유형 호출(`timeout 180 ... "${MODEL_ARG[@]}" -c model_reasoning_effort=high -c service_tier=fast -o "$OUT"`)로 변경 diff + 아래 프롬프트, 마지막 줄 `PASS`/`FAIL` + `[high]` 파싱으로 graceful degrade (180초 초과 시 §7 부분 수집/degrade):
+| exit | 뜻 | 행동 |
+|---|---|---|
+| `0` | 리뷰 완료 | `$OUT` 마지막 메시지의 `{verdict, high_findings}` 를 읽는다 |
+| `2` | 미설치·미인증·실패 | "Codex 미설치 — Supervisor 단독 검토" 플래그 후 Phase 5 진행 (**블로킹 금지**) |
+| `3` | 타임아웃 | `$OUT` 의 부분 출력을 "⚠️ 미완 리뷰"로 수거해 반영. 기다리지 않는다 |
 
-```text
-다음 코드 변경을 리뷰하세요. 순수 텍스트, 한국어. 각 지적은 [심각도 high/med/low] + 파일:라인 + 무엇이 + 왜. 마지막 줄에 PASS 또는 FAIL 한 단어만.
-## 작업 목표
-{GOAL}
-## 변경 내용
-{git diff}
-```
-5. **미응답/실패/180s 초과(exit 124)** — `timeout 180`(§4) 초과 또는 gate 시점에 미완이면 기다리지 않고 "Codex 리뷰 실패/미완: {요약}" 기록, Supervisor 단독 게이트로 진행 (블로킹 금지 — Codex 부재와 동일 취급). 상세: codex-integration.md §7.
+**판정**: `verdict == "fail"` **또는** `high_findings` 가 비어 있지 않으면 **FAIL** → Phase 5 재할당. 스키마가 강제하므로 PASS/FAIL 텍스트를 파싱하지 않는다.
+
+**보고 필수 (v3.34)**: Phase 7 최종 보고에 `Codex: {pass|fail|미실행(사유)}, 지적 N건 → 반영 M건` 을 **한 줄로 반드시 넣는다.** 눈에 보이는 산출물이 되어야 산문 지시가 이행된다 — 생략하면 보고서에 빈칸이 남아 사용자 눈에 걸린다.
 
 ---
 
