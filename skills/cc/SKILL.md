@@ -121,12 +121,15 @@ original_request: {원본 요청}
 1. **필수 섹션** — `validatePlanStructure` 를 실제로 실행한다(산문 자기점검 아님):
 
    ```bash
-   node -e "const m=require('${CLAUDE_PLUGIN_ROOT}/lib/plan-manager.js');const fs=require('fs');const r=m.validatePlanStructure(fs.readFileSync(process.argv[1],'utf-8'),process.argv[2]);console.log(JSON.stringify(r));process.exit(r.valid?0:1)" {plan_doc_path} {grade}
+   # grade 는 인자로 받지 않는다 — 문서 frontmatter 에서 직접 읽는다. /cp 의 핸드오프
+   # 페이로드에 [GRADE] 블록이 있는데도 이 자리에서 참조된 적이 없어(실측 0회), 인자를
+   # 비운 채 호출되면 deep 계획이 기본 등급으로 느슨하게 검사됐다. 문서가 SoT 다.
+   node -e "const m=require('${CLAUDE_PLUGIN_ROOT}/lib/plan-manager.js');const fs=require('fs');const c=fs.readFileSync(process.argv[1],'utf-8');const g=(c.match(/^grade\s*:\s*(\S+)/m)||[])[1];const r=m.validatePlanStructure(c,g);console.log(JSON.stringify({grade:g||'(기본)',...r}));process.exit(r.valid?0:1)" {plan_doc_path}
    ```
 
 2. **차단 질문 0** — `[BLOCKING_QUESTIONS]` 또는 계획서 `## ❓ 미해결 질문` 의 **차단** 항목이 비어 있는가. 남아 있으면 거부 — 답을 모르는 채 실행하면 worker 가 임의 가정으로 만든다.
 3. **실행 단계 ↔ 검증 연결** — `🛠 How` 의 각 단계가 `✅ Review` 의 검증 행과 연결되는가. 그리고 **서로 모순되지 않는가** (연결만 있고 모순되는 경우가 있다 — 예: 단계는 A를 만드는데 검증은 B를 확인).
-4. **라벨 ↔ 내용 일치** — frontmatter `grade` 가 실제 섹션 구성과 맞는가. `grade: deep` 인데 deep 필수 섹션이 비어 있으면 거부. (실측: `planner: cpp` 딱지에 71줄·하드게이트 전무 문서가 실재했다.)
+4. **라벨 ↔ 내용 일치** — 위 1번이 frontmatter 의 `grade` 를 직접 읽어 검사하므로 `grade: deep` 인데 deep 필수 섹션(🚧 비목표·🔀 검토된 대안·⚠️ 리스크 레지스터)이 비면 자동으로 거부된다. 딱지만 deep 인 문서를 여기서 걸러낸다. (실측: `planner: cpp` 딱지에 71줄·하드게이트 전무 문서가 실재했다.)
 
 **거부 시 보고 형식** — 무엇을 채우면 되는지 반드시 명시한다. "미달"만 알리면 사용자가 막힌다:
 
@@ -287,30 +290,20 @@ Lens Multi v3.33.0 — 실행 계획
 
 ### Phase 2: TodoWrite 준비 (Goal 우선 구조)
 
-**핵심 규칙**: SUCCESS_CRITERIA 가 **최상위 항목**, 서브태스크가 그 아래.
+상태 전이(pending → in_progress → completed)는 TodoWrite 도구 설명이 문장 단위로 강제하므로 여기서 재서술하지 않는다(v3.34: 네 곳에 흩어져 있던 40줄을 걷었다). **`/cc` 고유값은 둘뿐이다:**
+
+1. **SUCCESS_CRITERIA 가 최상위 항목**, 서브태스크가 그 아래.
+2. **SUCCESS_CRITERIA 는 서브태스크와 같은 라이프사이클로 묶이지 않는다** — 모든 서브태스크가 끝나도 `pending` 을 유지하고, **Phase 6 QA 가 직접 검증해야만** `completed` 가 된다.
+
+> 2번이 없으면 하위가 다 끝나는 순간 최상위도 함께 닫혀서 QA 를 건너뛸 유인이 생기고, "모든 Todo 가 초록인데 실제로는 미검증" 상태가 된다. 틀렸을 때 스스로 못 알아채는 종류라 산문으로 남긴다.
 
 ```text
-TodoWrite 구조 (Goal-first):
-1. [성공 기준 1] — Goal level (status: pending)
-2. [성공 기준 2] — Goal level (status: pending)
-...
-N+1. 서브태스크 #1: [설명] — execution level (status: pending)
-N+2. 서브태스크 #2: [설명] — execution level (status: pending)
+1. [성공 기준 1] — Goal level (pending 유지, QA 통과 시에만 completed)
+2. [성공 기준 2] — Goal level
+N+1. 서브태스크 #1: [설명] — execution level
 ```
 
-예시 (`/cp` 핸드오프로 진입):
-
-```text
-- content: "[Goal] POST /api/users 가 201 반환 + user row 생성", activeForm: "POST /api/users 검증 중", status: pending
-- content: "[Goal] JWT 토큰이 24시간 만료", activeForm: "JWT 만료 검증 중", status: pending
-- content: "서브태스크 #1: 사용자 인증 API 작성", activeForm: "사용자 인증 API 작성 중", status: pending
-- content: "서브태스크 #2: 데이터베이스 마이그레이션", activeForm: "데이터베이스 마이그레이션 중", status: pending
-- content: "서브태스크 #3: E2E 테스트 작성", activeForm: "E2E 테스트 작성 중", status: pending
-```
-
-핸드오프 없이 직접 호출된 경우: Leader 가 도출한 Goal 의 SUCCESS_CRITERIA 도 같은 방식으로 최상위 등록.
-
-**SUCCESS_CRITERIA 항목은 Plan A step 들과 같은 라이프사이클로 묶이지 않음** — 모든 step 완료 후 Phase 6 QA 에서 직접 검증되어야 yes, 그 전엔 pending 유지.
+핸드오프 없이 진입한 경우도 Leader 가 도출한 SUCCESS_CRITERIA 를 같은 방식으로 최상위 등록한다.
 
 ---
 
@@ -435,18 +428,6 @@ Worker 프롬프트 템플릿:
 
 ## 응답 언어
 {사용자 언어 — 한국어 우선}
-```
-
-#### 3.3 TodoWrite 업데이트
-
-모든 서브태스크를 `in_progress`로 변경합니다:
-
-```
-상태: in_progress
-각 항목: 
-  content: "서브태스크 #N: [설명]"
-  activeForm: "[설명] 중"
-  status: in_progress
 ```
 
 ### Phase 4: Supervisor — 품질 검토
@@ -780,15 +761,7 @@ Worker #2  |  점수: {score}/100  |  ✓ 통과
 
 #### 7.2 TodoWrite 최종 업데이트
 
-모든 서브태스크를 `completed`로 변경합니다:
-
-```
-상태: completed
-각 항목: 
-  content: "서브태스크 #N: [설명]"
-  activeForm: "[설명] 완료"
-  status: completed
-```
+서브태스크를 `completed` 로 닫는다. **SUCCESS_CRITERIA 항목은 Phase 6 QA 가 `verified: true` 를 낸 것만 닫는다** — QA 가 `false` 를 낸 상태에서 최상위가 `completed` 이면 그 자체가 모순이므로, Phase 7 진입 전에 둘의 정합성을 확인한다.
 
 #### 7.3 문서 통합 제안
 
