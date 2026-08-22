@@ -1,8 +1,15 @@
 /**
- * Lens - PreToolUse Hook (matcher: Task)
- * Tracks when a sub-agent (Task tool) starts execution.
+ * Lens - PreToolUse Hook (matcher: Task|Agent|Workflow)
+ * Tracks when a sub-agent starts execution.
  *
- * Triggered: Before each Task tool invocation
+ * The spawn tool is named `Agent` in this harness; `Task` is its legacy alias and
+ * still matches (the envelope comes back stamped `PostToolUse:Agent`). `Workflow`
+ * is matched too: it launches async and returns immediately, so without an entry
+ * an in-flight workflow is invisible to the launched-guard — the dashboard read
+ * "0 agents" through a run that had 22 of them (실측). One entry per workflow is
+ * the honest record; its internal agent() calls never surface as tool calls here.
+ *
+ * Triggered: Before each spawn tool invocation
  * Writes: .lens/agent-dashboard.json
  *
  * Input (stdin): { tool_name, tool_input: { description, ... } }
@@ -24,7 +31,9 @@ function main() {
     // Read tool input from stdin
     const input = readJsonInput();
     const toolInput = input?.tool_input || {};
-    const description = toolInput.description || toolInput.prompt || toolInput.task || '';
+    // `name` is Workflow's label for a predefined run; without it a workflow
+    // entry lands nameless and the dashboard row reads as noise.
+    const description = toolInput.description || toolInput.prompt || toolInput.task || toolInput.name || '';
 
     // Register the agent in dashboard.
     // v3.25: record the spawn model so TOP-tier usage is auditable. An omitted

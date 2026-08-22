@@ -14,7 +14,7 @@ installFailSoftHandlers('session-start');
 // Load modules
 const { scanInstalledSkills } = require(path.join(PLUGIN_ROOT, 'lib', 'skill-scanner'));
 const { loadMemory, saveMemory, recordSessionStart, formatMemorySummary } = require(path.join(PLUGIN_ROOT, 'lib', 'memory-store'));
-const { initSession, getDashboardPath } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
+const { initSession, loadDashboard, saveDashboard, getDashboardPath } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
 const { formatPlanSummary, ensurePlansDir } = require(path.join(PLUGIN_ROOT, 'lib', 'plan-manager'));
 const { formatAuditNudge } = require(path.join(PLUGIN_ROOT, 'lib', 'capability-audit'));
 
@@ -25,12 +25,37 @@ const config = safeReadJson(path.join(PLUGIN_ROOT, 'lens.config.json'), {}) || {
 
 function main() {
   try {
+    // stdin is a one-shot stream: readJsonInput() consumes it, so the second
+    // caller gets {} and its source check silently passes. Read once, pass down.
+    const source = readJsonInput()?.source;
+    const newConversation = NEW_CONVERSATION_SOURCES.has(source);
+
     // 0a. Drop the previous session's progress-report clock. Done before anything
     //     else so that a failure further down still leaves an honest clock.
-    clearPreviousSessionProgressClock();
+    clearPreviousSessionProgressClock(newConversation);
 
-    // 0. Initialize agent dashboard + plans + results directories for this session
-    const dashboard = initSession();
+    // 0. Initialize agent dashboard + plans + results directories for this session.
+    //    Gated by the same allowlist as 0a. This hook runs on EVERY SessionStart
+    //    event — the `once: true` in hooks.json is ignored (see the note above
+    //    NEW_CONVERSATION_SOURCES) — so an unconditional initSession() wiped the
+    //    dashboard on every auto-compact and fork. That reset summary.launched to
+    //    0, and the next PostToolUse then printed "All N agents complete" past a
+    //    still-unresolved background launch: the exact false completion this
+    //    module exists to prevent. Measured across ~3,000 transcripts before this
+    //    fix: "All N agents complete" 238 vs the guard firing 1.
+    //    Compact lands precisely during long multi-agent runs, i.e. when the
+    //    guard matters most. On a continuation keep the live dashboard; only a
+    //    genuinely new conversation starts a fresh one.
+    //    loadDashboard() never returns null — a missing or corrupt file yields a
+    //    default in memory — so the continuation branch has to save it explicitly
+    //    or the hook can finish leaving no dashboard on disk at all.
+    let dashboard;
+    if (newConversation) {
+      dashboard = initSession();
+    } else {
+      dashboard = loadDashboard();
+      saveDashboard(dashboard);
+    }
     ensurePlansDir(config.planDir || null);
     // Ensure results directory for /cc synthesis output
     if (config.saveSynthesisResults) {
@@ -140,9 +165,9 @@ function main() {
  */
 const NEW_CONVERSATION_SOURCES = new Set(['startup', 'resume', 'clear']);
 
-function clearPreviousSessionProgressClock() {
+function clearPreviousSessionProgressClock(newConversation) {
   try {
-    if (!NEW_CONVERSATION_SOURCES.has(readJsonInput()?.source)) return;
+    if (!newConversation) return;
     // Same resolution as hooks/stop.js and hooks/post-tool-progress.js — diverging
     // here would point the hooks at different files.
     const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();

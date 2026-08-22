@@ -1,7 +1,7 @@
 {
   "name": "lens",
   "version": "3.33.0",
-  "description": "Skill navigator + multi-repo git sync for Claude Code. Scans plugins (Skills, MCP, LSP), recommends best match in 8 languages, executes with /c, /cc, /cp. Multi-repo sync with /cs (opt-in auto-pull on session start, push on demand).",
+  "description": "Skill navigator + multi-repo git sync for Claude Code. Scans plugins (Skills, MCP, LSP), recommends best match in 8 languages, executes with /cc, /cp. Multi-repo sync with /cs (opt-in auto-pull on session start, push on demand).",
   "author": {
     "name": "Lens",
     "email": "livevil7@gmail.com",

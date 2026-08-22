@@ -36,7 +36,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Task",
+        "matcher": "Task|Agent|Workflow",
         "hooks": [
           {
             "type": "command",
@@ -48,7 +48,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Task",
+        "matcher": "Task|Agent|Workflow",
         "hooks": [
           {
             "type": "command",
