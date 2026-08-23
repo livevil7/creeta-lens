@@ -1,10 +1,12 @@
 /**
  * Lens - Stop Hook
- * Records final session state when Claude Code's main agent stops.
+ * Records final session state when Claude Code's main agent stops, and refuses
+ * the stop while gates are unmet (v3.35).
  *
  * Triggered: When the main agent finishes (Stop event — i.e. at the end of EVERY
  * turn, not only once per session)
  * Writes: .lens/agent-dashboard.json (marks session complete, orphaned agents as error)
+ *         .lens/gate-block-state.json (consecutive-block counter, per session)
  *
  * ⚠️ "Orphaned" means `running`/`pending` only. Background agents parked in
  * `launched` are exempt from the error sweep by endSession(): the hooks never
@@ -12,15 +14,30 @@
  * sweep would otherwise declare a healthy background agent failed seconds after
  * launch. Unobserved ≠ failed. SoT: docs/rules/harness-rules.md §4.5.
  *
- * Input (stdin): { stop_reason }
- * Output (stdout): { hookSpecificOutput }
+ * GATE ENFORCEMENT (v3.35)
+ * ------------------------
+ * This hook has sat on the Stop event since v3.x and never once refused a stop —
+ * both its success and its failure path wrote `{}`. Every "do not report done
+ * while a criterion is unmet" rule in /cc was therefore prose the model graded
+ * itself against. It now reads `.lens/gates/*.json` and returns
+ * `{decision:"block", reason}` while anything is outstanding.
+ *
+ * No ledger → byte-identical to the old behavior. That is the no-regression
+ * floor: only a run that deliberately created a ledger can be blocked.
+ *
+ * Input (stdin): { stop_reason, session_id, cwd }
+ * Output (stdout): {} | { systemMessage } | { decision: "block", reason }
  */
 
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
-const { installFailSoftHandlers, readJsonInput, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
+const {
+  installFailSoftHandlers, readJsonInput, writeJson,
+  safeLog, safeReadJson, safeWriteJson, withFileLock,
+} = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('stop');
 
 // Load agent tracker
@@ -45,6 +62,14 @@ function main() {
     // (See hooks/post-tool-progress.js)
     resetProgressReportClock();
 
+    // Gate enforcement runs AFTER the bookkeeping above: the dashboard and the
+    // report clock must be correct whether or not this turn is allowed to end.
+    const verdict = gateVerdict(input);
+    if (verdict) {
+      writeJson(verdict);
+      process.exit(0);
+    }
+
     // Stop hook does not support hookSpecificOutput in Claude Code schema
     // Dashboard is already saved by endSession() above
     writeJson({});
@@ -53,6 +78,72 @@ function main() {
     writeJson({});
     process.exit(0);
   }
+}
+
+/**
+ * Decide whether this stop is refused.
+ *
+ * Returns the object to print, or null to fall through to the old `{}`.
+ * Never throws: a bug in gate logic costs one sloppy turn, a trapped session
+ * costs the machine. Every failure path here returns null (= allow).
+ */
+function gateVerdict(input) {
+  try {
+    if (!gateEnforcementEnabled()) return null;
+
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR
+      || (input && typeof input.cwd === 'string' && input.cwd ? input.cwd : null)
+      || process.cwd();
+
+    const ledger = require(path.join(PLUGIN_ROOT, 'lib', 'gate-ledger'));
+    const loaded = ledger.loadLedgers(projectRoot);
+
+    // Fast path — no ledger anywhere means this hook behaves exactly as it did
+    // before v3.35. Most turns in most repos land here.
+    if (!loaded.ledgers.length && !loaded.invalid.length) return null;
+
+    const evaluation = ledger.evaluate(loaded);
+    const statePath = ledger.blockStatePath(projectRoot);
+    const sessionKey = crypto.createHash('sha256')
+      .update(String((input && input.session_id) || 'anonymous'))
+      .digest('hex').slice(0, 24);
+
+    const decide = () => {
+      const previous = safeReadJson(statePath, null);
+      const decision = ledger.decideBlock(evaluation, previous, { sessionKey });
+      safeWriteJson(statePath, decision.state);
+      return decision;
+    };
+
+    let decision;
+    try {
+      decision = withFileLock(`${statePath}.lock`, decide, { timeoutMs: 1500 });
+    } catch (lockErr) {
+      // A contended counter is not worth trapping a turn over, but it is also
+      // not a reason to skip the gate: decide unlocked and accept a possible
+      // lost increment (the cap only ever undercounts this way).
+      safeLog(`gate lock unavailable (${lockErr.message}); deciding unlocked`);
+      decision = decide();
+    }
+
+    if (decision.block) return { decision: 'block', reason: decision.reason };
+    if (decision.released && decision.systemMessage) return { systemMessage: decision.systemMessage };
+    return null;
+  } catch (err) {
+    safeLog(`gate verdict skipped: ${err && err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Kill switch. `lens.config.json` decides by default; the env var overrides it
+ * for one shell (`LENS_GATE_ENFORCEMENT=0 claude ...`) without editing config.
+ */
+function gateEnforcementEnabled() {
+  const env = process.env.LENS_GATE_ENFORCEMENT;
+  if (env !== undefined && env !== '') return !/^(0|false|off|no)$/i.test(env);
+  const config = safeReadJson(path.join(PLUGIN_ROOT, 'lens.config.json'), {}) || {};
+  return config.gateEnforcement !== false;
 }
 
 /**

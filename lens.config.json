@@ -11,6 +11,7 @@
   "baseBranch": { "Returns_ERP_v20": "staging", "namane-cms": "master" },
   "syncPolicy": { "Returns_ERP_v20": "pr-manual" },
   "protectedBranches": { "namane-cms": ["main"] },
+  "gateEnforcement": true,
   "requireTaskBranch": false,
   "autoDeleteMergedBranch": true,
   "branchPrefixes": ["feat", "fix", "ops", "docs"],
