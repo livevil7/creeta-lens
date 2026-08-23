@@ -1,17 +1,17 @@
 ---
 name: "cc"
-description: "Lens Multi v3.34.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and runs them as simultaneous Task workers, then reviews quality (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.35.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and runs them as simultaneous Task workers, then reviews quality (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.34.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.35.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: parallel execution, multi-agent, orchestrate, 병렬 실행, 멀티 에이전트, 동시 실행, 오케스트레이션
 
-You are **Lens Multi v3.34.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.35.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -48,6 +48,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 6. **실제 검증** — QA 는 텍스트 검토 금지. SUCCESS_CRITERIA 각 항목을 도구로 직접 증명한다. (Phase 6)
 7. **최대 5회 반복** — 6번째는 없다. 미달 상태로 끝나면 done 대신 사용자 개입을 요청한다. 통과한 서브태스크는 재수행하지 않는다. (Phase 5)
 8. **산출물은 풀 경로** — 최종 보고에서 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로. (Phase 7)
+9. **게이트 원장 (v3.35)** — SUCCESS_CRITERIA 를 `.lens/gates/` 에 결의하고, 증거(exit code + EXPECT 매칭)로만 닫는다. **증거 없는 `met` 는 미충족으로 계산된다** — 빈 게이트보다 나쁘다(자기채점이라서). 미충족이 남으면 `hooks/stop.js` 가 턴 종료를 거부한다. 포기는 사유를 적은 `abandoned` 로만. (Phase 0.5 · 6.0 · 7.2.5)
 
 ---
 
@@ -203,6 +204,26 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');const fs=req
 
 **헤드리스**(`LENS_NONINTERACTIVE=1`): `ask`·`block` 어느 쪽도 자동 진행하지 않는다 — **계획만 출력하고 종료**(fail-closed). 무인 환경에서 stash 는 그 머신의 라이브 상태를 바꾸고, 동반 커밋은 이 게이트가 막으려는 사고 그 자체다.
 
+#### 0.5 게이트 원장 생성 (v3.35 — 「done 보고 금지」를 산문에서 벽으로)
+
+> **왜 신설했나**: 핵심원칙 1(미달이면 done 보고 금지)·Phase 6(텍스트 검토 금지)·Phase 2(QA 전엔 최상위 미완)
+> 셋 다 **모델이 스스로 채점하는 산문**이었다. `hooks/stop.js` 는 Stop 이벤트에 등록돼 매 턴 끝마다
+> 실행되면서도 성공·실패 경로 양쪽에서 `{}` 만 냈다 — 벽이 될 자리에 계측기가 있었다. 원장은 그 훅에
+> 판단 근거를 준다. **미충족 게이트가 남아 있으면 턴이 끝나지 않는다.**
+
+`✅ Review` 표(= 핸드오프 `[VERIFICATION]`)의 각 행을 게이트 1개로 옮긴다. `종류=auto` 행은
+`check`(실행할 명령)와 `expect`(**성공했을 때만** 출력에 나오는 문자열)를 채우고, `manual` 행은 둘 다 비운다.
+
+```bash
+node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JSON.stringify(g.createLedger(process.cwd(),{scope:'{plan-id}',planDoc:'{plan_doc_path}',goal:'{Goal 한 문장}',gates:[{id:'G1',criterion:'{성공기준 1}',check:'{명령}',expect:'{성공 표지}'},{id:'G2',criterion:'{성공기준 2}',kind:'manual'}]})))"
+```
+
+- **`expect` 는 성공/실패 양쪽에서 찍히는 문자열이면 안 된다** — 그러면 게이트가 통과를 증명하지 못한다.
+- 원장은 `.lens/gates/` 에 있고 gitignore 다. **실행 상태이지 산출물이 아니다.**
+- 직접 호출(0.2)로 들어왔어도 Leader 가 도출한 SUCCESS_CRITERIA 로 똑같이 만든다. 게이트 0개면 만들지 않는다.
+- 상한: 같은 원장으로 **3회** 연속 진전이 없으면 훅이 경고와 함께 자동 해제한다(무한 대기 없음).
+  끄려면 `lens.config.json` 의 `gateEnforcement: false` 또는 `LENS_GATE_ENFORCEMENT=0`.
+
 ---
 
 ### Phase 1: Leader — Analyze & Plan
@@ -252,10 +273,10 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 
 > **왜 코드 게이트가 아니라 표의 칸인가**: 읽었는지는 검사할 수 없지만 **읽은 흔적이 승인 화면에 보이는지는 사람이 즉시 안다.** 이번 감사가 측정한 법칙이 정확히 이것이다 — 눈에 보이는 산출물은 산문 지시로도 이행되고(board 18개 레포 생성, 훅 0개), 눈에 안 보이는 자기절제만 코드가 필요하다. 보조로 `hooks/post-tool-plan-doc.js` 가 계획서를 쓸 때마다 같은 주제의 기존 문서 목록을 주입한다 — 목록이 컨텍스트에 없으면 존재조차 모르기 때문이다.
 
-**AskUserQuestion** (header: "Lens Multi v3.34.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.35.0 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.34.0 — 실행 계획
+Lens Multi v3.35.0 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -557,7 +578,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.34.0 — 반복 {N}/5
+Lens Multi v3.35.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -680,6 +701,28 @@ Lens Multi v3.34.0 — 반복 {N}/5
 - **verified = true 의 필요조건**: success_criteria_results 의 모든 항목이 pass
 ```
 
+#### 6.0 QA 결과를 원장에 기록 (v3.35 — 필수)
+
+QA 의 `success_criteria_results` 를 0.5 의 원장에 그대로 옮긴다. **이 기록이 없으면 Stop 훅이 계속
+차단한다** — QA 를 건너뛰고 Phase 7 로 가는 경로가 구조적으로 닫힌다.
+
+```bash
+# auto 항목 — 실제 실행의 종료코드와 출력을 그대로 넣는다
+node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JSON.stringify(g.recordEvidence(process.cwd(),'{scope}','{게이트 id}',{exit:{종료코드},output:process.argv[1]})))" "{명령 출력}"
+```
+
+- **판정은 코드가 한다.** 출력에 `expect` 문자열이 없거나 exit 이 0 이 아니면 `met` 로 기록되지 않는다.
+  「통과한 것 같음」이 원장에 들어갈 경로는 없다.
+- **manual 항목**은 사용자 확인을 받은 뒤 `{note:'{관측}',confirmedBy:'{확인한 사람}'}` 로 기록한다.
+  `confirmedBy` 가 비면 미충족으로 계산된다 — Phase 6 의 "manual 을 자동 pass 처리 금지" 가 여기서 강제된다.
+- **정말 검증이 불가능한 기준만** 사유를 적어 이탈한다. 조용히 빼지 마라:
+
+```bash
+node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JSON.stringify(g.abandonGate(process.cwd(),'{scope}','{id}','{왜 불가능한지 + 인계사항}')))"
+```
+
+사유가 비면 거부되고 게이트는 미충족으로 남는다.
+
 #### 6.1 verified == true AND 모든 SUCCESS_CRITERIA pass
 
 → **Phase 7 (최종 보고)** 로 진행
@@ -695,7 +738,7 @@ Lens Multi v3.34.0 — 반복 {N}/5
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.34.0 — 최종 결과                       ║
+║   Lens Multi v3.35.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -746,6 +789,17 @@ Worker #2  |  점수: {score}/100  |  ✓ 통과
 #### 7.2 TodoWrite 최종 업데이트
 
 서브태스크를 `completed` 로 닫는다. **SUCCESS_CRITERIA 항목은 Phase 6 QA 가 `verified: true` 를 낸 것만 닫는다** — QA 가 `false` 를 낸 상태에서 최상위가 `completed` 이면 그 자체가 모순이므로, Phase 7 진입 전에 둘의 정합성을 확인한다.
+
+#### 7.2.5 게이트 원장 종료 (v3.35 — 필수)
+
+원장을 닫는다. 닫지 않으면 이 레포의 **다음 세션까지** 훅이 계속 차단한다(24시간 뒤 자동 stale 해제).
+
+```bash
+node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JSON.stringify(g.closeLedger(process.cwd(),'{scope}')))"
+```
+
+반환된 `{met, unmet, abandoned}` 를 **최종 보고에 그대로 싣는다.** 이탈(abandoned)이 1건이라도 있으면
+done 이 아니라 **부분 완료**다 — 무엇을 왜 포기했는지 사유를 함께 보고한다.
 
 #### 7.3 문서 통합 제안
 
@@ -809,6 +863,7 @@ Lens Multi — 최종 결과
 ✓ {완료한 서브태스크}  (…)
 
 Goal 달성: {N}/{M}
+게이트: met {N} / unmet {N} / abandoned {N}   ← 7.2.5 의 closeLedger 반환값 그대로
 QA 증거: {실행한 명령·관측과 그 결과}
 산출물: {프로젝트 루트 기준 풀 경로}
 ```
