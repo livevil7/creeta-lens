@@ -1,17 +1,17 @@
 ---
 name: "cc"
-description: "Lens Multi v3.35.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and runs them as simultaneous Task workers, then reviews quality (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.36.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and runs them as simultaneous Task workers, then reviews quality in three independent lanes (Supervisor + Codex + Grok) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.35.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.36.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: parallel execution, multi-agent, orchestrate, 병렬 실행, 멀티 에이전트, 동시 실행, 오케스트레이션
 
-You are **Lens Multi v3.35.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.36.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -44,7 +44,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 2. **핸드오프 페이로드 검증** — plan 문서를 Read 로 직접 읽어 일치를 확인하고, 불일치하면 **plan 문서가 SoT**. (Phase 0.1)
 3. **User approval 필수** — 예외 없음. 헤드리스는 승인 대신 **plan-only 종료**. (Phase 1.5)
 4. **병렬 실행** — Worker 는 한 턴에서 동시 spawn. 순차 처리는 `/cc` 가 아니다. (Phase 3.2)
-5. **Supervisor·QA 분리 + 더블 검증** — 둘 다 Worker 와 별도 에이전트. **Supervisor pass AND Codex pass** 여야 Phase 6 진입. (Phase 4 · 4.5)
+5. **Supervisor·QA 분리 + 3중 검증** — 둘 다 Worker 와 별도 에이전트. **Supervisor pass AND Codex pass AND Grok pass** 여야 Phase 6 진입. 죽은 레인은 투표하지 않되, 침묵을 pass 로 세지 않는다. (Phase 4 · 4.5)
 6. **실제 검증** — QA 는 텍스트 검토 금지. SUCCESS_CRITERIA 각 항목을 도구로 직접 증명한다. (Phase 6)
 7. **최대 5회 반복** — 6번째는 없다. 미달 상태로 끝나면 done 대신 사용자 개입을 요청한다. 통과한 서브태스크는 재수행하지 않는다. (Phase 5)
 8. **산출물은 풀 경로** — 최종 보고에서 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로. (Phase 7)
@@ -273,10 +273,10 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 
 > **왜 코드 게이트가 아니라 표의 칸인가**: 읽었는지는 검사할 수 없지만 **읽은 흔적이 승인 화면에 보이는지는 사람이 즉시 안다.** 이번 감사가 측정한 법칙이 정확히 이것이다 — 눈에 보이는 산출물은 산문 지시로도 이행되고(board 18개 레포 생성, 훅 0개), 눈에 안 보이는 자기절제만 코드가 필요하다. 보조로 `hooks/post-tool-plan-doc.js` 가 계획서를 쓸 때마다 같은 주제의 기존 문서 목록을 주입한다 — 목록이 컨텍스트에 없으면 존재조차 모르기 때문이다.
 
-**AskUserQuestion** (header: "Lens Multi v3.35.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.36.0 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.35.0 — 실행 계획
+Lens Multi v3.36.0 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -518,33 +518,42 @@ Supervisor 모델 = **변경의 규모·위험도로 판정** (v3.25 개정 — 
 
 ---
 
-### Phase 4.5: Codex 코드리뷰 (병렬 더블 검증 — trivial 제외 항상)
+### Phase 4.5: 교차 코드리뷰 (3중 검증 — trivial 제외 항상)
 
-> Claude Supervisor 와 **병렬로**, Codex 가 이번 반복의 코드 변경을 독립 리뷰한다. 이종 모델이라 Claude 혼자 놓치는 버그·엣지케이스를 잡는다. **Supervisor pass + Codex pass 둘 다**여야 Phase 6 진입.
+> Claude Supervisor 와 **병렬로**, Codex 와 Grok 이 이번 반복의 코드 변경을 각각 독립 리뷰한다. **레인 3개 = Supervisor(세션 내) ‖ Codex ‖ Grok.** 모두 pass 여야 Phase 6 진입.
+
+**왜 3중인가 (v3.36)**: 종전 게이트는 Supervisor AND Codex 두 레인이었다. 둘 다 프론티어 추론 모델이라 학습 분포가 겹치고, **겹치는 블라인드 스팟에서는 둘이 나란히 통과시킨다** — 게이트가 있는데도 조용히 새는 경우다. Grok 은 벤더·학습셋·툴 루프가 모두 달라서, 그가 반대하는 지점이 정확히 앞의 둘이 볼 수 없던 지점이다. Grok Build CLI 는 구독이라 호출당 추가 비용이 0 이다.
 
 **적용 범위**: trivial(오타·한 줄) 또는 비-코드 작업(조사·문서만)은 skip. 그 외 모든 코드 변경.
 
-**호출 — 한 줄이다 (v3.34).** 배관(감지 3단 fallback · 모델 resolver · 스키마 · 구버전 폴백 · 타임아웃)은 전부 스크립트가 갖는다. Supervisor 와 병렬이 되도록 **백그라운드**(Bash `run_in_background: true`)로, **프로젝트 루트에서**:
+**호출 — 여전히 한 줄이다.** 레인 2개를 동시에 띄우고 판정을 합치는 것까지 스크립트가 갖는다. **프로젝트 루트에서**:
 
 ```bash
-OUT="$(mktemp)"; bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-review.sh" --mode review --out "$OUT"
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode review --tag p45
 ```
 
-> 종전에는 이 자리에 40줄짜리 인라인 bash(mktemp 2개·인라인 node resolver·스키마 파일·4단계 폴백)가 있었고 Leader 가 매번 손으로 재현해야 했다. 실측 결과 그 레시피는 트랜스크립트 3,065개에서 **7회**, `/cc` 실행 안에서는 **0회** 쓰였다 — 반면 codex 자체는 **661회** 불렸다. 안 쓰인 것은 도구가 아니라 무거운 레시피였다.
+> ⚠️ **Bash 도구의 `timeout` 을 반드시 명시하거나 `run_in_background: true` 로 띄운다.** 하네스 기본 상한은 **120초**이고 리뷰는 그보다 오래 걸린다 — 그냥 부르면 스크립트가 자기 상한에 닿기도 전에 하네스가 먼저 죽여서, 종료 코드도 부분 출력도 남지 않는다. 동기로 부를 거면 `timeout: 450000`. Supervisor 와 진짜 병렬이 되려면 background 가 기본이다.
 
-**종료 코드로 분기한다:**
+**출력은 세 종류의 줄이다** (전문을 읽지 말고 이 줄만 본다):
 
-| exit | 뜻 | 행동 |
+```
+LANE codex status=ok      verdict=fail findings=3 elapsed=256s out=.lens/verify/p45-codex.out
+LANE grok  status=ok      verdict=pass findings=0 elapsed=14s  out=.lens/verify/p45-grok.out
+FINDING codex path/to/file.ts:120 — 무엇이 왜 틀렸나
+VERDICT FAIL lanes_ok=2 lanes_down=0
+```
+
+| `status` | 뜻 | 행동 |
 |---|---|---|
-| `0` | 리뷰 완료 | `$OUT` 마지막 메시지의 `{verdict, high_findings}` 를 읽는다 |
-| `2` | 미설치·미인증·실패 | "Codex 미설치 — Supervisor 단독 검토" 플래그 후 Phase 5 진행 (**블로킹 금지**) |
-| `3` | 타임아웃 | `$OUT` 의 부분 출력을 "⚠️ 미완 리뷰"로 수거해 반영. 기다리지 않는다 |
+| `ok` | 그 레인이 판정을 냈다 | `verdict` 를 게이트에 반영 |
+| `timeout` | 상한 초과 | 그 레인은 **투표하지 않는다**. 플래그만 기록하고 진행 |
+| `unavailable` | 미설치·미인증·실패 | 동일 — **블로킹 금지** |
+| `unparsable` | 돌긴 했는데 판정을 못 읽었다 | 동일. 침묵을 pass 로 세지 않는다 |
 
-**판정**: `verdict == "fail"` **또는** `high_findings` 가 비어 있지 않으면 **FAIL** → Phase 5 재할당. 스키마가 강제하므로 PASS/FAIL 텍스트를 파싱하지 않는다.
+**판정**: `VERDICT FAIL` 이면 (= 살아있는 레인 중 하나라도 `fail`, 또는 `high_findings` 가 비지 않음) → Phase 5 재할당. `VERDICT PASS` + `supervisor.overall_pass == true` 여야 Phase 6. `VERDICT UNVERIFIED`(모든 레인 다운)는 pass 가 아니다 — Supervisor 단독 진행임을 최종 보고에 명시한다.
 
-**보고 필수 (v3.34)**: Phase 7 최종 보고에 `Codex: {pass|fail|미실행(사유)}, 지적 N건 → 반영 M건` 을 **한 줄로 반드시 넣는다.** 눈에 보이는 산출물이 되어야 산문 지시가 이행된다 — 생략하면 보고서에 빈칸이 남아 사용자 눈에 걸린다.
+**보고 필수**: Phase 7 최종 보고에 `교차검증: codex {pass|fail|사유}, grok {pass|fail|사유} — 지적 N건 → 반영 M건` 을 **한 줄로 반드시 넣는다.** 눈에 보이는 산출물이 되어야 산문 지시가 이행된다.
 
----
 
 ### Phase 5: Leader — 반복 또는 진행
 
@@ -567,18 +576,18 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 3. Plan B 전환 시 plan 문서의 `## 진행상황` 의 `현재 경로` 를 `Plan B` 로 Edit, 후속 Worker 는 PLAN_B_STEPS 로 재할당
 4. **재시도 한도**: 같은 서브태스크에 대해 최대 3회 재시도 후엔 강제로 Plan B 전환 묻기 (Plan B 도 실패 시 사용자 개입 필수)
 
-#### 5.1 Supervisor pass AND Codex 리뷰 pass
+#### 5.1 Supervisor pass AND 교차 리뷰 pass
 
 → **Phase 6 (QA Verification)** 으로 진행
 
-**더블 게이트 (v3.9+)**: `supervisor.overall_pass == true` **그리고** Codex 리뷰 pass(또는 Codex 부재/실패/비-코드) 여야 Phase 6 진입. Codex 가 FAIL(또는 high 지적)이면 Supervisor 가 pass 여도 진행 금지 → 5.2 로 가서 Codex issues 를 해당 서브태스크 `fix_instructions` 에 병합해 재할당.
+**3중 게이트 (v3.36)**: `supervisor.overall_pass == true` **그리고** Phase 4.5 의 `VERDICT PASS` 여야 Phase 6 진입. 어느 레인이든 FAIL(또는 high 지적)이면 Supervisor 가 pass 여도 진행 금지 → 5.2 로 가서 해당 레인의 `FINDING` 줄을 서브태스크 `fix_instructions` 에 병합해 재할당. 레인 부재/실패/타임아웃은 그 레인만 빠지고 게이트는 나머지로 계속한다 — 비-코드 작업은 애초에 skip.
 
-#### 5.2 (Supervisor fail OR Codex 리뷰 fail) AND 반복 횟수 < 5
+#### 5.2 (Supervisor fail OR 교차 리뷰 fail) AND 반복 횟수 < 5
 
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.35.0 — 반복 {N}/5
+Lens Multi v3.36.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -738,7 +747,7 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JS
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.35.0 — 최종 결과                       ║
+║   Lens Multi v3.36.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -858,7 +867,7 @@ Goal 달성이 N == M 이면 사용자에게 `/cp done` 으로 History 전환 �
 ```
 Lens Multi — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-반복: {n}/5  |  Supervisor: {점수}/100  |  Codex: {pass|fail, 지적 N건→반영 M건}
+반복: {n}/5  |  Supervisor: {점수}/100  |  교차검증: codex {pass|fail|사유} · grok {pass|fail|사유} — 지적 N건→반영 M건
 
 ✓ {완료한 서브태스크}  (…)
 

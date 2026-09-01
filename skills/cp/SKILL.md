@@ -18,7 +18,7 @@ power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Plan v3.35.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.36.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -184,18 +184,20 @@ large 규모는 목표를 **사람 언어 서브골 리스트**로 쪼갠다. �
 2. 가입한 사용자가 프로필을 수정할 수 있다       → 검증 3,4  (의존: 1)
 ```
 
-### Phase 0.5: Codex 병렬 독립 조사 (듀얼트랙 — trivial 제외 항상)
+### Phase 0.5: 병렬 독립 조사 (3중 트랙 — trivial 제외 항상)
 
-> Goal 정의 직후, **Claude 와 Codex 가 동시에 독립 조사**한다. Codex 는 Claude 계획의 "검토자"가 아니라 **공동 조사자** — 레포를 스스로 읽고 자기 접근안과 리스크를 낸다. 두 결과는 Phase 2.4 에서 합성한다.
+> Goal 정의 직후, **Claude · Codex · Grok 이 동시에 독립 조사**한다. Codex 와 Grok 은 Claude 계획의 "검토자"가 아니라 **공동 조사자** — 각자 레포를 읽고 자기 접근안과 리스크를 낸다. 세 결과는 Phase 2.4 에서 합성한다. 벤더가 다른 두 외부 레인을 두는 이유는 `skills/cc/SKILL.md` Phase 4.5 와 같다: 한 레인이 놓치는 지점은 다른 벤더가 본다.
 
 **적용 범위**: trivial(오타·변수명·한 줄 수정)은 skip — 애초에 `/cp` 를 쓸 일이 아니다. 상세 호출 규칙: `docs/rules/codex-integration.md` §8.5.
 
-1. **Codex 감지** — 3단계 fallback (PATH → VSCode 확장 번들 → 부재). 부재 시 "Codex 미설치 — Claude 단독 계획" 플래그 후 Phase 1 로 진행 (듀얼 비활성, 나머지 흐름 동일).
-2. **병렬 킥오프** — Codex 를 **백그라운드로** 실행(Bash `run_in_background: true`)해 Claude 의 Phase 1 작업과 진짜 병렬이 되게 한다. **프로젝트 루트에서** 호출 (Codex 가 파일 접근). 아래 프롬프트를 파일로 써서 넘긴다:
+1. **감지는 스크립트가 한다** — 각 레인의 CLI 부재·미인증은 그 레인만 빠지고 `LANE … status=unavailable` 로 보고된다. 전 레인 부재면 "외부 레인 없음 — Claude 단독 계획" 플래그 후 Phase 1 로 진행 (나머지 흐름 동일).
+2. **병렬 킥오프** — 두 외부 레인을 **백그라운드로** 실행(Bash `run_in_background: true`)해 Claude 의 Phase 1 작업과 진짜 병렬이 되게 한다. **프로젝트 루트에서** 호출 (레인이 파일에 접근한다). 아래 프롬프트를 파일로 써서 넘긴다:
 
 ```bash
-OUT="$(mktemp)"; bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-review.sh" --mode prompt --prompt-file PROMPT.txt --out "$OUT"
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode prompt --tag p05 --prompt-file PROMPT.txt
 ```
+
+> ⚠️ **Bash 도구의 `timeout` 을 명시하거나 `run_in_background: true` 로 띄운다.** 하네스 기본 상한은 **120초**라, 그냥 부르면 스크립트가 자기 상한에 닿기 전에 하네스가 먼저 죽인다 — 종료 코드도 부분 출력도 남지 않는다. 여기서는 background 가 기본이다.
 
 ```text
 이 작업을 당신이 직접 조사하고 독립적인 실행 계획을 제안하세요. 300단어 이내, 순수 텍스트, 한국어.
@@ -214,7 +216,7 @@ OUT="$(mktemp)"; bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-review.sh" --mode pro
 JSON 금지. Claude 의 안을 가정하지 말고 당신 시각으로 독립적으로.
 ```
 
-3. **Claude 는 기다리지 않는다** — 킥오프 후 즉시 Phase 1(자기 조사·Plan A 설계)로 진행. Codex 응답은 Phase 2.4 에서 `-o` 출력 파일(고유 파일명)에서 수거 (상세: `docs/rules/codex-integration.md` §5).
+3. **Claude 는 기다리지 않는다** — 킥오프 후 즉시 Phase 1(자기 조사·Plan A 설계)로 진행. 각 레인의 응답은 Phase 2.4 에서 `LANE … out=` 이 가리키는 `.lens/verify/p05-{codex,grok}.out` 에서 수거 (상세: `docs/rules/codex-integration.md` §5).
 
 ### Phase 1: Plan A 설계 (Goal 에 도달하는 권장 경로)
 
@@ -238,9 +240,9 @@ Plan A 가 막혔을 때의 **대체 방법** 을 명시.
 - **small 규모** → "Plan B 불필요 — 단일 명령 작업" 한 줄로 생략 가능 (외부 의존성 0인 순수 로컬 작업)
 - 생략 시 사유 명시 필수, 그렇지 않으면 Phase 5 Approve 거부
 
-### Phase 2.4: 듀얼 합성·교차검증 (Codex 조사가 있을 때)
+### Phase 2.4: 3자 합성·교차검증 (외부 레인 조사가 있을 때)
 
-> Phase 0.5 의 Codex 결과를 수거해 Claude 의 Plan A/B 와 합성한다. 핵심은 **"다른 부분의 재검증"** — 두 모델이 갈리는 지점이 곧 블라인드 스팟 후보다.
+> Phase 0.5 의 Codex·Grok 결과를 수거해 Claude 의 Plan A/B 와 합성한다. 핵심은 **"다른 부분의 재검증"** — 모델이 갈리는 지점이 곧 블라인드 스팟 후보다. 셋 중 둘만 갈려도 재검증 대상이다.
 
 Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude 단독 계획 그대로 Phase 2.5 진행, 문서에 "단일 모델 — Codex 미사용" 표기).
 
@@ -393,14 +395,14 @@ Plan A 의 **{단계 N} 에서 {신호}** 발생 시 즉시 전환.
 - [ ] step 1: …
 - [ ] step 2: …
 
-### 🔀 듀얼 합성 (Claude ‖ Codex)
-(Phase 2.4 에서 채움. Codex 미사용이면 "단일 모델 — Codex 미사용" 한 줄)
+### 🔀 3자 합성 (Claude ‖ Codex ‖ Grok)
+(Phase 2.4 에서 채움. 외부 레인 미사용이면 "단일 모델 — 외부 레인 미사용" 한 줄)
 
 **합의 (고신뢰):**
 - {둘 다 동의한 접근/리스크}
 
 **분기 → 해소:**
-- {분기 지점}: Claude={…} / Codex={…} → 채택={…} (근거: {코드 재확인 결과 또는 trade-off})
+- {분기 지점}: Claude={…} / Codex={…} / Grok={…} → 채택={…} (근거: {코드 재확인 결과 또는 trade-off})
 
 ### ⚠️ 사전 리스크 (Pre-mortem)
 (Phase 3 Pre-mortem 에서 자동 채움)
@@ -551,13 +553,13 @@ Phase 2.5 완료 후 저장된 계획 문서에 대해 **두 모델이 독립적
 
 > **중복 호출 회피 (v3.9+)**: Phase 0.5 에서 Codex 독립 조사가 이미 수행됐다면(=듀얼트랙 활성), Codex 의 리스크 시각은 Phase 2.4 합성에서 이미 통합됐으므로 **이 단계는 skip** (quota 절약). Pre-mortem 은 3.1 Claude TOP 이 통합안에 대해 단독 수행. Phase 0.5 가 skip 된 경우(trivial 아님에도 Codex 부재, 또는 handoff 직접 진입)에만 아래 Codex 호출 수행.
 
-호출은 한 줄이다 (v3.34) — 감지·모델 resolver·타임아웃은 스크립트가 갖는다. pre-mortem 은 소규모라 깊이 `xhigh`:
+호출은 한 줄이다 — 감지·모델 resolver·타임아웃·레인 병렬화는 스크립트가 갖는다. pre-mortem 은 소규모라 깊이 `xhigh`:
 
 ```bash
-OUT="$(mktemp)"; bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-review.sh" --mode prompt --prompt-file PROMPT.txt --out "$OUT" --effort xhigh
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode prompt --tag premortem --prompt-file PROMPT.txt --effort xhigh --timeout 240
 ```
 
-종료 코드 `2`(미설치·실패)면 skip 하고 "Codex 미설치 — Claude TOP 단독 pre-mortem" 플래그를 기록한다. `3`(타임아웃)이면 `$OUT` 의 부분 출력을 수거한다.
+`LANE … status=unavailable` 인 레인은 skip 하고 "{레인} 미설치 — 단독 pre-mortem" 플래그를 기록한다. `status=timeout` 이면 그 레인의 `out=` 파일에 부분 출력이 있는지만 확인하고 기다리지 않는다. 살아있는 레인이 하나도 없으면 Claude TOP 단독으로 진행한다.
 
 Codex 프롬프트:
 

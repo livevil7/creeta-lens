@@ -23,9 +23,39 @@ Codex 는 단순 "Claude 결과 검토자"가 아니라 **공동 조사자·공�
 - `/cp PLAN` **Phase 0.5 — 병렬 독립 조사**: Goal 정의 직후 Codex 가 레포를 스스로 읽고 자기 접근안+리스크를 제시 (Claude 의 Plan A 설계와 병렬). 결과는 Phase 2.4 에서 합성.
 - `/cp PLAN` **Phase 2.4 — 듀얼 합성·교차검증**: Claude 안과 Codex 안의 합의/분기 분류 → 분기 재검증.
 - `/cp PLAN` **Phase 3 — Pre-mortem**: 통합안의 최종 리스크 점검 (Phase 0.5 에서 Codex 조사가 이미 돌았으면 Opus 단독, 아니면 Codex 병렬).
-- `/cc` **Phase 4.5 — 코드리뷰 게이트**: 매 반복의 코드 변경을 Codex 가 독립 리뷰. Supervisor pass + Codex pass 둘 다여야 진행.
+- `/cc` **Phase 4.5 — 코드리뷰 게이트**: 매 반복의 코드 변경을 Codex 와 Grok 이 각각 독립 리뷰. **Supervisor pass + Codex pass + Grok pass** 셋 다여야 진행 (v3.36 — 3중 검증, §8.6). 죽은 레인은 투표하지 않되 침묵을 pass 로 세지 않는다.
 
 **trivial 작업(오타·변수명·한 줄 수정)은 모든 지점 skip** — 불필요한 호출 회피. Codex 부재/실패는 항상 graceful degrade (Claude/Supervisor 단독 진행 + 플래그 기록, 블로킹 금지). **단 예외 — `/cp deep` S4 교차 협의는 하드 게이트**(Constitution 2조): 미감지/미인증 시 degrade 하지 않고 **정지·보고**한다(사용자가 "Codex 없이 진행" 명시 시만 1회 우회). 위 graceful degrade 는 `/cp`·`/cc` 의 듀얼검증 지점에 적용된다.
+
+## 1.5 호출 불변식 — 타임아웃의 진짜 원인 (v3.36, 2026-09-01 실측)
+
+「codex 가 느리다」로 보이던 것의 대부분은 모델이 아니라 **배관**이었다. 아래 세 가지를 지키지 않으면 호출은 결과 없이 상한까지 매달린다. 상한을 올리는 처방은 이 셋 중 어느 것도 고치지 못한다.
+
+### ① stdin 을 반드시 닫는다 — `</dev/null`
+
+`codex exec` 와 `grok -p` 는 **파이프된 stdin 을 프롬프트에 덧붙인다** (`codex exec --help`: "If stdin is piped and a prompt is also provided, stdin is appended as a `<stdin>` block"). Claude Code Bash 도구의 stdin 은 EOF 가 오지 않는 열린 파이프라, codex 는 첫 토큰을 내기 전에 **영구 대기**한다 — 세션 배너조차 찍히지 않는다.
+
+실측(동일 프롬프트·동일 모델·순차 실행):
+
+| stdin | 결과 |
+| --- | --- |
+| 미차단 (v3.35 까지의 `codex-review.sh`) | **3/3 전부 상한까지 행, 산출 0바이트** |
+| `</dev/null` 차단 | **3/3 성공, 6–8초** |
+
+세션 누적 12회 중 미차단은 2회만 성공했다(**≈83% 실패**). 이것이 「입력이 크면 느려진다」로 오독돼 v3.25 의 상한 180→600 처방을 낳았다. **상한을 올려도 0바이트가 나온 이유가 바로 이것이다** — 대기하고 있던 것은 추론이 아니라 오지 않는 EOF 였다.
+
+### ② 프롬프트를 argv 로 넘기지 않는다 — `- < FILE`
+
+`codex exec "$(cat 프롬프트)"` 는 OS 인자 길이 한도에서 죽는다. 실측: 214KB 를 argv 로 = `rc 126 Argument list too long` 이 **0초에** 발생, 같은 바이트를 stdin 으로 = `rc 0` 6초. diff 를 주입하는 리뷰 호출은 수백 KB 로 쉽게 커지므로 argv 경로는 금지다. `-` 를 프롬프트 자리에 두고 파일을 리다이렉트한다 — 파일은 EOF 를 주므로 ①과 충돌하지 않는다.
+
+### ③ 하네스 상한이 스크립트 상한보다 낮다
+
+Claude Code Bash 도구의 기본 상한은 **120초**(최대 600초)다. 스크립트에 `--timeout 300` 을 걸어도 도구가 120초에 먼저 죽이면 **종료 코드 3 도, 부분 출력도 남지 않는다** — 호출자는 degrade 판단조차 못 하고 그냥 실패로 본다. 따라서 외부 레인 호출은 반드시 둘 중 하나다:
+
+- **`run_in_background: true`** (기본 — Claude 는 자기 작업을 계속하고 완료 알림에서 수거한다)
+- 동기라면 Bash 도구의 `timeout` 을 스크립트 상한보다 **크게 명시** (`--timeout 420` 이면 `timeout: 450000`)
+
+> 이 세 불변식은 전부 `scripts/codex-review.sh` · `scripts/grok-review.sh` 안에 들어가 있다. 호출자는 `scripts/cross-verify.sh` 한 줄만 쓰면 되고, 지켜야 할 것은 ③(background 또는 명시 timeout) 하나뿐이다.
 
 ## 2. 사전 조건 감지
 
@@ -231,26 +261,53 @@ Pre-mortem 은 repo 무관(`--skip-git-repo-check`)이지만, **조사·코드�
 ### 프롬프트 / 판정
 
 - **Phase 0.5 독립 조사**: "이 작업을 직접 조사하고 독립 실행 계획을 제안" (권장 접근 / 리스크 3 / 관련 파일). 전체 템플릿은 `skills/cp/SKILL.md` Phase 0.5.
-- **Phase 4.5 코드리뷰 (구조화·git-aware — v3.13+ 권장)**: 자유형 "이 diff 를 리뷰" 프롬프트 + 수동 diff 주입 + 본문 마지막 줄 awk `PASS`/`FAIL` 파싱은 **취약**(diff 잘림·텍스트 휴리스틱). 대신 **`codex exec review`** 가 git 을 직접 읽고 구조화 판정을 낸다 (현행 0.137+ 라이브 실측 확인):
+- **Phase 4.5 코드리뷰 (구조화 — v3.36 개정)**: 종전 권장이던 **`codex exec review --uncommitted` 는 폐기**한다. git 을 직접 읽어 diff 주입이 필요 없다는 장점은 실재했지만, CLI 가 `--uncommitted` 와 `[PROMPT]` 의 **병용을 거부**해서 **탐색 범위를 지시할 방법이 없다**. 실측(2026-09-01, 이 레포): 300초 동안 레포 전역 `rg`·PowerShell 을 **22회** 돌리고 644KB 의 JSONL 만 남긴 채 **판정을 못 냈다** — 게이트가 존재 이유인 바로 그 상황에서 죽은 것이다. §7 의 "초과가 반복되면 상한보다 프롬프트를 먼저 의심하라"가 여기에 그대로 적용되는데, 이 레시피에는 의심할 프롬프트 자리 자체가 없었다.
+
+  대신 **diff 를 주입한 평범한 `codex exec` + `--output-schema`** 를 쓴다. 구조화 판정(=awk PASS/FAIL 휴리스틱 제거)은 그대로 유지하면서 탐색 상한을 프롬프트로 걸 수 있다. 배관은 전부 `scripts/codex-review.sh --mode review` 안에 있으므로 호출자가 이 형태를 손으로 쓸 일은 없다:
 
   ```bash
-  # 모델 resolver (§4 ①) 를 먼저 실행해 MODEL_ARG 준비 — 이름 하드코딩 금지
-  SCHEMA=$(mktemp /tmp/codex_schema_XXXXXX.json)   # {verdict: pass|fail, high_findings:[...]}
-  RES=$(mktemp /tmp/codex_review_XXXXXX.json)
-  timeout 180 codex exec review --uncommitted \
-    "${MODEL_ARG[@]}" -c model_reasoning_effort=high -c service_tier=fast \
-    --output-schema "$SCHEMA" --ephemeral --json > "$RES" 2>/dev/null
-  # 판정: $RES 의 verdict==fail 또는 high_findings 비어있지 않음 → FAIL
-  # 깊이=high (전체 diff 는 대규모 입력 → xhigh 폭증 회피, §"깊이 분기").
-  # exit 124(180s 초과) → 구조화 JSON 불완전이면 degrade (§7).
+  # 실제 호출은 이 한 줄이다 (레인 2개 동시 — §8.6)
+  bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode review --tag p45
   ```
 
-  - `--uncommitted` (또는 `--base <branch>`) — Codex 가 작업트리 변경을 직접 읽음. **수동 diff 주입 제거**.
-  - `--output-schema` — `{verdict, high_findings}` 구조 강제. **awk PASS/FAIL 휴리스틱 제거**.
-  - `--ephemeral` — 세션 비영속. orphan 정리(Stop 훅) 의존 완화.
-  - ⚠️ **반드시 `codex exec review`** — bare `codex review` 는 `--output-schema`/`--ephemeral` 미노출. `exec review` 만이 review 인자(`--uncommitted/--base`)와 exec 플래그를 동시 노출.
-  - **fallback**: `codex exec review` 미지원 구버전이면 기존 자유형 diff 리뷰 + `PASS`/`FAIL`+`[high]` 파싱 (graceful degrade). 전체 템플릿은 `skills/cc/SKILL.md` Phase 4.5.
+  스크립트가 안에서 하는 일: ① 작업트리 diff + **미추적 파일 본문**(60KB 상한, 넘으면 잘렸다고 **표기** — 조용한 절단은 반만 읽은 파일을 pass 시킨다)을 모아 ② 탐색 상한("파일 최대 5개, 레포 전역 grep 금지")과 함께 프롬프트 파일로 만들고 ③ `-` + 파일 리다이렉트로 **stdin 을 통해** 넘긴다(§1.5 ①②) ④ `--output-schema` 로 `{verdict, high_findings}` 를 강제하고 `-o` 로 **최종 메시지만** 받는다(644KB 이벤트 스트림을 파싱할 일이 없다) ⑤ `-s read-only` 로 샌드박스를 좁힌다 — 리뷰 대상 diff 는 신뢰할 수 없는 입력이고, 사용자 `config.toml` 기본값은 `danger-full-access` 다.
+
+  ⚠️ **스키마에 `"additionalProperties": false` 가 없으면 서버가 400 을 낸다** (`Invalid schema for response_format ... 'additionalProperties' is required to be supplied and to be false`). v3.35 까지의 스키마에는 이게 빠져 있었다 — `exec review` 가 애초에 최종 메시지에 도달하지 못해 드러나지 않았을 뿐이다.
+
 - **합성/게이트**: 조사 결과는 Claude 가 합의/분기로 분류해 통합 (Phase 2.4). 리뷰 결과는 Supervisor 와 AND 게이트 (둘 다 pass 여야 진행).
+
+## 8.6 세 번째 레인 — Grok (v3.36)
+
+게이트가 Supervisor + Codex 두 레인이던 동안, **둘 다 프론티어 추론 모델이라 학습 분포가 겹쳤다.** 겹치는 블라인드 스팟에서는 둘이 나란히 통과시킨다 — 게이트가 있는데도 조용히 새는 경우다. Grok 은 벤더·학습셋·툴 루프가 모두 달라서 그가 반대하는 지점이 정확히 앞의 둘이 볼 수 없던 지점이다. Grok Build CLI 는 **구독**(세션 인증, API 키 아님)이라 호출당 추가 비용이 0 이다.
+
+- **스크립트**: `scripts/grok-review.sh` — 플래그·종료 코드가 `codex-review.sh` 와 **동일**하다. 네 번째 레인이 필요하면 이 파일을 복사하는 것이 추가 절차의 전부다.
+- **인증 감지**: `~/.grok/auth.json` 이 비어있지 않은지만 본다. 네트워크 프로브는 호출마다 왕복을 더하므로 쓰지 않는다.
+- **읽기 전용 자세**: `--tools read_file,grep,list_dir --disable-web-search`. 리뷰 대상 diff 는 **신뢰할 수 없는 입력**이고, `--always-approve` 와 `bash`·`search_replace` 가 함께 있으면 남의 패치에 심긴 프롬프트 인젝션이 로컬 코드 실행이 된다. 허용목록이라 오타가 나면 **시끄럽게** 실패한다(거부목록은 조용히 위험한 툴을 남긴다).
+- **`--sandbox strict` 는 쓰지 않는다**: 그 아래서 `read_file` 이 `tool_output_error` 를 내고 에이전트가 실패한 호출을 상한까지 재시도했다 — 300초·0바이트 대 14초·정상 판정(2026-09-01 실측). 쓰기·실행 표면을 없애는 것은 허용목록이지 strict 가 아니다.
+- **구조화 출력**: `--json-schema` 는 `--output-format json` 을 함의하며, 모델의 답은 봉투의 `.text` 에 **JSON 문자열로** 들어온다. 스크립트가 이걸 벗겨서 codex 레인과 **같은 `{verdict, high_findings}` 모양**으로 `$OUT` 에 쓴다 — 호출자가 봉투 형식 두 개를 배울 일이 없다.
+
+### 남은 리스크 — 읽기 노출 (수용, v3.36)
+
+리뷰 대상 diff 는 원리적으로 신뢰할 수 없는 입력이고, 두 레인 모두 **읽기 도구는 계속 쥐고 있다.** 따라서 악의적 diff 에 심긴 프롬프트 인젝션이 로컬 파일을 읽어 외부 모델 요청에 실을 여지는 남는다 (`-s read-only` 는 *쓰기*를 막을 뿐 읽기 범위를 좁히지 않는다). 막은 것과 남긴 것을 분명히 해 둔다:
+
+- **막았다**: 쓰기·셸 실행(허용목록에 `bash`·`search_replace` 없음, codex 는 `-s read-only`), 그리고 **심볼릭 링크 역참조** — 레포 밖을 가리키는 미추적 링크 하나면 그 대상 파일이 통째로 프롬프트에 실렸다.
+- **남겼다**: 레포 내 파일 읽기. 리뷰어에게서 읽기를 뺏으면 지적의 근거를 확인할 수 없어 "정보 부족으로 판단 불가"만 내놓는 레인이 된다(실측 — 그 응답이 high 지적으로 올라가 게이트를 거짓 차단했다).
+- **전제**: `/cc` 가 리뷰하는 diff 는 **자기 Worker 가 방금 쓴 것**이다. 외부 PR 처럼 제3자가 쓴 diff 를 이 레인에 물릴 때는 이 전제가 깨지므로, 그때는 시크릿이 레포 안에 없는지 먼저 확인한다.
+
+### 오케스트레이터 — `scripts/cross-verify.sh`
+
+레인 2개를 **동시에** 띄우고 판정을 합쳐 세 종류의 줄로 보고한다. 이게 호출자가 아는 전부다:
+
+```
+LANE codex status=ok      verdict=fail findings=3 elapsed=256s out=.lens/verify/p45-codex.out
+LANE grok  status=ok      verdict=pass findings=0 elapsed=14s  out=.lens/verify/p45-grok.out
+FINDING codex path/to/file.ts:120 — 무엇이 왜 틀렸나
+VERDICT FAIL lanes_ok=2 lanes_down=0
+```
+
+- **죽은 레인은 투표하지 않는다** — `timeout`·`unavailable`·`unparsable` 은 `lanes_down` 으로 세고 게이트는 나머지로 계속한다. 침묵을 pass 로 세면 도구가 깨지는 바로 그 순간에 게이트가 약해진다.
+- **종료 코드에 판정을 싣지 않는다** — 0 이 아닌 종료는 「스크립트 자체가 깨졌다」와 구분되지 않고, 그 둘을 구분 못 하는 리뷰 게이트는 인프라 오류에서 fail-open 한다. 판정은 `VERDICT` 줄로만 읽는다.
+- 레인 출력은 실행 **전에** 비운다. 감지·인증 단계에서 죽은 헬퍼는 자기 `: > $OUT` 에 도달하지 못해 지난 실행의 판정이 그 경로에 남고, 낡은 FAIL 이 새 FAIL 로 읽히는 것은 게이트가 작동하는 것처럼 보이기 때문에 가장 나쁜 오답이다.
 
 ## 9. 관련 파일 / 외부 참조
 
