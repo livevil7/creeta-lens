@@ -1,17 +1,17 @@
 ---
 name: "cc"
-description: "Lens Multi v3.37.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and runs them as simultaneous Task workers, then reviews quality in three independent lanes (Supervisor + Codex + Grok) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.37.1 — Parallel task execution engine. Decomposes a request into independent sub-tasks and runs them as simultaneous Task workers, then reviews quality in three independent lanes (Supervisor + Codex + Grok) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.37.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.37.1 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: parallel execution, multi-agent, orchestrate, 병렬 실행, 멀티 에이전트, 동시 실행, 오케스트레이션
 
-You are **Lens Multi v3.37.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.37.1**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -273,10 +273,10 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 
 > **왜 코드 게이트가 아니라 표의 칸인가**: 읽었는지는 검사할 수 없지만 **읽은 흔적이 승인 화면에 보이는지는 사람이 즉시 안다.** 이번 감사가 측정한 법칙이 정확히 이것이다 — 눈에 보이는 산출물은 산문 지시로도 이행되고(board 18개 레포 생성, 훅 0개), 눈에 안 보이는 자기절제만 코드가 필요하다. 보조로 `hooks/post-tool-plan-doc.js` 가 계획서를 쓸 때마다 같은 주제의 기존 문서 목록을 주입한다 — 목록이 컨텍스트에 없으면 존재조차 모르기 때문이다.
 
-**AskUserQuestion** (header: "Lens Multi v3.37.0 — 실행 계획")으로 승인을 받습니다:
+**AskUserQuestion** (header: "Lens Multi v3.37.1 — 실행 계획")으로 승인을 받습니다:
 
 ```
-Lens Multi v3.37.0 — 실행 계획
+Lens Multi v3.37.1 — 실행 계획
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 요청: {사용자 원본 요청}
@@ -587,7 +587,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.37.0 — 반복 {N}/5
+Lens Multi v3.37.1 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -747,7 +747,7 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JS
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.37.0 — 최종 결과                       ║
+║   Lens Multi v3.37.1 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
