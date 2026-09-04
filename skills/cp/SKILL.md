@@ -18,7 +18,7 @@ power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Plan v3.36.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.37.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -64,6 +64,28 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 - **승인은 전용 게이트로**: 요구사항·접근 방식 질문은 승인 요청 전에 모두 끝낸다. "이 계획 괜찮나요?"류 확인을 중간 질문에 섞지 않는다 — 승인은 Phase 5 게이트 하나로 모은다.
 
 출처: `docs/rules/harness-rules.md` §E·§4.5.
+
+---
+
+## 계획은 TOP 티어가 쓴다 (v3.37 — 사용자 지시)
+
+> 사용자 지시(2026-09-04): *"기획을 할 때는 왠만하면 fable 5.1 을 쓰게 해. 계획서를 쓸 때는 특히."*
+
+계획은 난이도 사다리의 **Critical 칸**이다. `/cc` 의 배분 규칙(`정형 반복=중간 티어 / 사고과정=상위 티어 / 비가역·보안·아키텍처=TOP`)을 계획 자체에 적용하면 결론이 하나로 나온다 — **계획서는 되돌리기 어려운 결정을 문서에 박는 활동**이고, 여기서 틀리면 실행 전체가 틀린 것을 정확히 만든다. 실행 워커는 TOP 을 쓰면서 그 워커들이 따를 계획은 세션 기본 모델로 쓰는 것은 사다리를 거꾸로 세운 것이다.
+
+**TOP = `Agent` 도구 model enum 의 최상위 티어 — 현재 `fable`(Fable 5.1), enum 에 없으면 `opus`.** 이름이 아니라 상대 위치라서 세대가 바뀌면 자동으로 따라 올라간다(v3.24 정책 그대로).
+
+| 세션 모델 | 무엇을 하는가 | 왜 |
+|---|---|---|
+| 이미 TOP (`fable`) | **세션 안에서 그대로 쓴다. spawn 금지.** | 부모가 이미 대화·조사 컨텍스트를 갖고 있다 — Pre-mortem 3.1 과 같은 판정. 위임은 순손실 |
+| TOP 미만 (opus·sonnet·haiku) | **Phase 1 ~ 2.5(Plan A·B 설계 + 문서 작성)를 `Agent(model: "fable")` 에 위임한다.** 지정 생략(상속) 금지 | 계획 품질이 세션 모델 우연에 좌우되는 것을 끊는다 |
+
+**위임할 때의 절대 조건 — 컨텍스트를 통째로 실어 보낸다.** 원본 요청 전문 · Phase 0 의 What/Why · Phase 0.5/0.6 조사 결과(3중 레인 산출 포함) · Phase 2.45 인벤토리 전량 · 관련 `docs/rules/`·`docs/history/` 경로. **컨텍스트 없는 위임은 상위 모델이 아니라 무지한 모델을 쓰는 것이다** — 그 실패는 v3.25 가 Pre-mortem 을 세션 내부로 되돌린 이유와 같다.
+
+- 결과는 frontmatter `planner_model:` 에 기록한다(`fable` / `opus` / `sonnet` …). **기록 없는 계획서는 어느 모델이 썼는지 사후에 알 수 없다** — `/crv` 감사가 읽는 값이다.
+- 승인 화면(Phase 5.1)에 한 줄로 표시한다: `계획 작성 모델: fable (세션 위임)` 또는 `fable (세션 자체)`.
+- TOP spawn 상한은 `hooks/pre-tool-task.js` 가 1회 실행 3개로 계측한다. 계획 위임은 **1개**다 — 상한을 잡아먹는 용도가 아니다.
+- **예외는 하나뿐**: 오타·변수명 같은 trivial 은 애초에 `/cp` 를 쓰지 않는다(Edge Cases). 계획을 쓸 값어치가 있으면 TOP 으로 쓴다.
 
 ---
 
@@ -291,6 +313,7 @@ Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude �
 | `base` | `resolveBase()` 로 **감지**하고 **원격 ref 실존 확인**(`preflight`)을 통과한 값 | `/cp` (Phase 2.5) |
 | `branch` | `feat/<slug>` — 접두사는 `feat/` `fix/` `ops/` `docs/` **4종만** | `/cp` 가 **이름만** 정함 |
 | `pr` | `null` (계획 시점엔 PR 이 없다) | `/cd` 가 채움 |
+| `planner_model` | 이 계획서를 실제로 쓴 모델 (`fable` \| `opus` \| …) + 세션 자체인지 위임인지 | `/cp` (Phase 2.5, 위 "계획은 TOP 티어가 쓴다") |
 
 - **`/cp` 는 브랜치를 만들지 않는다** — 이름만 정해 문서에 적는다. 실제 생성·체크아웃은 `/cc` 가 실행 진입 시 한다. (`/cp` 는 계획·문서화 전용이라는 절대 규칙 그대로.)
 - **이름에 날짜를 넣지 않는다** — 커밋이 이미 날짜를 갖고 있다. 도구 이름 접두사(`lens/…`)도 금지.
@@ -306,6 +329,7 @@ Phase 0.5 가 skip 됐거나 Codex 부재/실패면 이 Phase 도 skip (Claude �
 ---
 plan_id: YYYY-MM-DD-<slug>
 planner: cp
+planner_model: <fable|opus|sonnet> (<세션 자체|세션 위임>)
 grade: 기본|deep
 created: YYYY-MM-DD
 status: planned
@@ -626,6 +650,39 @@ N+2. [Plan A step 2] — execution level (status: pending)
 
 성공 기준은 모든 Plan A step 이 완료된 후 자동 재평가됨. 미달 항목이 있으면 done 차단. `/cc` 핸드오프 시 이 구조를 그대로 인계.
 
+### Phase 4.5: 계획서를 눈앞에 띄운다 (v3.37 — 승인 요청 직전, 생략 불가)
+
+> 사용자 지적(2026-09-04): *"저장했으니 승인해라 이렇게만 보고를 해 … 맨날 계획서 찾는다고 탐색기 찾고 뭐하고 아주 지겨워 죽겠어."*
+> **경로를 적는 것은 띄우는 것이 아니다.** 사용자는 VS Code 확장과 Claude 앱에서 일한다 — 파일 경로만 받으면 탐색기를 뒤져야 하고, 그러다 안 보고 승인한다. **안 본 문서에 대한 승인은 승인이 아니다.**
+
+**순서가 중요하다 — 띄우는 것은 Phase 2.6 이 아니라 여기다.** Pre-mortem(P3)이 `## ⚠️ 사전 리스크` 를 md 에 추가하므로, 2.6 에서 만든 HTML 을 그대로 띄우면 **사용자가 보는 화면과 승인 대상 문서가 다르다.**
+
+1. **HTML·board 를 최종 md 기준으로 갱신한다.** Phase 3 이후 md 가 바뀌었으면 `/cp html docs/tasks/{id}.md` 절차로 슬라이드를 다시 만들고, `node ${CLAUDE_PLUGIN_ROOT}/lib/board-builder.js {projectRoot}` 로 board 를 재빌드한다. (md 무변경이면 생략.)
+2. **띄운다.**
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" docs/tasks/{id}.md
+   ```
+
+   HTML 이 있으면 HTML 을, 없으면 md 를 OS 기본 연결 프로그램(브라우저/편집기)으로 연다. 결과는 JSON 한 줄:
+
+   | `method` | 뜻 | 다음 행동 |
+   |---|---|---|
+   | `browser` | 이 기계 화면에 실제로 떴다 | 승인 화면에 파일 경로를 그대로 적고 진행 |
+   | `remote` | SSH·헤드리스 세션 — 여기서 브라우저를 열어도 사용자는 못 본다 | **아래 3번 Artifact 폴백 필수** |
+   | `failed` | opener 실패 (사유는 `error`) | 3번 시도, 그래도 안 되면 4번 |
+   | `missing` | 문서가 없다 | Phase 2.5/2.6 회귀 |
+
+3. **Artifact 폴백 (원격·실패 시).** 세션에 `Artifact` 도구가 있으면 계획서를 아티팩트로 발행하고 — 계획 md 를 그대로 붙여넣지 말고 읽히는 페이지로 만든다(작성 전 `artifact-design` 스킬 로드) — 받은 URL 을 표시 기록에 되먹인다:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --artifact <URL> {id}
+   ```
+
+4. **전부 실패하면 숨기지 말고 승인 화면 첫 줄에 적는다**: `⚠️ 계획서 띄우기 실패: {사유} — 경로: docs/tasks/{id}.html`. 조용히 넘어가는 것이 이 Phase 가 없애려는 실패 모드 그 자체다.
+
+**띄웠다고 읽었다고 가정하지 마라** — 승인 화면(5.1)에 위치·URL 을 다시 적는다. 이 단계의 성공 기록은 `.lens/report-shown.json` 에 남고 Phase 5.0 §7 게이트가 그 기록을 읽는다.
+
 ### Phase 5: 사용자 검토 (게이트 통과 후 진입)
 
 #### 5.0 진입 전 자동 검사
@@ -672,22 +729,43 @@ N+2. [Plan A step 2] — execution level (status: pending)
 
    표시가 게이트인 이유: 사용자가 **승인 시점에 위험한 base 를 눈으로 잡을 수 있어야** 한다. `Returns_ERP_v20` 은 base 가 `staging` 이고 **staging 머지는 곧 배포**다 — 승인 화면에 base 가 안 보이면 "계획 승인"이 "배포 경로 승인"인 줄 모른 채 지나간다. **base 판정 불가면** 추정으로 채우지 말고 `⚠️ base 판정 불가 (레포: <repo>)` 를 표시한 뒤 AskUserQuestion 으로 진행 여부를 확인한다 (조용한 추정 0건). **이름은 해석됐지만 원격 ref 가 없는 경우도 같은 취급**이다 — Phase 2.5 의 `preflight` 검사가 `base: null` 을 낸 것(예: 빈 원격을 tracking 하는 `docs` 레포)이고, 존재하지 않는 base 를 frontmatter 에 쓰면 `/cc` 가 나중에 실패한다.
 
+7. **표시 게이트 (v3.37 — 실제 코드 검사)** — 사용자가 이 계획서를 **실제로 봤는가**. 산출물 게이트가 *파일의 존재*를 보는 반면 이 게이트는 **화면에 떴는지**를 본다.
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --check {id}
+   ```
+
+   exit 0 (`method` 가 `browser` 또는 `artifact`) 이어야 통과. `unshown`·`remote`·`failed` 는 **Phase 4.5 로 회귀**한다. 게이트가 `.lens/report-shown.json` 을 읽는 이유는 하나다 — 산문 규칙("풀 경로로 링크하라")은 v3.25 부터 있었고 사용자는 2026-09-04 에 같은 불만을 냈다. **파일을 여는 것만이 파일을 여는 것이다.**
+
+8. **작성 모델 게이트** — frontmatter `planner_model:` 이 채워졌는가. 비었으면 Phase 2.5 로 회귀해 채운다. TOP 미만 모델이 세션 안에서 직접 썼다면(위임도 안 함) 그 사실을 승인 화면에 명시한다 — 숨기지 않는다. (규칙: 위 "계획은 TOP 티어가 쓴다".)
+
 게이트 미통과 시 사유 표시하며 Phase 0 또는 Phase 2 로 회귀.
 
 #### 5.1 사용자 의사결정
 
-문서 내용과 저장 경로를 표시한 후, **AskUserQuestion** (header: "Lens Plan") 으로 물어봅니다:
+**승인 요청 메시지의 첫 블록은 고정이다 (v3.37).** "저장했습니다 / 승인해주세요" 만 적는 보고는 위반이다 — 사용자가 무엇을 승인하는지 **지금 화면에서** 알 수 있어야 한다:
+
+```text
+📄 계획서 — 방금 띄웠습니다: docs/tasks/{id}.html      ← Phase 4.5 가 연 그 대상 (또는 아티팩트 URL)
+   원본(md): docs/tasks/{id}.md   ·   보드: docs/board_<repo>.html
+🧭 브랜치: feat/<slug>  ←  base: <base>  (감지: <출처>)   [레포: <repo>]
+🧠 계획 작성 모델: fable (세션 자체 | 세션 위임)
+📊 커버리지: 인벤토리 N건 → 포함 M / 제외 K (제외 사유 전건 기재)
+📝 요약: {🎯 What 한 줄} — {가장 큰 리스크 한 줄}
+```
+
+그 다음 **AskUserQuestion** (header: "Lens Plan") 으로 물어봅니다:
 
 - **Approve** — 계획 확정
 - **Modify** — 수정할 부분 지정
 - **Execute** — 계획 확정 후 `/cc` 로 실행 핸드오프 (아래 **핸드오프 프로토콜** 참조)
 
-Blocker 모드면 Modify 가 첫 옵션으로 노출됨.
+Blocker 모드면 Modify 가 첫 옵션으로 노출됨. 띄우기가 실패했다면 첫 줄을 `⚠️ 계획서 띄우기 실패: {사유}` 로 바꾸고 경로를 그대로 남긴다.
 
 ### Phase 6: 응답 처리
 
-- **Approve**: 저장 완료 안내. 끝.
-- **Modify**: 수정 사항 반영 → 재저장 → Phase 5 로 복귀.
+- **Approve**: 저장 완료 안내 — **띄운 계획서의 위치(또는 URL)를 한 번 더 적는다.** 끝.
+- **Modify**: 수정 사항 반영 → 재저장 → **Phase 4.5 재실행(HTML·board 갱신 + 다시 띄우기)** → Phase 5 로 복귀. 사용자가 열어 둔 탭은 수정 전 문서다 — 고친 문서를 다시 띄우지 않으면 사용자는 옛 버전을 승인한다.
 - **Execute**: 아래 **/cp → /cc 핸드오프 프로토콜** 대로 `lens:cc` 호출. 호출 후 `/cp` 는 종료, 실행은 `/cc` 가 책임.
 
 ---
@@ -841,7 +919,8 @@ branch: {branch}
 
 > **원칙: md = SoT, HTML = 파생 뷰.** `docs/tasks|history/*.md` 가 데이터·상태 원본이다. 상태·요약을 HTML 에 원본 저장하지 않는다.
 
-- **언제**: Phase 2.6(md 저장 직후) 에 `docs/tasks/{id}.html` 생성 + board 갱신. **승인 게이트를 막지 않는다** — 필수는 md 와 board 뿐이다(v3.34).
+- **언제**: Phase 2.6(md 저장 직후) 에 `docs/tasks/{id}.html` 생성 + board 갱신. **승인 게이트를 막지 않는다** — 필수는 md 와 board 뿐이다(v3.34). **사용자에게 띄우는 것은 Phase 4.5** — Pre-mortem 이 md 를 바꾸므로 그 전에 띄우면 화면과 승인 대상이 어긋난다(v3.37).
+- **띄우기**: `node ${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js <docs/tasks/{id}.md>` — HTML 있으면 HTML, 없으면 md 를 OS 기본 프로그램으로 연다. 기록은 `.lens/report-shown.json`, 게이트는 Phase 5.0 §7. 원격/헤드리스면 `--artifact <URL>` 로 아티팩트를 되먹인다.
 - **어떻게**: 작성 절차·양식 규칙·메타 태그·다국어·경로 한계는 전부 `${CLAUDE_PLUGIN_ROOT}/templates/report-conversion-spec.md` 에 있다. 그 파일을 Read 한 뒤 따른다. 여기에 복제하지 않는다(v3.34).
 - **board 빌드**: `node ${CLAUDE_PLUGIN_ROOT}/lib/board-builder.js {projectRoot}` — idempotent, 언제 재실행해도 안전.
 - **`/cp html <md-path>`** = CONVERT 모드. 같은 스펙 파일의 판별 규칙(`doc_kind: flow` → FLOW 뷰어, `grade: deep`·`planner: cpp` → task-deep 무제한 슬라이드, 그 외 폴더로 판별)을 따른다.
@@ -929,7 +1008,9 @@ docs/
 - 전문가 관점 — 주니어가 놓칠 통찰 제시
 - AskUserQuestion 필수 — 일반 텍스트로 선택지 물어보지 않음
 - **산출물 링크는 풀 경로** — 보고/안내 시 deliverable 파일은 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로의 클릭 가능 링크로 제시 (`docs/tasks/{id}.md`, `docs/tasks/{id}.html`, `docs/board_<repo>.html`).
+- **계획서는 띄운 뒤에 승인을 요청한다 (v3.37)** — 경로만 적고 "승인해주세요" 는 금지. Phase 4.5 가 실제로 화면에 띄우고, Phase 5.0 §7 게이트가 `.lens/report-shown.json` 으로 그것을 확인한다. 띄우기가 실패했으면 **실패했다고 말한다** — 승인 요청을 조용히 이어가지 않는다.
+- **계획은 TOP 티어(현재 `fable`)가 쓴다 (v3.37)** — 세션이 TOP 이면 세션 안에서, 아니면 Phase 1~2.5 를 `Agent(model: "fable")` 에 컨텍스트 전량과 함께 위임. 어느 쪽이든 frontmatter `planner_model:` 에 기록하고 승인 화면에 표시한다.
 - **Codex 교차검증** — trivial 제외 항상 Codex 와 병렬 조사(P0.5) + 합성(P2.4). 기본 등급은 부재 시 graceful degrade(Claude 단독 + 플래그), **deep 은 degrade 금지·정지·보고**(deep 델타 D2). 호출은 `scripts/codex-review.sh`. 상세: `docs/rules/codex-integration.md`.
 - **등급 분기** — `/cp` 하나로 기본·deep 을 커버한다. 등급은 **위험도**로 정하고 `/cp deep` 로 직접 지정할 수 있다. 낮춰 지정하면 경고하되 강제 전환은 없다.
 - **2분 진행보고 (v3.16+, v3.25 강화 · 공통 규칙)** — Codex 대기·fan-out 조사·**Workflow**·Task 에이전트 등 2분 이상 걸리는 구간은 침묵 금지. **2분 주기**로 세 가지를 **전부** 보고: ① **생존 확인 결과**(추측 금지 — `TaskOutput(block=false)`·산출물 mtime 으로 실제 확인. **확인 없이 "진행 중"이라 말하지 않는다**) ② 끝난 것/남은 것(N/M) ③ **부분 산출물은 대기 중이라도 먼저 낸다**(대기가 산출을 100% 막지 않게). **"아직입니다"만 적는 보고는 위반** — 세 요소가 다 없는 보고는 보고가 아니다. 유실·정지 감지 시 즉시 보고 + **복구보다 폐기·재판단 우선 검토.** 사용자 VS Code 확장엔 진행창이 없다 — 보고 책임은 전적으로 스킬에 있다. **이 주기는 훅이 강제한다** — 스킬 본문의 권고에만 의존하면 컨텍스트가 길어질 때 조용히 건너뛰어진다(실측). ⚠️ **단, Lens 대시보드·훅의 `done` / `All N agents complete` 출력을 생존확인 근거로 쓰지 마라** — 백그라운드 에이전트는 도구 호출이 즉시 반환되므로 그 신호가 **배포 직후에 거짓 완료로 나온다**(실측: 10개 배포 직후 전부 `done (132ms)`, 실제로는 최대 311초 실행 중). ①의 실측은 `TaskOutput(block=false)`·산출물 mtime 처럼 **에이전트 바깥의 증거**로 한다. (SoT: `docs/rules/harness-rules.md` §4.4.)
-- Phase 순서 — 조사(P0.6) → What+Why(P0) → Codex 병렬 조사(P0.5) → Plan A(P1) → Plan B(P2) → 듀얼 합성(P2.4) → **작업 인벤토리(P2.45)** → 문서(P2.5) → HTML+board(P2.6) → Pre-mortem(P3) → TodoWrite(P4) → **게이트+승인(P5)** → 응답(P6).
+- Phase 순서 — 조사(P0.6) → What+Why(P0) → Codex 병렬 조사(P0.5) → Plan A(P1) → Plan B(P2) → 듀얼 합성(P2.4) → **작업 인벤토리(P2.45)** → 문서(P2.5) → HTML+board(P2.6) → Pre-mortem(P3) → TodoWrite(P4) → **띄우기(P4.5)** → **게이트+승인(P5)** → 응답(P6).

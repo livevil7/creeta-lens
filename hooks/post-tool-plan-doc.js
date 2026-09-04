@@ -20,6 +20,13 @@
  *
  * So: advisory context, cutoff-respecting, never blocking.
  *
+ * v3.37 adds two lines to the same message, for the same reason: the owner's
+ * 2026-09-04 complaint was that /cp reports a saved path and asks for approval,
+ * leaving them to hunt the file down. The skill now shows the document (Phase 4.5)
+ * and records which model wrote it (`planner_model`); this hook is where those two
+ * rules are repeated at the moment the document is written, because a rule read
+ * 70KB earlier in SKILL.md is a rule that gets skipped.
+ *
  * Triggered: after each Write/Edit
  * Reads:     the written file (docs/tasks/*.md only)
  * Output:    { hookSpecificOutput: { additionalContext } } — or nothing at all
@@ -37,6 +44,8 @@ const {
   validatePlanStructure,
   findRelatedDocs,
 } = require(path.join(PLUGIN_ROOT, 'lib', 'plan-manager'));
+
+const { wasShown } = require(path.join(PLUGIN_ROOT, 'lib', 'report-viewer'));
 
 // Plan documents only. History entries have a different skeleton by design, and
 // rules/ is not a plan at all — checking either would produce noise on every edit.
@@ -90,6 +99,26 @@ function main() {
       + ` 계획을 굳히기 전에 열어보고, 겹치거나 이미 결정된 것이 있으면 📋 인벤토리에 반영하라.`
     : '';
 
+  // v3.37: the two things the owner asked for on 2026-09-04 — show the plan
+  // instead of naming it, and record which model wrote it. Both are prose rules
+  // in SKILL.md; this is the line that survives a long context.
+  const planId = path.basename(filePath, '.md');
+  const relPath = path.relative(projectRoot, filePath).split(path.sep).join('/') || filePath;
+  let shown = null;
+  try {
+    shown = wasShown(projectRoot, planId);
+  } catch {
+    shown = null; // a broken record must not change the gate report
+  }
+  const showHint = shown
+    ? ''
+    : ` 승인을 요청하기 전에 계획서를 띄워라(Phase 4.5): `
+      + `node "$CLAUDE_PLUGIN_ROOT/scripts/show-report.js" ${relPath} — `
+      + `경로만 적은 "저장했습니다, 승인해주세요" 는 보고가 아니다(사용자 지적 2026-09-04).`;
+  const modelHint = /^planner_model\s*:/m.test(content)
+    ? ''
+    : ` frontmatter 에 planner_model 이 없다 — 이 계획서를 쓴 모델을 기록하라(계획은 TOP 티어=fable 원칙).`;
+
   const structure = validatePlanStructure(content, grade(content));
   const coverage = validatePlanCoverage(content);
   if (structure.valid && coverage.valid) {
@@ -100,7 +129,7 @@ function main() {
         hookEventName: 'PostToolUse',
         additionalContext:
           `[Lens] 계획서 게이트 통과 — 커버리지: 인벤토리 ${coverage.total}건 → 포함 ${coverage.included} / 제외 ${coverage.excluded}. ` +
-          `승인 화면에 이 카운트를 그대로 표시하라.` + priorWork,
+          `승인 화면에 이 카운트를 그대로 표시하라.` + showHint + modelHint + priorWork,
       },
     });
   }
@@ -124,7 +153,7 @@ function main() {
       additionalContext:
         `[Lens] 계획서 ${path.basename(filePath)} 가 게이트를 통과하지 못한다. ${parts.join(' · ')}. ` +
         `승인을 요청하기 전에 고쳐라 — 이 검사는 /cp Phase 5.0 과 /cc 실행 진입에서 다시 돈다. ` +
-        `(차단하지 않는다: 진행 중인 계획서 대다수가 이 원장 도입 전에 쓰였다.)` + priorWork,
+        `(차단하지 않는다: 진행 중인 계획서 대다수가 이 원장 도입 전에 쓰였다.)` + showHint + modelHint + priorWork,
     },
   });
 }
