@@ -104,6 +104,8 @@ Key behaviors:
 
 Unlike `/cc`, which starts building immediately, `/cp` generates a **work plan document** before any execution. Every plan is built on four themes — **What (goal) → Why (the problem/motivation) → How (Plan A/B) → Review (verification)** — with **Why** a required gate so you never finely solve the wrong problem. The plan is saved as a markdown file and presented for your approval. `/cp` is the **fast/standard lane** — quick fixes and standard plans. Grades scale the ceremony to the risk of the task.
 
+**The plan opens on your screen before you are asked to approve it (v3.37).** A saved path is not a report: `/cp` now runs `scripts/show-report.js` right before the approval gate, which opens the rendered plan (`docs/tasks/{id}.html`, or the markdown if there is no deck) in your default application and records that it happened. The approval gate reads that record — no showing, no approval prompt. On an SSH or headless session it refuses to pretend, and falls back to publishing the plan as an Artifact URL you can open from any device. **And the plan itself is written by the top model tier** (currently `fable`): if the session is running on something lower, `/cp` delegates Plan A/B design and the document to a top-tier agent with the full research payload, and records which model wrote it in the plan's `planner_model` frontmatter.
+
 | You type | What happens |
 | --- | --- |
 | `/cp fix this typo` | Fast tier — concise Goal + checklist + approve (skips Codex/pre-mortem) |
