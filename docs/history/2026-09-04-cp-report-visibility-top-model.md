@@ -15,7 +15,7 @@ refs: []
 # `/cp` 계획서를 눈앞에 띄운다 + 계획은 TOP 티어가 쓴다 — 완료
 
 **완료일**: 2026-09-04
-**출시**: v3.37.0
+**출시**: v3.37.0 (표시 경로 수정 v3.37.1)
 
 ## 🎯 What — 무엇이 가능해졌는가
 
@@ -41,7 +41,7 @@ refs: []
 
 행위는 검사할 수 없지만 기록은 검사할 수 있다. 그래서 여는 것과 동시에 기록을 남긴다.
 
-- **`lib/report-viewer.js` (신규)** — `docs/tasks/{id}.html`(없으면 `.md`)을 OS 기본 프로그램으로 열고 `.lens/report-shown.json` 에 `{method, file|url, shownAt}` 을 남긴다. `browser`·`artifact` 만 "봤다"로 친다.
+- **`lib/report-viewer.js` (신규)** — `docs/tasks/{id}.html`(없으면 `.lens/preview/{id}.html` 로 원문을 감싼 페이지)을 OS 기본 프로그램으로 열고 `.lens/report-shown.json` 에 `{method, file|url, shownAt}` 을 남긴다. `browser`·`artifact` 만 "봤다"로 친다.
 - **`scripts/show-report.js` (신규)** — CLI. `show-report.js <md>` 로 띄우고, `--check <id>` 로 게이트가 읽고, `--artifact <url> <id>` 로 아티팩트 폴백을 되먹인다. 출력은 JSON 한 줄, exit 0 = 사용자가 지금 볼 수 있다.
 - **정직성 조항** — SSH·헤드리스는 `remote` 로 기록하고 **게이트를 통과시키지 않는다.** 원격 기계의 브라우저를 여는 것은 아무도 안 보는 창을 띄우는 것이다.
 
@@ -76,16 +76,16 @@ refs: []
 
 | # | 검증 | 수단 | 결과 |
 |---|---|---|---|
-| V1 | 단위 불변식 (표시 판정·원격 거부·HTML 우선·아티팩트 폴백) | `node lib/report-viewer.test.js` | **17/17 PASS** |
+| V1 | 단위 불변식 (표시 판정·원격 거부·HTML 우선·아티팩트 폴백·연결 프로그램 게이트·프리뷰) | `node lib/report-viewer.test.js` | **20/20 PASS** (v3.37.1) |
 | V2 | 실제 화면에 뜨는가 (Windows 로컬) | `node scripts/show-report.js docs/tasks/2026-08-14-cs-mirror-invariant.md` → 창 목록 실측 | Chrome 창 제목 `/cs 미러 개편 · 계획 - Chrome` **확인** |
 | V3 | 게이트가 기록을 읽는가 | `show-report.js --check <id>` | exit 0 · `표시 게이트 통과` |
 | V4 | 훅이 미표시·`planner_model` 부재를 잡는가 | 임시 레포에 계획 md 작성 → 훅 stdin 주입 | 두 지시 **모두 주입됨** |
 | V5 | 충족되면 훅이 조용한가 | `planner_model` 추가 + 표시 기록 후 재실행 | 두 지시 **모두 사라짐** |
-| V6 | 기존 테스트 회귀 | `plan-coverage` 37 · `gate-ledger` 34 · `git-branch-entry` 15 · `install-sync` 8 · `session-start` 11 | **105/105 PASS** (신규 17 포함 122/122) |
+| V6 | 기존 테스트 회귀 | `plan-coverage` 37 · `gate-ledger` 34 · `git-branch-entry` 15 · `install-sync` 8 · `session-start` 11 | **105/105 PASS** (신규 20 포함 125/125) |
 
 ## ⚠️ 남은 것 · 주의점
 
 - **표시 게이트는 "띄웠다"까지만 증명한다.** 사용자가 읽었는지는 증명하지 못한다 — 그래서 승인 화면이 위치·요약·리스크 한 줄을 여전히 같이 낸다.
 - **`/cd`·`/crv` 보고서에는 아직 안 걸었다.** 같은 불만이 그쪽에서도 나오면 `show-report.js` 를 그대로 재사용하면 된다(스킬 3줄).
-- **Windows 에서 `.md` 를 여는 프로그램은 연결 설정에 달렸다** — VS Code 로 열리면 그것도 사용자 눈앞이다. 렌더된 화면을 원하면 Phase 2.6 이 만드는 `.html` 이 있으면 된다(HTML 은 v3.34 이후로도 여전히 선택 사항).
+- **`.md` 를 OS 에 그대로 넘기면 안 된다 (v3.37.1 에서 수정).** 릴리즈 직후 실측에서 잡혔다 — 이 기계의 Windows 에는 `.md` 연결 프로그램이 없고(`assoc .md` exit 1), 그때 `start` 는 **exit 0 을 내면서 창도 다운로드도 만들지 않는다**(`file://` URL 로 바꿔도 동일). 첫 구현은 그것을 `browser` 로 기록했다 — **§4.8 이 금지하는 조용한 거짓 성공을 스스로 저지른 것.** 지금은 ① win32 확장자 연결을 먼저 확인하고 ② 덱이 없으면 `.lens/preview/{id}.html` 로 원문을 감싸 연다. 창 제목으로 재확인(무변화 → 계획 id).
 - **`planner_model` 은 구조 게이트의 필수 항목이 아니다** — 기존 계획서 82건을 한꺼번에 실패시키지 않기 위해서다. 잡는 것은 Phase 5.0 §8(신규 계획)과 훅의 안내다.

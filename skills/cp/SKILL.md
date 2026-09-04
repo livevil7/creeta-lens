@@ -18,7 +18,7 @@ power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Plan v3.37.0**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.37.1**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -664,7 +664,7 @@ N+2. [Plan A step 2] — execution level (status: pending)
    node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" docs/tasks/{id}.md
    ```
 
-   HTML 이 있으면 HTML 을, 없으면 md 를 OS 기본 연결 프로그램(브라우저/편집기)으로 연다. 결과는 JSON 한 줄:
+   `docs/tasks/{id}.html` 가 있으면 그것을 연다. **없으면 md 를 그대로 넘기지 않는다** — `.lens/preview/{id}.html` 로 원문을 감싼 페이지를 만들어 그걸 연다(v3.37.1). 실측: Windows 에서 `.md` 는 연결 프로그램이 없을 수 있고, 그때 `start` 는 **0 을 내면서 아무것도 열지 않는다**(창도 다운로드도 없음). 결과는 JSON 한 줄:
 
    | `method` | 뜻 | 다음 행동 |
    |---|---|---|
@@ -920,7 +920,7 @@ branch: {branch}
 > **원칙: md = SoT, HTML = 파생 뷰.** `docs/tasks|history/*.md` 가 데이터·상태 원본이다. 상태·요약을 HTML 에 원본 저장하지 않는다.
 
 - **언제**: Phase 2.6(md 저장 직후) 에 `docs/tasks/{id}.html` 생성 + board 갱신. **승인 게이트를 막지 않는다** — 필수는 md 와 board 뿐이다(v3.34). **사용자에게 띄우는 것은 Phase 4.5** — Pre-mortem 이 md 를 바꾸므로 그 전에 띄우면 화면과 승인 대상이 어긋난다(v3.37).
-- **띄우기**: `node ${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js <docs/tasks/{id}.md>` — HTML 있으면 HTML, 없으면 md 를 OS 기본 프로그램으로 연다. 기록은 `.lens/report-shown.json`, 게이트는 Phase 5.0 §7. 원격/헤드리스면 `--artifact <URL>` 로 아티팩트를 되먹인다.
+- **띄우기**: `node ${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js <docs/tasks/{id}.md>` — HTML 있으면 HTML, 없으면 `.lens/preview/{id}.html`(원문을 감싼 페이지)을 만들어 연다. 기록은 `.lens/report-shown.json`, 게이트는 Phase 5.0 §7. 원격/헤드리스면 `--artifact <URL>` 로 아티팩트를 되먹인다. **HTML 이 있으면 읽기 경험이 훨씬 낫다 — 프리뷰는 바닥이지 목표가 아니다.**
 - **어떻게**: 작성 절차·양식 규칙·메타 태그·다국어·경로 한계는 전부 `${CLAUDE_PLUGIN_ROOT}/templates/report-conversion-spec.md` 에 있다. 그 파일을 Read 한 뒤 따른다. 여기에 복제하지 않는다(v3.34).
 - **board 빌드**: `node ${CLAUDE_PLUGIN_ROOT}/lib/board-builder.js {projectRoot}` — idempotent, 언제 재실행해도 안전.
 - **`/cp html <md-path>`** = CONVERT 모드. 같은 스펙 파일의 판별 규칙(`doc_kind: flow` → FLOW 뷰어, `grade: deep`·`planner: cpp` → task-deep 무제한 슬라이드, 그 외 폴더로 판별)을 따른다.
