@@ -1,4 +1,4 @@
-# Lens v3.37.1
+# Lens v3.38.0
 
 **Never wonder which plugin to use again.**
 
@@ -86,6 +86,7 @@ Leader → Workers (parallel) → Supervisor → QA Verification → Final Repor
 
 Key behaviors:
 - **Works on ANY task** — not limited to installed skills or plugins
+- **Engine routing (v3.38)** — each sub-task goes to the cheapest engine that can do it. Anything that writes files, calls a Skill or uses an MCP tool stays on a Claude subagent; read-only research goes to the flat-rate Codex and Grok CLIs via `scripts/delegate.sh`, all dispatched in the same turn so the wall clock is max(engine), not the sum. External lanes stay read-only on purpose — an engine that writes the code cannot also be an independent reviewer of it at the cross-review gate.
 - **Mandatory user approval** — the Leader presents a work plan and waits for your approval before Workers execute
 - **Max 5 iteration feedback loop** — Supervisor can send work back to Workers up to 5 times until quality standards are met
 
