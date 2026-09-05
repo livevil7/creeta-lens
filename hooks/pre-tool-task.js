@@ -26,13 +26,18 @@ installFailSoftHandlers('pre-tool-task');
 // Load agent tracker
 const { registerAgent, loadDashboard } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
 
-// Top tier of the Agent tool's model enum. /cc caps it at 3 per run, but the cap
+// Top tier of the Agent tool's model enum. /cc caps it per run, but the cap
 // lived only in SKILL.md prose and the audit measured what that was worth: the
 // ladder collapsed toward the EXPENSIVE end (opus 55.6% of 162 spawns, haiku
 // 0.6%), and the two runs that broke the cap did so by 4-6x. The tracker already
 // recorded every model; nobody ever read the record back. This is that read.
+//
+// v3.38: 3 → 2, in step with docs/rules/harness-rules.md §4.1. The number must
+// move here and there together — a cap loosened only in prose is the failure
+// this hook exists to catch, and a cap tightened only in prose is the same bug
+// wearing the other hat. hooks/pre-tool-task.test.js pins the two to each other.
 const TOP_TIER = 'fable';
-const TOP_CAP = 3;
+const TOP_CAP = 2;
 
 /** Count TOP-tier spawns already on the board, including trimmed-away ones. */
 function topTierUsed() {

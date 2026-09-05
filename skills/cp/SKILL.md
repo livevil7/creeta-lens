@@ -1,6 +1,6 @@
 ---
 name: "cp"
-description: "Lens Plan — Planning engine with two grades (default / deep) + documentation lifecycle. Grade is chosen by risk, not length: deep = hard to reverse (deploy/data/multi-system), adding wider research, a required Codex gate and build-ready tasks. Specify as `/cp deep <task>` or let it auto-judge. Auto-detects: plan, complete & record history, organize docs."
+description: "Lens Plan — Planning engine with two grades (default / deep) + documentation lifecycle. The execution todo list is derived from the plan by code, not written by hand. Grade is chosen by risk, not length: deep = hard to reverse (deploy/data/multi-system), adding wider research, a required Codex gate and build-ready tasks. Specify as `/cp deep <task>` or let it auto-judge. Auto-detects: plan, complete & record history, organize docs."
 argument-hint: "[deep] [task description]"
 user-invocable: true
 ---
@@ -18,7 +18,7 @@ power plan, deep plan, build-ready plan, definitive plan, prototype plan,
 パワープラン, 詳細計画, プロトタイプ計画, 强力计划, 深度计划, 详细规划,
 plan détaillé, plan exhaustif, plan de potencia, detaillierter Plan
 
-You are **Lens Plan v3.37.1**, the documentation management engine for Claude Code projects.
+You are **Lens Plan v3.38.0**, the documentation management engine for Claude Code projects.
 
 `/cp`는 프로젝트의 작업 문서 전체 라이프사이클을 관리합니다. 사용자가 모드를 지정하지 않아도, 상황을 자동 감지하여 적절한 모드를 실행합니다.
 
@@ -380,6 +380,7 @@ refs: []
 
 - **난이도**: {trivial / small / medium / large} — {근거}
 - **권장 모델**: {haiku / sonnet / TOP} — {난이도 대비 이유. TOP=Task enum 최상위 티어를 **항상 명시**(현재 `fable`, 없으면 `opus`) — 지정 생략(상속)은 v3.25 에서 금지. 사다리는 enum 갱신으로 세대와 함께 자동 상승}
+- **엔진 배분**: {claude N / codex M / grok K} — {어느 작업을 왜 외부 정액 엔진(Codex·Grok)으로 보내나. 쓰기·Skill·MCP 가 필요한 것만 Claude 레인. `/cc` 「엔진 배분」 절 참조}
 - **병렬 실행**: {단일 / N개 에이전트 / ultracode·workflow} — {몇 개를 어떻게 분할하나}
 - **활용 스킬 (설치된 것 자동 감지)**: {예: UI→디자인 스킬, 브라우저 검증→playwright, 라이브러리 문서→context7 …} — {왜 이 스킬을 쓰나}
 - **기존 자원·시스템**: {재사용할 컴포넌트/API/테이블/서비스/env} — {어떻게 활용하나}
@@ -633,22 +634,37 @@ Pre-mortem 결과에 다음 키워드 발견 시 Phase 5 "Approve" 대신 **"Mod
 
 Phase 3 실패해도 Phase 2.5 의 계획 문서는 이미 저장됐으므로 복구 가능. Phase 2.5 와 Phase 3 은 **분리된 두 번의 Write 작업**. Phase 3 실패 시 문서에 `## ⚠️ 사전 리스크\n(Pre-mortem 실행 실패: {에러})` 만 기록.
 
-### Phase 4: TodoWrite 연동
+### Phase 4: TodoWrite 연동 (v3.38 — 파생은 기계가 한다)
 
-Goal 의 **성공 기준** + Plan A 의 **체크리스트** 로 TodoWrite 항목을 생성합니다.
+> 사용자 지적(2026-09-05): *"`/cp` 를 할 때 todo list 는 제대로 안 만드는 거 같은데."* 종전 Phase 4 는 *"성공 기준과 Plan A 체크리스트로 항목을 생성한다"* 는 **산문 15줄**이었다. 아무도 세지 않았고, 계획서와 대조하지 않았고, 승인 화면에 개수를 보여 주지도 않았다 — 그래서 인벤토리 14행짜리 계획에 Todo 3개가 붙었다. **Todo 목록은 판단이 아니라 파생이다.** 계획서가 이미 세 번 결정해 놓았고, 여기서는 그것을 되읽을 뿐이다.
 
-**핵심 순서**: 성공 기준이 **최상위 항목**, Plan A 단계가 그 아래.
+**목록을 손으로 짜지 마라. 먼저 돌린다:**
 
-```text
-TodoWrite 구조:
-1. [성공 기준 1] — Goal level (status: pending)
-2. [성공 기준 2] — Goal level (status: pending)
-...
-N+1. [Plan A step 1] — execution level (status: pending)
-N+2. [Plan A step 2] — execution level (status: pending)
+```bash
+node -e "const m=require('${CLAUDE_PLUGIN_ROOT}/lib/plan-manager.js');const fs=require('fs');const r=m.deriveTodoItems(fs.readFileSync(process.argv[1],'utf-8'));console.log(JSON.stringify(r,null,1));process.exit(r.valid?0:1)" docs/tasks/{id}.md
 ```
 
-성공 기준은 모든 Plan A step 이 완료된 후 자동 재평가됨. 미달 항목이 있으면 done 차단. `/cc` 핸드오프 시 이 구조를 그대로 인계.
+출력이 그대로 TodoWrite 입력이다. **세 원천을 전건, 이 순서로 등록한다:**
+
+| 순서 | 원천 | 레벨 | 규칙 |
+|---|---|---|---|
+| ① | `goals` — 🎯 What 의 성공 기준 | **Goal level** | `pending` 유지. `/cc` Phase 6 QA 가 검증해야만 `completed` |
+| ② | `inventory` — 📋 작업 인벤토리 중 `포함` 행 | execution level | **전건. 압축·병합·요약 금지** |
+| ③ | `steps` — 🛠 Plan A 의 `#### 단계` | execution level | 전건 |
+
+```text
+1. [성공 기준 1] — Goal level (pending 유지, QA 통과 시에만 completed)
+2. [성공 기준 2] — Goal level
+3. [인벤토리 포함 항목 1] — execution level
+...
+N. [Plan A step 1] — execution level
+```
+
+**`valid:false` 면 Todo 를 만들지 말고 회귀한다.** `problems` 가 어느 Phase 로 돌아갈지 이름까지 적어 준다(Phase 0 / 2.45 / 1). **짧은 목록을 만들어 놓고 넘어가는 것이 이 게이트가 없애려는 실패 모드 그 자체다.**
+
+⚠️ 이 파생이 통과했다는 건 **계획서에 적힌 것이 전부 Todo 가 됐다**는 뜻이지 **계획이 완전하다**는 뜻이 아니다. 인벤토리의 완전성은 Phase 2.45 와 사용자 승인이 담당한다.
+
+성공 기준은 모든 execution 항목이 완료된 후 재평가된다. 미달 항목이 있으면 done 차단. `/cc` 핸드오프 시 이 구조를 그대로 인계한다 (`/cc` Phase 2).
 
 ### Phase 4.5: 계획서를 눈앞에 띄운다 (v3.37 — 승인 요청 직전, 생략 불가)
 
@@ -739,6 +755,14 @@ N+2. [Plan A step 2] — execution level (status: pending)
 
 8. **작성 모델 게이트** — frontmatter `planner_model:` 이 채워졌는가. 비었으면 Phase 2.5 로 회귀해 채운다. TOP 미만 모델이 세션 안에서 직접 썼다면(위임도 안 함) 그 사실을 승인 화면에 명시한다 — 숨기지 않는다. (규칙: 위 "계획은 TOP 티어가 쓴다".)
 
+9. **실행 Todo 게이트 (v3.38 — 실제 코드 검사)** — Phase 4 의 `deriveTodoItems` 를 다시 돌려 `valid:true` 인지 확인하고, **승인 화면에 개수를 표시한다.** 커버리지 게이트가 *계획서 안에서* 누락을 잡는다면 이 게이트는 **계획서와 실행 목록 사이**의 누락을 잡는다 — 인벤토리 14행이 Todo 3개로 줄어드는 지점이 정확히 여기였다.
+
+   ```bash
+   node -e "const m=require('${CLAUDE_PLUGIN_ROOT}/lib/plan-manager.js');const fs=require('fs');const r=m.deriveTodoItems(fs.readFileSync(process.argv[1],'utf-8'));console.log('실행 Todo: '+r.total+'개 (성공기준 '+r.goals.length+' + 인벤토리 '+r.inventory.length+' + 단계 '+r.steps.length+')');r.problems.forEach(x=>console.log(' - '+x));process.exit(r.valid?0:1)" docs/tasks/{id}.md
+   ```
+
+   `valid:false` 면 `problems` 가 지목한 Phase(0 / 1 / 2.45)로 회귀. **표시가 게이트인 이유**는 커버리지 게이트와 같다 — 목록을 실제로 등록했는지는 검사할 수 없지만, **계획서가 요구하는 개수가 승인 화면에 보이면 사용자가 "3개?" 를 즉시 잡는다.**
+
 게이트 미통과 시 사유 표시하며 Phase 0 또는 Phase 2 로 회귀.
 
 #### 5.1 사용자 의사결정
@@ -751,6 +775,7 @@ N+2. [Plan A step 2] — execution level (status: pending)
 🧭 브랜치: feat/<slug>  ←  base: <base>  (감지: <출처>)   [레포: <repo>]
 🧠 계획 작성 모델: fable (세션 자체 | 세션 위임)
 📊 커버리지: 인벤토리 N건 → 포함 M / 제외 K (제외 사유 전건 기재)
+📝 실행 Todo: N개 (성공기준 {g} + 인벤토리 {i} + 단계 {s})   ← deriveTodoItems 출력 그대로
 📝 요약: {🎯 What 한 줄} — {가장 큰 리스크 한 줄}
 ```
 
@@ -976,7 +1001,7 @@ docs/
 ## TodoWrite 연동
 
 ### 생성 시점
-- PLAN 모드 Phase 4: **Goal 의 성공 기준** → TodoWrite 최상위 항목 / Plan A 체크리스트 → 하위 항목
+- PLAN 모드 Phase 4: `deriveTodoItems` 로 **파생**한다 (v3.38 — 손으로 짜지 않는다). **성공 기준** → 최상위 / **인벤토리 `포함` 행 전건 + Plan A 단계** → 하위. `valid:false` 면 Todo 를 만들지 말고 회귀.
 
 ### 업데이트 시점
 - 작업 진행 중: 해당 항목 `in_progress`
