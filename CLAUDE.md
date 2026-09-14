@@ -4,7 +4,7 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.39.0**
+- Current: **v3.40.0**
 - Updated: 2026-09-14
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.40.0 feat: **승인 한 번이면 끝까지 — `/cc` 무정지 실행.** 대표 지시 *"맞아 그건 필요해. 진행해."*(2026-09-14) · 근거 *"1,2,3 다 해. 싹다 해 멀 자꾸 하나하나 할라그래 싹 다 하라고."*(2026-09-04). 승인 뒤 마지막 검증까지 묻지 않고, **정지 3종**(되돌리기 어려운 행동 · 돈/외부 발송 · 범위 변경)만 멈추고, 그중 배포·머지=배포·DB 변경·대량 삭제·force push·발송은 계획에 있어도 멈춘다(대표가 "묻지 말고 하라" 고 한 것만 예외). `/cc` 5.0 경로 전환은 자동, manual 검증은 끝에 한 번 `검증 확인`. `hooks/pre-tool-ask.js` 가 이 세션의 게이트 원장이 열린 동안 허용 header 6개(`실행 승인`·`정지:비가역`·`정지:외부영향`·`정지:범위변경`·`검증 확인`·`실행 종료`) 외 질문창을 거부한다. 상세: `CHANGELOG.md` · `docs/rules/harness-rules.md` §4.11.
