@@ -1,5 +1,5 @@
 {
-  "description": "Lens v3.38.0 by Creeta - Task Execution Engine + Documentation Management + Multi-Repo Sync for Claude Code",
+  "description": "Lens v3.39.0 by Creeta - Task Execution Engine + Documentation Management + Multi-Repo Sync for Claude Code",
   "hooks": {
     "SessionStart": [
       {
@@ -41,6 +41,16 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-task.js",
+            "timeout": 3000
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-ask.js",
             "timeout": 3000
           }
         ]

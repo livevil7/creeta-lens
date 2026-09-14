@@ -66,13 +66,13 @@
       ],
       "purpose": "/cp PLAN·/c Phase1~2의 read-only 조사-후-계획 게이트를 네이티브 plan mode(--permission-mode plan)가 대체",
       "assumed_native_gap": "네이티브가 편집 전 read-only 계획 게이트를 못 제공",
-      "gap_closed_signal": "claude --help의 --permission-mode 값에 plan 존재 — 이미 닫힘. plan mode가 디스크 md+html+board 산출물까지 만들면 /cp 데이터층 잔여가치 약화",
+      "gap_closed_signal": "claude --help의 --permission-mode 값에 plan 존재 — 이미 닫힘. plan mode가 디스크 md 계획서 + 승인 기록까지 만들면 /cp 데이터층 잔여가치 약화",
       "signal_method": "probe",
       "probe_hint": "claude --help · claude plugin list/details · 세션 도구표(Skill/TodoWrite/Workflow/EnterPlanMode/Cron) 존재 여부",
       "official_sources": [
         "https://code.claude.com/docs/en/release-notes"
       ],
-      "false_obsolete_risk": "plan mode는 큐레이션된 md/html/board 영속 산출물을 안 만듦 — /cp 문서 라이프사이클은 비대체",
+      "false_obsolete_risk": "plan mode는 인벤토리 게이트를 거친 영속 md 계획서·승인 기록을 안 만들고 Codex·Grok 과 공유되지 않음 — /cp 문서 라이프사이클은 비대체",
       "last_reviewed": "2026-06-06"
     },
     {

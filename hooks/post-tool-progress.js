@@ -48,11 +48,13 @@ const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '.
 const {
   installFailSoftHandlers,
   readJsonInput,
+  resolveProjectRoot,
   safeReadJson,
   safeWriteJson,
   withFileLock,
   writeJson,
 } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
+const fs = require('fs');
 installFailSoftHandlers('post-tool-progress');
 
 // ── Constants ────────────────────────────────────────────
@@ -106,14 +108,17 @@ function isWorkflowLaunchEnvelope(text) {
   return !!text && WORKFLOW_LAUNCH_RE.test(text) && WORKFLOW_ID_RE.test(text);
 }
 // Calling these means the agent is checking on background work right now.
-const POLL_TOOLS = new Set([
-  'TaskOutput', 'AgentOutput', 'BashOutput', 'SendMessage', 'KillShell', 'KillTask', 'TaskStop',
-]);
+// v3.39: SendMessage is not a poll (it talks to a teammate, nothing is awaited),
+// and stopping work is the opposite of waiting on it — both used to arm the
+// "백그라운드 작업 대기 중" reminder on turns that were waiting on nothing.
+const POLL_TOOLS = new Set(['TaskOutput', 'AgentOutput', 'BashOutput']);
+const DISARM_TOOLS = new Set(['KillShell', 'KillTask', 'TaskStop']);
 
 // ── Helpers ──────────────────────────────────────────────
 
-function getStatePath() {
-  const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+// Same resolution as hooks/stop.js and hooks/session-start.js — they share this file.
+function getStatePath(input) {
+  const projectRoot = resolveProjectRoot({ cwd: input && typeof input.cwd === 'string' ? input.cwd : undefined });
   return path.join(projectRoot, '.lens', 'progress-report-state.json');
 }
 
@@ -185,9 +190,12 @@ function toMs(iso) {
   return Number.isNaN(ms) ? 0 : ms;
 }
 
-function buildReminder({ sinceReportSec, waitingSec }) {
+function buildReminder({ sinceReportSec, sinceSignalSec }) {
+  // v3.39: the second number used to be "since this state was first armed" —
+  // "대기 4767초째" printed hours after the work had ended. The honest number is
+  // how long ago the last background signal was seen.
   return [
-    `[Lens 진행보고 강제 · 2분 규칙] 마지막 보고 기점 이후 ${sinceReportSec}초 경과(기준 120초), 백그라운드 작업 대기 ${waitingSec}초째.`,
+    `[Lens 진행보고 강제 · 2분 규칙] 마지막 보고 기점 이후 ${sinceReportSec}초 경과(기준 120초), 마지막 백그라운드 신호 ${sinceSignalSec}초 전.`,
     '지금 사용자에게 진행보고를 내라. 세 요소 전부 — 하나라도 빠지면 위반이다:',
     '① 생존확인 실측 — TaskOutput(block=false)·BashOutput·산출물 mtime 으로 실제 확인한 결과를 쓴다. 확인 없이 "진행 중"이라 쓰지 마라.',
     '② 끝난 것/남은 것 N/M.',
@@ -204,9 +212,15 @@ function main() {
   const toolName = input?.tool_name || '';
   const toolInput = input?.tool_input || {};
   const signal = isBackgroundSignal(toolName, toolInput, input);
-  const statePath = getStatePath();
+  const statePath = getStatePath(input);
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
+
+  if (DISARM_TOOLS.has(toolName)) {
+    try { fs.unlinkSync(statePath); } catch {}
+    writeJson({});
+    process.exit(0);
+  }
 
   const decide = () => {
     const state = safeReadJson(statePath, null);
@@ -226,7 +240,8 @@ function main() {
     // slower than ARM_TTL_MS reset its own report clock on every poll, so the
     // reminder never fired and breaking the rule bought silence (Codex 7차 P2).
     // The clock is kept; only the decision to fire is deferred.
-    const sinceSignalMs = now - toMs(state.lastSignalAt);
+    const prevSignalMs = toMs(state.lastSignalAt);
+    const sinceSignalMs = now - prevSignalMs;
     const dormant = sinceSignalMs > ARM_TTL_MS;
 
     if (dormant) {
@@ -273,7 +288,7 @@ function main() {
     safeWriteJson(statePath, state);
     return {
       sinceReportSec: Math.round(sinceReportMs / 1000),
-      waitingSec: Math.round((now - toMs(state.armedAt)) / 1000),
+      sinceSignalSec: Math.round((signal ? 0 : now - prevSignalMs) / 1000),
     };
   };
 

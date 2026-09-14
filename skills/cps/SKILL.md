@@ -166,7 +166,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 
 ### F1: 스캔
 
-- CLAUDE.md · `docs/rules/` · README 를 먼저 Read → 엔트리포인트(라우트/페이지/화면/CLI/대시보드)·백그라운드 잡·외부 시스템을 Read/Glob/Grep 으로 수집. (프로젝트가 단수 `docs/rule/` 를 쓰면 그쪽도 스캔하되, 산출물은 board-builder 가 스캔하는 `docs/rules/` 에 두고 그 사실을 보고에 명시.)
+- CLAUDE.md · `docs/rules/` · README 를 먼저 Read → 엔트리포인트(라우트/페이지/화면/CLI/대시보드)·백그라운드 잡·외부 시스템을 Read/Glob/Grep 으로 수집. (프로젝트가 단수 `docs/rule/` 를 쓰면 그쪽도 스캔하되, 산출물은 `docs/rules/` 에 두고 그 사실을 보고에 명시.)
 - **실제 파일만 근거로 삼는다.** 근거 파일이 없는 노드는 `(추정)` 표기 의무 — 잘못된 추론이 Rule 로 굳는 것을 방지.
 
 ### F2: 2층 추출 + 관계 매핑
@@ -194,12 +194,12 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 - 노드 click 링크는 **실존 확인된 파일만** 연결 — 화면 노드는 가능하면 그 화면 실물(목업 html·라우트 템플릿·페이지 파일)로. **click 줄은 HTML 전용** (md 의 mermaid 는 구조만 — SoT 에 click 줄을 넣지 않는다).
 - **Fallback**: 노드 50+ 또는 렌더 위험 시 mermaid 를 복수 블록(메인 단계층 + 단계별 드릴다운)으로 분할해 뷰어에 섹션 렌더.
 
-### F5: board + 보고
+### F5: 보고
 
-- `node ${CLAUDE_PLUGIN_ROOT}/lib/board-builder.js {projectRoot}` 로 board 재빌드.
-- 산출물(`docs/rules/flow.md`, `docs/rules/flow.html`, `docs/board_<repo>.html`)을 풀 경로로 보고.
+- `docs/rules/flow.html` 을 사용자 화면에 띄운다 — Artifact 도구가 있으면 발행해 링크로, 없으면 OS 브라우저로. 경로만 적지 않는다.
+- 산출물(`docs/rules/flow.md`, `docs/rules/flow.html`)을 풀 경로로 함께 보고.
 
-**한계**: board stale 은 md↔html 불일치만 감지 — 코드 변경은 `/cps flow` 재실행으로 갱신한다.
+**한계**: 코드가 바뀌면 `/cps flow` 재실행으로 갱신한다. (v3.39: 보드 파이프라인 폐지)
 
 ---
 

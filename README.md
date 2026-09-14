@@ -1,4 +1,4 @@
-# Lens v3.38.0
+# Lens v3.39.0
 
 **Never wonder which plugin to use again.**
 
@@ -105,34 +105,30 @@ Key behaviors:
 
 Unlike `/cc`, which starts building immediately, `/cp` generates a **work plan document** before any execution. Every plan is built on four themes — **What (goal) → Why (the problem/motivation) → How (Plan A/B) → Review (verification)** — with **Why** a required gate so you never finely solve the wrong problem. The plan is saved as a markdown file and presented for your approval. `/cp` is the **fast/standard lane** — quick fixes and standard plans. Grades scale the ceremony to the risk of the task.
 
-**The plan opens on your screen before you are asked to approve it (v3.37).** A saved path is not a report: `/cp` now runs `scripts/show-report.js` right before the approval gate, which opens the rendered plan (`docs/tasks/{id}.html`, or the markdown if there is no deck) in your default application and records that it happened. The approval gate reads that record — no showing, no approval prompt. On an SSH or headless session it refuses to pretend, and falls back to publishing the plan as an Artifact URL you can open from any device. **And the plan itself is written by the top model tier** (currently `fable`): if the session is running on something lower, `/cp` delegates Plan A/B design and the document to a top-tier agent with the full research payload, and records which model wrote it in the plan's `planner_model` frontmatter.
+**The plan opens on the running engine's own surface before you are asked to approve it (v3.37, reworked v3.39).** A saved path is not a report. The plan is a markdown file the gates read; what you see is whatever the engine already has — a **Claude Code Artifact** URL, a **Codex app inline visualization**, or (Grok CLI, `claude -p`) a **rendered page** in your browser built from the markdown by `lib/md-render.js`. The show is recorded with the document's hash, so a plan edited after it was shown goes `stale` and must be shown again before approval. There are no slide decks or boards any more (v3.39). Approval is a report first, then one question with outcome-named choices — *run now* / *change something* / *keep the plan for later* — and `/cc` does not ask again for a plan you approved. Plans come in three kinds: **new**, **improvement** (must carry an AS-IS → TO-BE section) and **research report**. **And the plan itself is written by the top model tier** (currently `fable`): if the session is running on something lower, `/cp` delegates Plan A/B design and the document to a top-tier agent with the full research payload, and records which model wrote it in the plan's `planner_model` frontmatter.
 
 | You type | What happens |
 | --- | --- |
 | `/cp fix this typo` | Fast tier — concise Goal + checklist + approve (skips Codex/pre-mortem) |
 | `/cp build auth with JWT` | Standard tier — full plan, saves to `docs/2026-02-28-jwt-auth.md`, asks for approval |
 | `/cp refactor the API layer` | Creates a step-by-step plan, saves to `docs/`, waits for your go-ahead |
-| `/cp flow` | FLOW mode — maps user-journey stages ↔ engines/modules ↔ dependencies into one interactive flowchart, saved as `docs/rules/flow.md` + `flow.html` (the project's big-picture Rule) |
 | `/cp` (no args) | Shows full skill inventory |
 
-### Grades — `fast` / `standard` / `deep`
+### Grades — default / `deep`
 
 ```
-/cp fast <task>        # explicit grade
-/cp standard <task>
-/cp deep <task>
+/cp deep <task>        # explicit grade
 /cp <task>             # auto-judged by risk
 ```
 
-**Grade is chosen by risk, not by length.** Sizing a plan by line count makes length a proxy for quality — a hollow document passes just by being long. The question is *how hard is this to undo*.
+**Grade is chosen by risk, not by length.** Sizing a plan by line count makes length a proxy for quality — a hollow document passes just by being long. The question is *how hard is this to undo*. (Typos and one-file fixes don't need `/cp` at all.)
 
 | Grade | When | What you get |
 | --- | --- | --- |
-| `fast` | Small scope, few choices, **easily reversible** | Goal + Why + Plan A checklist + Review |
-| `standard` | Multiple components/choices, or user-facing impact | Full flow: Codex dual-track, Plan A/B, pre-mortem, HTML deck |
-| `deep` | **Hard to reverse** — deploy, data, multi-system, high uncertainty | Fan-out research (6 axes) · domain deep-spec (UI → ASCII wireframe + states + copy) · **mandatory Codex gate** (stops and reports if Codex is missing) · build-ready tasks (exact path + change + verify + `[P]`/deps) · zero follow-up questions |
+| default | Most work — reversible | Goal + Why + inventory + method + verification, parallel research lanes, pre-mortem, shown on the engine's surface |
+| `deep` | **Hard to reverse** — deploy, data, multi-system, high uncertainty | + 6-axis research · **mandatory Codex gate** (stops and asks if Codex is missing) · build-ready tasks (exact path + change + verify + `[P]`/deps) · no blocking questions left |
 
-**Mismatch guard (both directions).** Even when you name a grade, `/cp` still judges the risk and speaks up if they disagree — but it never overrides you. Aiming **too low** (planning a deploy-critical change as `fast`) gets a strong warning with specific reasons, because that one actually costs you. Aiming **too high** gets a single light note, because over-planning only wastes time. Your override is recorded in the plan either way.
+**Mismatch guard.** If you ask for the default grade on something that looks deploy-critical, the approval report says so with specific reasons — it does not stop to ask and it never overrides you.
 
 > `/cpp` was folded into `deep` in v3.25 and removed. Its trigger words still route here.
 
@@ -216,7 +212,7 @@ Every run writes a pre-upgrade snapshot to `~/.claude/lens/cu-last-scan.json` an
 /crv deep       # + demand-side conversation mining → net-new feature proposals
 ```
 
-`/crv` re-evaluates **every Lens feature** as Claude Code + Codex evolve. It diffs a registry of "assumed native gaps" (`docs/rules/capability-assumptions.json`) against live reality — mostly by **probing the running environment** (`claude --help`, the session's tool surface, `codex --help`), falling back to official changelogs — and classifies each feature **KEEP / THIN / OBSOLETE**, with concrete upgrade vectors and ergonomics improvements. In `deep` mode it also mines your own session transcripts for recurring pains and proposes net-new features. Output is a dated report (md + HTML + board); high-confidence upgrades are handed to `/cp` as task docs. OBSOLETE never auto-deletes anything — it only proposes. A SessionStart nudge reminds you when the audit goes stale (Lens repo only; `capabilityAuditIntervalDays`, default 30).
+`/crv` re-evaluates **every Lens feature** as Claude Code + Codex evolve. It diffs a registry of "assumed native gaps" (`docs/rules/capability-assumptions.json`) against live reality — mostly by **probing the running environment** (`claude --help`, the session's tool surface, `codex --help`), falling back to official changelogs — and classifies each feature **KEEP / THIN / OBSOLETE**, with concrete upgrade vectors and ergonomics improvements. In `deep` mode it also mines your own session transcripts for recurring pains and proposes net-new features. Output is a dated markdown report shown on the engine's own surface (Artifact / inline / rendered page); high-confidence upgrades are handed to `/cp` as task docs. OBSOLETE never auto-deletes anything — it only proposes. A SessionStart nudge reminds you when the audit goes stale (Lens repo only; `capabilityAuditIntervalDays`, default 30).
 
 | You type | What happens |
 | --- | --- |

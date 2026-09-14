@@ -8,7 +8,7 @@ const fs = require('fs');
 
 // Resolve plugin root (hooks/ is one level deep)
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
-const { installFailSoftHandlers, readJsonInput, safeEnsureDir, safeReadJson, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
+const { installFailSoftHandlers, readJsonInput, resolveProjectRoot, safeEnsureDir, safeReadJson, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('session-start');
 
 // Load modules
@@ -27,12 +27,14 @@ function main() {
   try {
     // stdin is a one-shot stream: readJsonInput() consumes it, so the second
     // caller gets {} and its source check silently passes. Read once, pass down.
-    const source = readJsonInput()?.source;
+    const hookInput = readJsonInput() || {};
+    const source = hookInput.source;
     const newConversation = NEW_CONVERSATION_SOURCES.has(source);
+    const projectRoot = resolveProjectRoot({ cwd: typeof hookInput.cwd === 'string' ? hookInput.cwd : undefined });
 
     // 0a. Drop the previous session's progress-report clock. Done before anything
     //     else so that a failure further down still leaves an honest clock.
-    clearPreviousSessionProgressClock(newConversation);
+    clearPreviousSessionProgressClock(newConversation, projectRoot);
 
     // 0. Initialize agent dashboard + plans + results directories for this session.
     //    Gated by the same allowlist as 0a. This hook runs on EVERY SessionStart
@@ -61,7 +63,7 @@ function main() {
     if (config.saveSynthesisResults) {
       const resultsDir = config.resultsDir
         ? path.resolve(config.resultsDir)
-        : path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.lens', 'results');
+        : path.join(projectRoot, '.lens', 'results');
       safeEnsureDir(resultsDir);
     }
 
@@ -74,15 +76,18 @@ function main() {
     // 2. Load and update memory
     const memoryPath = config.memoryPath || null;
     const memory = loadMemory(memoryPath);
-    recordSessionStart(memory);
-    saveMemory(memory, memoryPath);
+    // v3.39: a compact or fork is the same conversation — counting it as a new
+    // session inflated the session number and re-printed the activation banner.
+    if (newConversation) {
+      recordSessionStart(memory);
+      saveMemory(memory, memoryPath);
+    }
     const memorySummary = formatMemorySummary(memory);
 
     // 3. Build plan history for context
     const planSummary = formatPlanSummary(config.planDir || null);
 
     // 3b. /crv capability-audit staleness nudge — Lens repo only, NO network.
-    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
     const auditNudge = formatAuditNudge({ root: projectRoot, config });
 
     // 4. Build additional context
@@ -94,7 +99,9 @@ function main() {
 
     // 6. Output response
     const response = {
-      systemMessage: `Lens v3.38.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready`,
+      ...(newConversation
+        ? { systemMessage: `Lens v3.39.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready` }
+        : {}),
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         skillCount: skills.length,
@@ -113,7 +120,7 @@ function main() {
   } catch (err) {
     // Fail gracefully - don't break the session
     const fallback = {
-      systemMessage: 'Lens v3.38.0 activated (scan skipped)',
+      systemMessage: 'Lens v3.39.0 activated (scan skipped)',
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         error: err.message,
@@ -165,12 +172,11 @@ function main() {
  */
 const NEW_CONVERSATION_SOURCES = new Set(['startup', 'resume', 'clear']);
 
-function clearPreviousSessionProgressClock(newConversation) {
+function clearPreviousSessionProgressClock(newConversation, projectRoot) {
   try {
     if (!newConversation) return;
     // Same resolution as hooks/stop.js and hooks/post-tool-progress.js — diverging
     // here would point the hooks at different files.
-    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
     fs.unlinkSync(path.join(projectRoot, '.lens', 'progress-report-state.json'));
   } catch {
     // No state file (the normal case) or an unreadable one — nothing to reset.
@@ -188,7 +194,7 @@ function clearPreviousSessionProgressClock(newConversation) {
 // What remains is Lens-only state the host cannot know: session memory, plan
 // history, and the /crv staleness nudge.
 function buildAdditionalContext({ memorySummary, planSummary, auditNudge }) {
-  let ctx = `# Lens v3.38.0 - Session Startup\n\n`;
+  let ctx = `# Lens v3.39.0 - Session Startup\n\n`;
 
   // /crv capability-audit nudge (Lens repo only; muted single line)
   if (auditNudge) {
@@ -209,7 +215,7 @@ function buildAdditionalContext({ memorySummary, planSummary, auditNudge }) {
 }
 
 function buildFallbackContext() {
-  return `# Lens v3.38.0 - Session Startup
+  return `# Lens v3.39.0 - Session Startup
 
 Session memory could not be loaded (scan or read error). Lens skills still work; run \`/cp\` or \`/cc\` directly.
 `;

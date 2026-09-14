@@ -1,3 +1,45 @@
+## [3.39.0] - 2026-09-14
+
+**`/cp` 가 세 엔진의 네이티브 화면으로 계획서를 보여준다 · 양식 강제 해제 · UX 소음 제거.** 대표 지적(2026-09-14): *"cp 로 작성하는 양식이 너무 템플렛화 되어 있고, grok·codex 다 공통으로 쓰는데 md·html 로 만드는 걸 너무 강제해 놔서 각 플랫폼의 기획문서 아티팩트를 하나도 못 쓰고 보기 어려운 md 로만 기획서를 만들고 있어."* · *"기존 것을 개선할 때는 반드시 AS-IS → TO-BE"* · *"update todo 를 하면 뭐가 계속 없다고만 찡찡거리던데?"* · *"승인 받기 전에 계획서를 보고도 하지 않고 그냥 질문부터 띄우는거야?"* 이어서 UX 전수 조사(Claude 전사 65 · Codex 799 · Grok 1,020 세션 · 메모리 · 계획서 14건 정독 → 발굴 145건 → 101후보)를 반영했다. 계획서: `docs/tasks/2026-09-14-cp-native-artifacts.md` (인벤토리 88 → 포함 75).
+
+### Added (v3.39.0)
+
+- **엔진 네이티브 표시 레인** — `artifact`(Claude Artifact) → `inline`(Codex `visualize`) → `sendfile` → `browser`. `scripts/show-report.js --shown <method> <ref> <id>` 로 기록, `--check` 가 **띄운 뒤 문서가 바뀌었으면 `stale`** (기록에 md sha256) — Modify 후 다시 띄우지 않으면 승인 게이트가 막는다.
+- **`lib/md-render.js`** — 의존성 없는 md → HTML. 브라우저 레인이 `<pre>` 원문 대신 제목(앵커)·표(코드 스팬 안 파이프 보존)·중첩/체크 목록·코드·인용·frontmatter 배지로 렌더한다. 모든 문자 이스케이프, 스크립트 가능한 링크 스킴은 텍스트로.
+- **계획 종류(kind)** — `신규` · `개선`(**`AS-IS → TO-BE` 섹션 필수**) · `조사보고`(질문·근거·결론만, 실행 원장 대상 아님). `validatePlanStructure(content, grade, kind)`, frontmatter `kind:`.
+- **`hooks/pre-tool-ask.js`** — 마지막 도구 결과 이후 사용자에게 보인 글이 40자 미만이면 `AskUserQuestion` 을 거부하고 무엇을 쓸지 알려 준다. fail-open, `LENS_ASK_GUARD=0`.
+- **`lib/hook-utils.resolveProjectRoot({filePath, cwd})`** — 훅이 대상으로 삼는 레포: `docs/tasks·history·rules` 경로 → git toplevel → `CLAUDE_PROJECT_DIR` → cwd(홈은 레포로 치지 않음).
+- **게이트 원장 사용자 색인** `~/.claude/lens/active-ledgers.json` — `/cc` 가 레포에 만든 원장을 워크스페이스 세션의 Stop 훅이 찾는다. 원장 `sessionId` 기본값 = `CLAUDE_CODE_SESSION_ID`, 다른 세션의 원장은 이 턴을 막지 않는다.
+- 상태 칸 **`보류: 사유`** — 실행 목록에서 빠지고 사유가 필수.
+- 테스트 신설: `lib/md-render.test.js`(12) · `lib/hook-utils.test.js`(6) · `hooks/pre-tool-ask.test.js`(8) · `hooks/post-tool-plan-doc.test.js`(7) · `scripts/user-prompt-handler.test.js`(7). `plan-coverage` 74 → 96, `report-viewer` 20 → 24.
+
+### Changed (v3.39.0)
+
+- **`skills/cp/SKILL.md` 1,041 → 471줄.** 앞 60줄 = **계약 카드**(Codex 가 스킬 앞 180~210줄만 읽는 것을 세션 로그로 실측). 166줄 리터럴 골격 삭제 — 계약 섹션 6(+deep 3, +개선 1)만 제목으로 요구하고 순서·나머지는 주제가 정한다. 제목 아래 `문제 / 해야 할 것 / 대표 결정` 3줄, Phase 0 직후 질문 아닌 조기 보고 4줄, 조사 3축 정의(과거·현재·규칙 + 로컬 뒤처짐 확인 + `<id>.research.md` 재사용), 리스크 표 하나(출처 열), Blocker = 영향 높음 + 되돌리기 불가 행, deep 검증은 한국어 3열(EARS 폐기), 박스 문자·이 컴퓨터 전용 절대경로 금지.
+- **승인** — 보고 텍스트(링크 · 목표 · 🙋 대표 결정 · 대표가 직접 할 일 · 리스크 상위 5 · 외부 레인 상태 · 다음 행동 · `🔧 검사` 한 줄) 다음에 질문 한 번. 선택지는 결과 문장 **지금 실행 / 고칠 곳 있음 / 계획만 보관**. 승인 전 질문 1개 상한(등급·base·모드는 묻지 않음), 타이핑 문구 요구 삭제. 승인 기록 `status: approved` · `approved_at` · `approved_via` · `approval_note` · `## 🧭 결정`. 인자 없는 `/cp` 가 "이어갈 계획 N건" 을 보여준다. 긴 계획 후 `PushNotification`.
+- **Modify** — `🔁 이번 판에서 바뀐 것` 블록, 바뀐 섹션만 Edit, 스킬 재독 금지, **같은 링크로 재발행**, 요청마다 받아들임/반대/확인 질문 먼저, 아티팩트 댓글 = 인벤토리 행 + reply·resolve, "직접 고침" 경로, 실행 지시가 섞인 Modify 는 재승인 없이 `/cc`.
+- **Todo = 엔진 네이티브 도구** — Claude `TodoWrite` · Codex `update_plan` · Grok `todo_write`, 없으면 계획서 `📌 진행 체크리스트`. `[목표]`/`[실행]` 두 층. Claude 5 세션의 TodoWrite 부재 원인(`CLAUDE_CODE_ENABLE_TODO_TOOLS` 미설정)을 스킬에 명시.
+- **`deriveTodoItems`** — 단계 0건은 `warnings`(목표 + 인벤토리로 진행), `Plan A` 제목이 없으면 `🛠 어떻게` 블록에서 읽고 Plan B 는 자름, 인벤토리와 같은 단계는 한 번만, 목표는 최상위 불릿·번호 목록·목표 표에서 읽고 `🚧 비목표` 는 건너뜀. `problems`(사람 말) / `hints`(Phase) 두 층.
+- **`/cc`** — `[APPROVED]` 핸드오프(또는 `status: approved` 계획)는 승인표를 다시 띄우지 않고, 분해가 계획과 다를 때만 그 차이를 묻는다. 진입 게이트는 **거부 대신 보완 후 진행**(워크스페이스 진행 중 계획 41건 중 39건이 구조, 41건이 Todo 검사에서 떨어지고 있었다). 승인표는 마크다운 표 + 결과 문장 선택지. Goal 달성 시 `/cd` 로 이어서 마감.
+- **`post-tool-plan-doc` 훅** — 루트는 파일 경로에서, `status: approved|executing|…` 이면 승인 힌트 생략(문제만 말함), 같은 메시지 연속 주입 억제(`.lens/plan-doc-hook.json`), 조사보고는 인벤토리 요구 안 함, 절대경로 경고, 안내 명령에 런타임 절대경로.
+- **Stop 게이트** — 차단 시 사용자에게 보이는 `systemMessage`, 상한 3 → 2.
+- **진행보고 훅** — 두 번째 숫자를 "첫 무장 이후" 에서 "마지막 백그라운드 신호 N초 전" 으로. `SendMessage` 는 폴링이 아님, `KillShell`·`KillTask`·`TaskStop` 은 해제.
+- **SessionStart** — compact·fork 에서 활성화 배너·세션 카운트 증가 금지.
+- **`/cp …?` 처럼 질문·불만으로 끝나는 슬래시 메시지**는 Skill 강제 실행 OVERRIDE 를 붙이지 않는다.
+- `scripts/bump-version.sh` 에 `.codex-plugin/plugin.json` 추가(10곳) — 빠져 있어서 Codex 가 v3.24 부터 14릴리즈 동안 3.24.0 을 설치하고 있었다.
+- 문서: `docs/rules/harness-rules.md` §4.8 v3.39 · §4.10 신설, `branch-lifecycle.md`·`capability-assumptions.json`·README·CLAUDE.md 에서 덱·보드·`/cp done` 정리.
+
+### Removed (v3.39.0)
+
+- **HTML 슬라이드 덱 · 보드 파이프라인** — `lib/board-builder.js`, `templates/board.template.html`, `templates/report-conversion-spec.md`, `templates/report-plan.example.html`, `templates/report-history.example.html`, `templates/report-shared.css`, `/cp html` 모드, `/cd` Phase 3.5, `/cps` F5 보드 재빌드, `lens.config.json` 의 `reportFormat`·`buildBoard`. 각 레포에 이미 있는 `board_*.html`·`docs/**/*.html` 은 지우지 않았다(갱신만 멈춤).
+- `/cp` 의 "Goal-enforced 실행(`/goal` 한 줄을 복사해 입력)" 안내.
+
+### Fixed (v3.39.0)
+
+- **게이트 오탐 4종**: 문장·코드 안 `{id}` 를 미해결 템플릿으로 거부(줄 전체가 `{…}` 일 때만 거부, 나머지는 경고) · 표 셀의 코드 스팬 안 `|` 가 열을 밀어 "상태를 해석할 수 없다" · 상태 칸 부분 문자열 판정(`보류 (pending)` 이 `in` 으로 포함, `포함 안 함` 이 포함) · 목표 하위 불릿을 목표로 셈. 워크스페이스 계획서 105건 기준 **회귀 0**, 구조+Todo 완전 통과 19 → 33, 자리표시자 오탐 11 → 0, 목표를 못 읽던 문서 47 → 36.
+- **워크스페이스 세션에서 훅이 엉뚱한 `.lens/` 를 봄** — 계획서 훅이 띄운 기록을 못 찾고 "띄워라" 를 편집마다 반복(한 턴 10회), Stop 게이트가 빈 `.lens/gates` 를 읽고 거짓 통과.
+- `safeWriteJson` 이 rename 실패 시 `.tmp` 를 남기던 것.
+
 ## [3.38.0] - 2026-09-05
 
 **엔진 배분 + 실행 Todo 파생.** 사용자 지시 두 건(2026-09-05): *"fable 5.1 을 아무 데나 쓰면 너무 토큰 소모량이 크고, codex 도 astra 가 나와서 똑똑하거든, grok 은 빠르고 효율적으로 하니 — `/cc` 로 작업할 때 이걸 병렬로 효율적으로 배분하는 규칙을 넣어라."* / *"`/cp` 를 할 때 todo list 는 제대로 안 만드는 거 같은데 그것도 제대로 만들게 하고."*

@@ -73,11 +73,11 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 2. 청크별로 반복 작업·불편·우회·암묵 요청 마이닝 → 클러스터 → **net-new 제안**.
 3. **적대적 검증**: 각 제안이 (a) 실제 반복에 뿌리내렸나(1회성 아님) (b) 기존 7스킬이 이미 하나(중복) (c) skill 형태로 구조적 달성 가능한가. drop/merge 사유 명시. **흥미로워 보여도 근거 약하면 DROP.**
 
-## Phase 4 — 리포트 산출 (md + HTML + board)
+## Phase 4 — 리포트 산출 (md + 엔진 네이티브 화면)
 
 `docs/history/YYYY-MM-DD-lens-modernization-audit.md` 작성. 구조(Pass 1 양식):
 - 한 줄 결론 → 기능별 판정 표(KEEP/THIN/OBSOLETE/UNCERTAIN) → 우선순위 실행목록(임팩트×저비용) → (deep) 수요 측 제안 + DROP 사유 → 검증된 코드 드리프트 → /crv 관계.
-- 그다음 `/cp html` 절차로 HTML 슬라이드덱(history 양식) 생성 + `node lib/board-builder.js {root}` 로 board 재빌드.
+- 그다음 리포트를 사용자 화면에 띄운다 — `/cp` Phase 4.5 와 같은 레인(Artifact → Codex visualize → `scripts/show-report.js` 브라우저 렌더). 슬라이드 덱·보드는 만들지 않는다(v3.39 폐지).
 
 ## Phase 5 — `/cp` 핸드오프 (고신뢰 건)
 

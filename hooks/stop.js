@@ -36,7 +36,7 @@ const crypto = require('crypto');
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
 const {
   installFailSoftHandlers, readJsonInput, writeJson,
-  safeLog, safeReadJson, safeWriteJson, withFileLock,
+  safeLog, safeReadJson, safeWriteJson, withFileLock, resolveProjectRoot,
 } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('stop');
 
@@ -60,7 +60,7 @@ function main() {
     // has received a message. The state itself is kept — deleting it would let a
     // later poll re-arm with a fresh clock and postpone the reminder.
     // (See hooks/post-tool-progress.js)
-    resetProgressReportClock();
+    resetProgressReportClock(input);
 
     // Gate enforcement runs AFTER the bookkeeping above: the dashboard and the
     // report clock must be correct whether or not this turn is allowed to end.
@@ -91,12 +91,26 @@ function gateVerdict(input) {
   try {
     if (!gateEnforcementEnabled()) return null;
 
-    const projectRoot = process.env.CLAUDE_PROJECT_DIR
-      || (input && typeof input.cwd === 'string' && input.cwd ? input.cwd : null)
-      || process.cwd();
+    const projectRoot = resolveProjectRoot({ cwd: input && typeof input.cwd === 'string' ? input.cwd : undefined });
 
     const ledger = require(path.join(PLUGIN_ROOT, 'lib', 'gate-ledger'));
+    // v3.39: /cc creates its ledger in the repo it works in, while a workspace
+    // session's hook cwd is the workspace — so this hook read an empty
+    // `.lens/gates` and passed silently. Ledgers register their repo in a user-level
+    // index; this session's own ledgers are loaded from every registered repo.
     const loaded = ledger.loadLedgers(projectRoot);
+    const roots = typeof ledger.indexedRoots === 'function' ? ledger.indexedRoots() : [];
+    const seen = new Set([path.resolve(projectRoot).toLowerCase()]);
+    for (const root of roots) {
+      const key = path.resolve(root).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      loaded.ledgers.push(...ledger.loadLedgers(root).ledgers);
+    }
+    // A ledger another session opened is not this turn's obligation — it used to
+    // block unrelated sessions for up to 24 hours.
+    const sessionId = input && input.session_id;
+    if (sessionId) loaded.ledgers = loaded.ledgers.filter(l => !l.sessionId || l.sessionId === sessionId);
 
     // Fast path — no ledger anywhere means this hook behaves exactly as it did
     // before v3.35. Most turns in most repos land here.
@@ -126,7 +140,17 @@ function gateVerdict(input) {
       decision = decide();
     }
 
-    if (decision.block) return { decision: 'block', reason: decision.reason };
+    if (decision.block) {
+      // v3.39: a blocked turn delivered nothing to the user — up to three silent
+      // turns. Say why the work continues.
+      const n = evaluation.outstanding.length;
+      return {
+        decision: 'block',
+        reason: decision.reason,
+        systemMessage: `[Lens] 완료 조건 ${n}건이 아직 확인되지 않아 이어서 작업합니다: `
+          + `${evaluation.outstanding.slice(0, 3).join(' · ')}${n > 3 ? ` 외 ${n - 3}건` : ''}`,
+      };
+    }
     if (decision.released && decision.systemMessage) return { systemMessage: decision.systemMessage };
     return null;
   } catch (err) {
@@ -161,9 +185,10 @@ function gateEnforcementEnabled() {
  * finds a live state and measures against this stamp; if nothing is in flight
  * the TTL lets it go dormant on its own.
  */
-function resetProgressReportClock() {
+function resetProgressReportClock(input) {
+  // Same resolution as hooks/post-tool-progress.js getStatePath().
+  const projectRoot = resolveProjectRoot({ cwd: input && typeof input.cwd === 'string' ? input.cwd : undefined });
   try {
-    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
     const statePath = path.join(projectRoot, '.lens', 'progress-report-state.json');
     if (!fs.existsSync(statePath)) return;
     const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
@@ -173,7 +198,6 @@ function resetProgressReportClock() {
     // Unreadable/corrupt state: fall back to removing it rather than leaving a
     // broken file that the next hook cannot parse.
     try {
-      const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
       fs.unlinkSync(path.join(projectRoot, '.lens', 'progress-report-state.json'));
     } catch {}
   }
