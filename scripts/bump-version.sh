@@ -43,7 +43,7 @@ fi
 
 TODAY=$(date +%Y-%m-%d)
 
-echo "=== Updating 9 files ==="
+echo "=== Updating 10 files ==="
 
 # Regex patterns match ANY v MAJOR.MINOR(.PATCH)? — the patch segment is
 # optional so 2-part banners (e.g. "Lens Multi v3.4") are caught too. Earlier
@@ -57,7 +57,12 @@ echo "=== Updating 9 files ==="
 
 # 1. .claude-plugin/plugin.json
 sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/plugin.json
-echo "[1/9] .claude-plugin/plugin.json"
+echo "[1/10] .claude-plugin/plugin.json"
+
+# 1b. .codex-plugin/plugin.json — v3.39: missing from this list since v3.24, so
+# Codex kept installing Lens 3.24.0 for fourteen releases while Claude ran 3.38.
+sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .codex-plugin/plugin.json
+echo "[1b/10] .codex-plugin/plugin.json"
 
 # 2. .claude-plugin/marketplace.json (version + ref)
 sed "${SEDI[@]}" -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/" .claude-plugin/marketplace.json
@@ -121,6 +126,7 @@ echo "=== Verification ==="
 # Check new version appears in all files
 COUNT=$(grep -rl "v$NEW_VERSION\|\"$NEW_VERSION\"" \
   .claude-plugin/plugin.json \
+  .codex-plugin/plugin.json \
   .claude-plugin/marketplace.json \
   hooks/hooks.json \
   hooks/session-start.js \
@@ -132,7 +138,7 @@ COUNT=$(grep -rl "v$NEW_VERSION\|\"$NEW_VERSION\"" \
   README.md \
   CHANGELOG.md 2>/dev/null | wc -l)
 
-echo "Files with v$NEW_VERSION: $COUNT/10 (+README, +CHANGELOG)"
+echo "Files with v$NEW_VERSION: $COUNT/11 (+README, +CHANGELOG)"
 
 # Check stale version remnants — any v[0-9].[0-9].[0-9] that is NOT the new
 # version, across version-bearing files (excludes CHANGELOG and docs/history

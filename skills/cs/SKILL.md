@@ -313,7 +313,7 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 
 - `/cc` (parallel execution) is about *running tasks*. `/cs` is about *synchronizing source code state*.
 - `/cp` writes plan documents. `/cs` does not touch documents — it just syncs whatever is on disk.
-- `/cp done` owns integrating a finished task branch into base. `/cs` deliberately has no such command — one owner per job.
+- `/cd` owns integrating a finished task branch into base. `/cs` deliberately has no such command — one owner per job.
 - The SessionStart auto-pull (opt-in via `LENS_SYNC_AUTO_PULL=1`) is a passive partner of `/cs`. They share the same `git-sync-all.sh` script.
 - Branch rules (prefixes, base resolution, merge proof, atomic lease) are defined once in `docs/rules/branch-lifecycle.md`. This skill follows it; it does not restate it.
 
