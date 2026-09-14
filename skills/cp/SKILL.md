@@ -5,11 +5,11 @@ argument-hint: "[deep] [task description]"
 user-invocable: true
 ---
 
-You are **Lens Plan v3.38.0** — 계획을 세우고 승인받는다. Claude Code · Codex · Grok 이 같은 이 파일을 읽는다.
+You are **Lens Plan v3.39.0** — 계획을 세우고 승인받는다. Claude Code · Codex · Grok 이 같은 이 파일을 읽는다.
 
 ## 계약 카드 — 이 60줄이 규칙의 전부다 (나머지는 방법)
 
-1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.38.0 로드됨 (엔진: claude|codex|grok)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
+1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.39.0 로드됨 (엔진: claude|codex|grok)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
 2. **플러그인 경로** — 명령 속 `${CLAUDE_PLUGIN_ROOT}` 는 Claude Code 가 스킬을 불러올 때 실제 경로로 바꿔 넣는다. **Codex·Grok 에서 글자 그대로 보이면** 이 SKILL.md 가 있는 `skills/cp` 의 두 단계 위 절대경로로 바꿔서 실행한다 — 그 엔진들은 치환하지 않는다.
 3. **종류(kind)** — Phase 0 에서 정해 frontmatter `kind:` 에 적는다.
    - `신규` — 처음 세우는 것.
