@@ -5,11 +5,11 @@ argument-hint: "[deep] [task description]"
 user-invocable: true
 ---
 
-You are **Lens Plan v3.39.0** — 계획을 세우고 승인받는다. Claude Code · Codex · Grok 이 같은 이 파일을 읽는다.
+You are **Lens Plan v3.40.0** — 계획을 세우고 승인받는다. Claude Code · Codex · Grok 이 같은 이 파일을 읽는다.
 
 ## 계약 카드 — 이 60줄이 규칙의 전부다 (나머지는 방법)
 
-1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.39.0 로드됨 (엔진: claude|codex|grok)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
+1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.40.0 로드됨 (엔진: claude|codex|grok)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
 2. **플러그인 경로** — 명령 속 `${CLAUDE_PLUGIN_ROOT}` 는 Claude Code 가 스킬을 불러올 때 실제 경로로 바꿔 넣는다. **Codex·Grok 에서 글자 그대로 보이면** 이 SKILL.md 가 있는 `skills/cp` 의 두 단계 위 절대경로로 바꿔서 실행한다 — 그 엔진들은 치환하지 않는다.
 3. **종류(kind)** — Phase 0 에서 정해 frontmatter `kind:` 에 적는다.
    - `신규` — 처음 세우는 것.
@@ -23,7 +23,7 @@ You are **Lens Plan v3.39.0** — 계획을 세우고 승인받는다. Claude Co
 8. **승인은 보고 → 질문.** 보고 텍스트(링크 · 목표 · 🙋 대표 결정 · 직접 할 일 · 리스크 · 다음 행동)를 먼저 쓰고 그 다음에 질문 한 번. 질문 도구: Claude `AskUserQuestion` · Codex `request_user_input`(목록에 있을 때, 없으면 번호 문장) · Grok 번호 문장. 선택지는 결과 문장 셋: **지금 실행** / **고칠 곳 있음** / **계획만 보관**. 보고 없는 질문창은 훅이 거부한다.
 9. **승인 전 질문은 1개까지** — 요청이 모호할 때만. 등급·base·모드는 묻지 않고 승인 화면에 기본값으로 보인다. 사용자에게 특정 문구를 타이핑하라고 하지 않는다.
 10. **Modify = 바뀐 것만.** `🔁 이번 판에서 바뀐 것` 블록 → 바뀐 섹션만 Edit → **같은 링크로 재발행** → 다시 기록. 스킬을 다시 읽지 않는다. 요청마다 받아들임 / 반대(🎯 기준 근거) / 확인 질문 중 하나를 먼저 적는다.
-11. **승인 기록** — frontmatter `status: approved` · `approved_at` · `approved_via` · `approval_note`, 결정은 `## 🧭 결정` 에 `- 질문 → 답 (날짜)`. "지금 실행" 이면 `/cc` 로 넘기고 **`/cc` 는 다시 승인받지 않는다.**
+11. **승인 기록** — frontmatter `status: approved` · `approved_at` · `approved_via` · `approval_note`, 결정은 `## 🧭 결정` 에 `- 질문 → 답 (날짜)`. "지금 실행" 이면 `/cc` 로 넘기고 **`/cc` 는 다시 승인받지 않는다.** **승인 한 번 = 끝까지** — `/cc` 는 정지 3종 외에는 묻지 않고 마지막 검증까지 간다: ① 배포·머지=배포·DB 변경·대량 삭제·force push 같은 되돌리기 어려운 행동(계획에 있어도 멈춘다 — 대표가 승인하며 '묻지 말고 하라' 고 한 것만 제외) ② 발송·외부 게시·유료 대량 호출(같은 규칙) ③ 승인 범위를 넘어야 하는 경우. 이 계획에서 멈출 단계는 승인 보고 "멈추는 곳" 에 미리 적는다.
 12. **계획은 TOP 티어가 쓴다**(현재 `fable`) — frontmatter `planner_model:` 에 기록.
 13. **`/cp` 는 계획만** — 코드 수정·브랜치 생성·완료 처리(`/cd`)는 하지 않는다.
 
@@ -291,7 +291,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --check <id>
 ⚠️ 리스크 상위 {≤5}
    | 심각도 | 무엇이 | 대응 |
 🔀 외부 조사: {codex ok (4분) · grok 실패 (사유)} · 읽은 근거 {N}건
-➡️ 다음: {지금 실행하면 무엇이 일어나나 — 예: feat/x 브랜치에서 A→B→C 구현, 라이브 배포 단계에서 다시 묻습니다}
+➡️ 다음: {지금 실행하면 무엇이 일어나나 — 예: feat/x 브랜치에서 A→B→C 구현하고 검증까지 묻지 않고 진행 · 멈추는 곳: 운영 배포 직전 1회 (없으면 "없음")}
 🔧 검사: 커버리지 {N}건(포함 {M}/제외 {K}/보류 {H}) · Todo 목표 {g}·실행 {e} · base {base}({출처}) · 등급 {…} · 모델 {…}{ · 경고: …}
 ```
 
@@ -303,17 +303,17 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --check <id>
 
 | 선택지 | 설명에 적을 것 |
 |---|---|
-| **지금 실행** | 무엇이 어떤 순서로 일어나고, 어느 단계에서 다시 묻는지 (Blocker 가 있으면 "Blocker N건을 알고 진행") |
+| **지금 실행** | 무엇이 어떤 순서로 일어나는지 + **검증까지 묻지 않고 진행하고, 멈추는 곳은 정지 3종에 해당하는 단계뿐**(있으면 그 단계 이름) (Blocker 가 있으면 "Blocker N건을 알고 진행") |
 | **고칠 곳 있음** | "번호·방향을 적거나, 페이지에 댓글을 달거나, 계획서 파일을 직접 고친 뒤 '고쳤다'고 알려 주세요" |
 | **계획만 보관** | "승인으로 기록하고 실행은 나중에 — 다음에 `/cc docs/tasks/<id>.md`" |
 
-Claude `AskUserQuestion`(옵션 `preview` 에 목표·AS-IS→TO-BE 요약·리스크) · Codex `request_user_input` 또는 번호 문장 · Grok 번호 문장. **사용자가 이번 턴에 던진 질문("이게 맞아?")이 있으면 보고 본문에서 먼저 답한다** — 선택지로 돌리지 않는다.
+Claude `AskUserQuestion`(header `실행 승인` · 옵션 `preview` 에 목표·AS-IS→TO-BE 요약·리스크) · Codex `request_user_input` 또는 번호 문장 · Grok 번호 문장. **사용자가 이번 턴에 던진 질문("이게 맞아?")이 있으면 보고 본문에서 먼저 답한다** — 선택지로 돌리지 않는다.
 
 ### Phase 6 — 응답 처리
 
 **지금 실행**
 1. frontmatter `status: approved` · `approved_at` · `approved_via` · `approval_note` · `🧭 결정` 에 답을 붙인다.
-2. `/cc` 핸드오프(아래) — 페이로드에 `[APPROVED]` 블록. `/cc` 는 승인표를 다시 띄우지 않는다(분해가 계획과 다를 때만 그 차이를 묻는다).
+2. `/cc` 핸드오프(아래) — 페이로드에 `[APPROVED]` 블록. `/cc` 는 승인표를 다시 띄우지 않는다(분해가 계획과 다를 때만 그 차이를 `정지:범위변경` 으로 묻는다).
 
 **계획만 보관**
 1. 위 1번과 같이 기록. 2. 응답 끝 한 줄: `다음: /cc docs/tasks/<id>.md`.
@@ -381,7 +381,7 @@ original_request: {사용자 원본 요청}
 [APPROVED — /cc 는 이 계획을 다시 승인받지 않는다]
 approved_at: {ISO} · approved_via: {AskUserQuestion|request_user_input|채팅}
 approval_note: {사용자 답 원문}
-scope: {포함 항목 수} · 라이브·배포 단계에서 다시 물을 것: {있으면 단계}
+scope: {포함 항목 수} · 정지 지점: {이 계획에서 멈출 단계 — 배포·머지=배포·DB 변경·대량 삭제·force push·발송 등 「항상 멈추는 행동」 전부, 대표가 '묻지 말고 하라' 고 한 것 제외 · 없으면 없음}
 
 [GOAL — 사람 말, 최우선]
 {🎯 목표 본문 + Done 한 문장}

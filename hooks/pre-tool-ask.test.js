@@ -20,6 +20,10 @@ const { execFileSync } = require('child_process');
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
 const HOOK = path.join(PLUGIN_ROOT, 'hooks', 'pre-tool-ask.js');
 
+// v3.40 run-guard tests create real ledgers; never touch the user's real index.
+process.env.LENS_LEDGER_INDEX = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lens-ask-index-')), 'active-ledgers.json');
+const ledger = require(path.join(PLUGIN_ROOT, 'lib', 'gate-ledger'));
+
 let passed = 0;
 let failed = 0;
 function test(name, fn) {
@@ -93,6 +97,93 @@ test('a missing transcript fails open', () => {
 test('LENS_ASK_GUARD=0 turns it off', () => {
   const t = transcript([user('해줘'), toolResult(), call('AskUserQuestion')]);
   assert.deepStrictEqual(run({ tool_name: 'AskUserQuestion', transcript_path: t }, { LENS_ASK_GUARD: '0' }), {});
+});
+
+// ── v3.40 — no stops during an approved run ─────────────────
+
+console.log('\n  -- 무정지 실행 --');
+
+/** A repo with an open ledger for `sessionId`; returns { root, workspace }. */
+function runRepo(sessionId, { close = false } = {}) {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'lens-ask-ws-'));
+  const root = path.join(workspace, 'repo');
+  fs.mkdirSync(path.join(root, '.git'), { recursive: true });
+  const made = ledger.createLedger(root, { scope: '2026-09-14-x', sessionId, gates: [{ id: 'G1', criterion: '가입 완료', kind: 'manual' }] });
+  assert.ok(made.ok, JSON.stringify(made));
+  if (close) assert.ok(ledger.closeLedger(root, '2026-09-14-x').ok);
+  return { root, workspace };
+}
+
+const reported = () => transcript([user('해줘'), toolResult(), say(REPORT)]);
+const ask = (header, { cwd, session = 'S1', env } = {}) => run({
+  tool_name: 'AskUserQuestion',
+  transcript_path: reported(),
+  session_id: session,
+  cwd,
+  tool_input: { questions: [{ question: '어떻게 할까요?', header, options: [] }] },
+}, env);
+
+test('during this session\'s run, an ordinary question is denied and names the stop kinds', () => {
+  const { root } = runRepo('S1');
+  const r = ask('경로 전환', { cwd: root });
+  assert.ok(denied(r), JSON.stringify(r));
+  const reason = r.hookSpecificOutput.permissionDecisionReason;
+  assert.match(reason, /정지:범위변경/);
+  assert.match(reason, /검증 확인/);
+});
+
+test('the refusal gives a way out for a cancelled run: the exact closeLedger call and the kill switch', () => {
+  // its own session — the index still lists S1 runs left open by the other tests
+  const { root } = runRepo('S4');
+  const reason = ask('작업 완료 — 정리', { cwd: root, session: 'S4' }).hookSpecificOutput.permissionDecisionReason;
+  assert.match(reason, /closeLedger\('[^']+','2026-09-14-x'\)/);
+  assert.match(reason, /LENS_ASK_GUARD=0/);
+  // …and the command it prints actually closes the run.
+  const cmd = reason.match(/node -e "([^"]+)"/)[1];
+  execFileSync(process.execPath, ['-e', cmd]);
+  assert.deepStrictEqual(ask('작업 완료 — 정리', { cwd: root, session: 'S4' }), {});
+});
+
+for (const header of ['정지:비가역', '정지:외부영향', '정지:범위변경', '검증 확인', '실행 종료', '실행 승인', '정지 : 범위변경']) {
+  test(`during the run, header "${header}" is allowed`, () => {
+    const { root } = runRepo('S1');
+    assert.deepStrictEqual(ask(header, { cwd: root }), {});
+  });
+}
+
+test('the run is found through the ledger index when the session cwd is the workspace', () => {
+  const { workspace } = runRepo('S1');
+  assert.ok(denied(ask('이어서 할까요', { cwd: workspace })));
+});
+
+test('another session\'s open ledger does not stop this session\'s questions', () => {
+  const { root } = runRepo('S2');
+  assert.deepStrictEqual(ask('이어서 할까요', { cwd: root, session: 'S9' }), {});
+});
+
+test('a closed ledger means the run is over', () => {
+  const { root } = runRepo('S3', { close: true });
+  assert.deepStrictEqual(ask('다음 작업', { cwd: root, session: 'S3' }), {});
+});
+
+test('no session id in the hook input fails open', () => {
+  const { root } = runRepo('S1');
+  const r = run({ tool_name: 'AskUserQuestion', transcript_path: reported(), cwd: root, tool_input: { questions: [{ header: '아무거나' }] } });
+  assert.deepStrictEqual(r, {});
+});
+
+test('both problems at once are reported together', () => {
+  const { root } = runRepo('S1');
+  const r = run({
+    tool_name: 'AskUserQuestion',
+    transcript_path: transcript([user('해줘'), toolResult()]),
+    session_id: 'S1',
+    cwd: root,
+    tool_input: { questions: [{ header: '다음 단계' }] },
+  });
+  assert.ok(denied(r));
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /보고가 먼저/);
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /승인된 실행이 열려 있다/);
 });
 
 console.log(`\n  ${passed} passed, ${failed} failed\n`);
