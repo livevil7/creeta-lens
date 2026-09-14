@@ -38,6 +38,13 @@ function main() {
     const parts = message.split(/\s+/);
     const skillName = parts[0].substring(1);
     const args = parts.slice(1).join(' ');
+
+    // v3.39: "/cp 결과가 이상한데 이게 맞아?" is a question about the skill, not an
+    // order to run it — forcing the Skill tool turned it into a new plan document.
+    if (looksLikeQuestion(args)) {
+      writeJson({ systemMessage: '' });
+      process.exit(0);
+    }
     const clippedArgs = args.substring(0, 200);
     const displayedArgs = JSON.stringify(args.substring(0, 100));
     const toolArgs = JSON.stringify(clippedArgs);
@@ -62,6 +69,16 @@ function getInput() {
     return { userMessage: process.env.CLAUDE_USER_MESSAGE };
   }
   return readJsonInput();
+}
+
+/** A question or complaint about the command, rather than a request to run it. */
+function looksLikeQuestion(args) {
+  const t = String(args || '').trim();
+  if (!t) return false;
+  if (/[?？]\s*$/.test(t)) return true;
+  // `\b` is an ASCII word boundary — it never matches next to Hangul.
+  if (/^왜(?:\s|$)/.test(t)) return true;
+  return /(?:맞아|맞나|맞냐|뭐야|뭐지|거지|건지|이상한데|이상해|안\s?되는데|안\s?돼|찡찡|어떻게\s?(?:하지|해야\s?돼|수정하지))\s*[.!~]*\s*$/.test(t);
 }
 
 function isExplicitSlashCommand(message) {
