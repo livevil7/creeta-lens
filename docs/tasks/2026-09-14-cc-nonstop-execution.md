@@ -5,14 +5,14 @@ planner_model: opus (세션 자체)
 kind: 개선
 grade: 기본
 created: 2026-09-14
-status: executing
+status: done
 approved_at: 2026-09-14T22:40+09:00
 approved_via: 채팅
 approval_note: "맞아 그건 필요해. 진행해." (무정지 실행만 — 단계별 확인 옵션·항목 골라 실행은 보류)
 repo: creeta-lens
 base: master
 branch: feat/cc-nonstop-execution
-pr: null
+pr: https://github.com/livevil7/creeta-lens/pull/11
 refs: [docs/tasks/2026-09-14-cp-native-artifacts.md]
 ---
 
@@ -105,4 +105,7 @@ Done: 승인된 계획을 `/cc` 로 실행하는 동안 정지 3종이 아닌 �
 - **허용 header 5 → 6**: manual 검증 확인 질문이 어느 header 에도 안 맞아 Phase 6 이 pre-tool-ask(거부)와 stop(미충족 차단) 사이에 갇혔다(커버리지 렌즈 high). → `검증 확인`, 자동 검증을 끝낸 뒤 한 질문에 모아.
 - **원장 생성 시점**: 직접 호출 `/cc` 는 승인 전에 원장을 만들어, 취소해도 24시간 질문이 막혔다(훅 렌즈, 임시 레포에서 재현). → 직접 호출은 1.5 승인 뒤에 만들고, 취소 시 `closeLedger`, 거부 문구에 닫는 명령·`LENS_ASK_GUARD=0`.
 - 그 밖에: 1.5 분해 차이·TOP 상한 초과 질문의 header, 우회로 단계의 위험 행동, 헤드리스 폴백 문구, 핵심원칙 1·7. 이름표만 보는 한계는 고치지 않고 명시했다(내용 판정은 훅이 할 수 없다).
-- [ ] v3.40.0 릴리즈 · Codex·Claude 재설치
+- [x] 테스트 재실행 — 13 스위트 전부 통과(pre-tool-ask 22, 거부 문구가 출력한 `closeLedger` 명령을 실제로 실행해 원장이 닫히는지까지)
+- [x] v3.40.0 릴리즈 — PR #11 병합(6cd8fec) · 태그 v3.40.0 · GitHub Release · 기능 브랜치 삭제
+- [x] 재설치 — Codex `lens@CreetaCorp 3.40.0` · Claude Code `3.39.0 → 3.40.0`(재시작 후 적용)
+- [ ] 실화면 확인 — Claude Code 재시작 후 승인된 실행 중 일반 질문창이 거부되는지
