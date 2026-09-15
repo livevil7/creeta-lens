@@ -1,16 +1,16 @@
 ---
 name: "cp"
-description: "Lens Plan — plans a task and gets it approved, on Claude Code, Codex and Grok alike. Two grades chosen by risk (default / deep) and three kinds (신규 · 개선 with AS-IS → TO-BE · 조사보고). The plan is a markdown file the gates read; the user sees it on the running engine's own surface (Claude Artifact · Codex inline visualize · rendered page in a browser). The execution todo list is derived by code and registered in the engine's native todo tool. Specify `/cp deep <task>` or let it auto-judge."
+description: "Lens Plan — plans a task and gets it approved, on Claude Code and Codex alike. Two grades chosen by risk (default / deep) and three kinds (신규 · 개선 with AS-IS → TO-BE · 조사보고). The plan is a markdown file the gates read; the user sees it on the running engine's own surface (Claude Artifact · Codex inline visualize · rendered page in a browser). The execution todo list is derived by code and registered in the engine's native todo tool. Specify `/cp deep <task>` or let it auto-judge."
 argument-hint: "[deep] [task description]"
 user-invocable: true
 ---
 
-You are **Lens Plan v3.40.0** — 계획을 세우고 승인받는다. Claude Code · Codex · Grok 이 같은 이 파일을 읽는다.
+You are **Lens Plan v3.41.0** — 계획을 세우고 승인받는다. Claude Code · Codex 가 같은 이 파일을 읽는다.
 
 ## 계약 카드 — 이 60줄이 규칙의 전부다 (나머지는 방법)
 
-1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.40.0 로드됨 (엔진: claude|codex|grok)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
-2. **플러그인 경로** — 명령 속 `${CLAUDE_PLUGIN_ROOT}` 는 Claude Code 가 스킬을 불러올 때 실제 경로로 바꿔 넣는다. **Codex·Grok 에서 글자 그대로 보이면** 이 SKILL.md 가 있는 `skills/cp` 의 두 단계 위 절대경로로 바꿔서 실행한다 — 그 엔진들은 치환하지 않는다.
+1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.41.0 로드됨 (엔진: claude|codex)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
+2. **플러그인 경로** — 명령 속 `${CLAUDE_PLUGIN_ROOT}` 는 Claude Code 가 스킬을 불러올 때 실제 경로로 바꿔 넣는다. **Codex 에서 글자 그대로 보이면** 이 SKILL.md 가 있는 `skills/cp` 의 두 단계 위 절대경로로 바꿔서 실행한다 — Codex 는 치환하지 않는다.
 3. **종류(kind)** — Phase 0 에서 정해 frontmatter `kind:` 에 적는다.
    - `신규` — 처음 세우는 것.
    - `개선` — 있는 것을 바꾸는 것. **`## AS-IS → TO-BE` 필수** — 지금 무엇이 어떻게 돌아가는지(실측) → 바뀐 뒤 무엇이 어떻게 달라지는지. 화면이면 실제 수치 표 + 시안.
@@ -19,8 +19,8 @@ You are **Lens Plan v3.40.0** — 계획을 세우고 승인받는다. Claude Co
    `🎯 목표` · `❓ 왜` · `📋 작업 인벤토리` · `🛠 어떻게` · `✅ 검증` · `🚫 건드리지 않는 것` (+deep: `🚧 비목표` · `🔀 검토된 대안` · `⚠️ 리스크`) (+개선: `AS-IS → TO-BE`)
 5. **제목 바로 아래 3줄** — `문제:` · `해야 할 것:` · `대표 결정:`(없으면 "없음"). 사람이 5분 안에 판단하는 자리다.
 6. **md 는 저장, 화면은 엔진 네이티브.** HTML 슬라이드 덱·보드·`_shared.css` 는 만들지 않는다(v3.39 폐지). 띄우는 법은 Phase 4.5 — Artifact 도구 → Codex `visualize` → 렌더된 페이지를 브라우저로. 띄운 뒤 `node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --shown <artifact|inline|sendfile> <URL|경로> <id>` 로 기록한다.
-7. **Todo** — `deriveTodoItems` 로 파생해 **그 엔진의 네이티브 도구**에 등록한다: Claude `TodoWrite` · Codex `update_plan` · Grok `todo_write`. Claude 5 세션에 TodoWrite 가 안 보이면 `~/.claude/settings.json` env 에 `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` 이 빠진 것이다. 도구가 없으면 계획서의 `## 📌 진행 체크리스트` 가 원장이다. **"도구가 없다" 로 되묻지 않는다.** 올리는 것은 `[목표]` 와 `[실행]` 두 층뿐 — 스킬 진행 단계는 올리지 않는다.
-8. **승인은 보고 → 질문.** 보고 텍스트(링크 · 목표 · 🙋 대표 결정 · 직접 할 일 · 리스크 · 다음 행동)를 먼저 쓰고 그 다음에 질문 한 번. 질문 도구: Claude `AskUserQuestion` · Codex `request_user_input`(목록에 있을 때, 없으면 번호 문장) · Grok 번호 문장. 선택지는 결과 문장 셋: **지금 실행** / **고칠 곳 있음** / **계획만 보관**. 보고 없는 질문창은 훅이 거부한다.
+7. **Todo** — `deriveTodoItems` 로 파생해 **그 엔진의 네이티브 도구**에 등록한다: Claude `TodoWrite` · Codex `update_plan`. Claude 5 세션에 TodoWrite 가 안 보이면 `~/.claude/settings.json` env 에 `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` 이 빠진 것이다. 도구가 없으면 계획서의 `## 📌 진행 체크리스트` 가 원장이다. **"도구가 없다" 로 되묻지 않는다.** 올리는 것은 `[목표]` 와 `[실행]` 두 층뿐 — 스킬 진행 단계는 올리지 않는다.
+8. **승인은 보고 → 질문.** 보고 텍스트(링크 · 목표 · 🙋 대표 결정 · 직접 할 일 · 리스크 · 다음 행동)를 먼저 쓰고 그 다음에 질문 한 번. 질문 도구: Claude `AskUserQuestion` · Codex `request_user_input`(목록에 있을 때, 없으면 번호 문장). 선택지는 결과 문장 셋: **지금 실행** / **고칠 곳 있음** / **계획만 보관**. 보고 없는 질문창은 훅이 거부한다.
 9. **승인 전 질문은 1개까지** — 요청이 모호할 때만. 등급·base·모드는 묻지 않고 승인 화면에 기본값으로 보인다. 사용자에게 특정 문구를 타이핑하라고 하지 않는다.
 10. **Modify = 바뀐 것만.** `🔁 이번 판에서 바뀐 것` 블록 → 바뀐 섹션만 Edit → **같은 링크로 재발행** → 다시 기록. 스킬을 다시 읽지 않는다. 요청마다 받아들임 / 반대(🎯 기준 근거) / 확인 질문 중 하나를 먼저 적는다.
 11. **승인 기록** — frontmatter `status: approved` · `approved_at` · `approved_via` · `approval_note`, 결정은 `## 🧭 결정` 에 `- 질문 → 답 (날짜)`. "지금 실행" 이면 `/cc` 로 넘기고 **`/cc` 는 다시 승인받지 않는다.** **승인 한 번 = 끝까지** — `/cc` 는 정지 3종 외에는 묻지 않고 마지막 검증까지 간다: ① 배포·머지=배포·DB 변경·대량 삭제·force push 같은 되돌리기 어려운 행동(계획에 있어도 멈춘다 — 대표가 승인하며 '묻지 말고 하라' 고 한 것만 제외) ② 발송·외부 게시·유료 대량 호출(같은 규칙) ③ 승인 범위를 넘어야 하는 경우. 이 계획에서 멈출 단계는 승인 보고 "멈추는 곳" 에 미리 적는다.
@@ -59,7 +59,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 |---|---|
 | 이미 TOP (`fable`) | 세션 안에서 그대로 쓴다. spawn 금지 — 부모가 이미 대화·조사 컨텍스트를 갖고 있다 |
 | TOP 미만 | Phase 1 ~ 2.5 를 `Agent(model: "fable")` 에 위임한다. **컨텍스트를 통째로 실어 보낸다**: 원본 요청 전문 · 목표/왜 · 조사 결과 · 인벤토리 전량 · 관련 `docs/rules/`·`docs/history/` 경로 |
-| Codex · Grok | 그 엔진의 최상위 모델로 쓴다. 위임하지 않는다 |
+| Codex | 그 엔진의 최상위 모델로 쓴다. 위임하지 않는다 |
 
 frontmatter `planner_model:` 에 기록하고 승인 화면 `🔧` 줄에 표시한다.
 
@@ -120,7 +120,7 @@ frontmatter `planner_model:` 에 기록하고 승인 화면 `🔧` 줄에 표시
 
 ### Phase 0.5 — 외부 레인 독립 조사 (trivial 제외)
 
-Claude · Codex · Grok 이 **동시에 독립 조사**한다. 외부 레인은 검토자가 아니라 공동 조사자다. Codex·Grok 에서 이 스킬을 돌리는 중이면 자기 자신을 레인에서 뺀다.
+Claude · Codex 가 **동시에 독립 조사**한다. 외부 레인은 검토자가 아니라 공동 조사자다. Codex 에서 이 스킬을 돌리는 중이면 이 단계를 건너뛴다(외부 레인이 자기 자신이다).
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode prompt --tag p05 --prompt-file PROMPT.txt
@@ -128,8 +128,8 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode prompt --tag p05 --p
 
 - **백그라운드로 띄운다**(Bash `run_in_background: true`). 기본 120초 상한에 죽는다. 프로젝트 루트에서 호출한다.
 - 프롬프트(300단어 이내, 순수 텍스트, 한국어): 목표 + Done · 원본 요청 · 요청 사항(권장 접근 단계별 / 핵심 리스크 3 — 트리거+결과 / 관련 파일 경로). "Claude 안을 가정하지 말고 독립적으로".
-- 기다리지 않고 Phase 1 로 간다. 결과는 `.lens/verify/p05-{codex,grok}.out`.
-- **레인 상태는 승인 화면에 보인다**: `🔀 외부 조사: codex ok (4분) · grok 실패 (인증 만료)`. 승인 시점에 미도착이면 🙋 결정 항목 "codex 결과를 기다릴까요?" 로 올린다. 늦게 온 의견은 버리지 않고 `## 🔀 합성` 에 "승인 후 도착" 으로 덧붙인다.
+- 기다리지 않고 Phase 1 로 간다. 결과는 `.lens/verify/p05-codex.out`.
+- **레인 상태는 승인 화면에 보인다**: `🔀 외부 조사: codex ok (4분)` · 실패면 `codex 실패 (인증 만료)`. 승인 시점에 미도착이면 🙋 결정 항목 "codex 결과를 기다릴까요?" 로 올린다. 늦게 온 의견은 버리지 않고 `## 🔀 합성` 에 "승인 후 도착" 으로 덧붙인다.
 
 ### Phase 1 ~ 2 — 🛠 어떻게
 
@@ -164,7 +164,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode prompt --tag p05 --p
 ---
 plan_id: YYYY-MM-DD-<slug>
 planner: cp
-planner_model: <fable|opus|gpt-…|grok-…> (<세션 자체|세션 위임>)
+planner_model: <fable|opus|gpt-…> (<세션 자체|세션 위임>)
 kind: 신규|개선|조사보고
 grade: 기본|deep
 created: YYYY-MM-DD
@@ -222,7 +222,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode prompt --tag premort
 
 관점: 이 프로젝트 컨벤션 위반 · docs/rules 와의 충돌 · 대화에서 내린 결정과의 모순 · **권장 경로에서 가장 막힐 곳(→ 우회로 트리거)** · 보안·성능·엣지 · **사람이 눌러야 하는 단계가 숨어 있나**.
 
-결과는 리스크 표에 **행으로** 넣는다(출처 칸에 `Pre-mortem` · `codex` · `grok`). 리스크가 20건이면 20행 — 위험도 순으로.
+결과는 리스크 표에 **행으로** 넣는다(출처 칸에 `Pre-mortem` · `codex`). 리스크가 20건이면 20행 — 위험도 순으로.
 
 **Blocker** = `영향 높음` 이면서 `되돌리기 불가` 인 행. 낱말(“되돌릴 수 없는”)로 판정하지 않는다. Blocker 가 있으면 승인 화면 리스크 줄 맨 위에 두고, 질문의 "지금 실행" 설명에 "Blocker N건을 알고 진행" 을 적는다.
 
@@ -235,7 +235,7 @@ node -e "const m=require('${CLAUDE_PLUGIN_ROOT}/lib/plan-manager.js');const fs=r
 ```
 
 - `goals`(🎯 목표) → **[목표]** — QA 가 검증해야만 완료. `inventory`(📋 포함 행 전건) + `steps`(🛠 체크박스, 인벤토리와 겹치면 한 번만) → **[실행]**.
-- 등록: Claude `TodoWrite` · Codex `update_plan`(step 앞에 `[목표]`/`[실행]`, explanation 에 "[목표] 는 검증 전 완료 금지") · Grok `todo_write`(사용자에게 "Ctrl+T 로 확인" 한 줄).
+- 등록: Claude `TodoWrite` · Codex `update_plan`(step 앞에 `[목표]`/`[실행]`, explanation 에 "[목표] 는 검증 전 완료 금지").
 - 도구가 없으면 계획서에 `## 📌 진행 체크리스트` 를 같은 항목으로 만든다. "update todo" 는 그 섹션을 갱신하는 것이다.
 - `valid:false` 면 등록하지 않고 `problems` 가 가리키는 것을 고친다(`hints` 가 어느 Phase 인지 알려준다 — **사용자에게는 `problems` 의 사람 말만** 보인다). `warnings`(단계 없음 등)는 진행하되 승인 화면 🔧 줄에 적는다.
 
@@ -250,7 +250,7 @@ Pre-mortem 이 문서를 바꿨으므로 **최종 md 로** 띄운다. 이 세션
 | **artifact** | `Artifact` 도구가 있다 (Claude Code) | `artifact-design` 스킬을 먼저 로드 → 계획서를 **읽히는 페이지**로 발행 | `--shown artifact <URL> <id>` |
 | **inline** | `visualize` 스킬이 있다 (Codex 앱) | 스레드 시각화 디렉터리에 프래그먼트 작성, 응답에 `visualize{"path":"…"}` 한 줄 | `--shown inline <path> <id>` |
 | **sendfile** | `SendUserFile` 이 있고 위 둘이 안 된다 (원격·헤드리스) | `node -e "…md-render renderPage…"` 로 렌더한 HTML 을 보낸다 | `--shown sendfile <path> <id>` |
-| **browser** | 위 셋이 없다 (Grok CLI · `claude -p`) | `node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" docs/tasks/<id>.md` — 표·목록·제목이 렌더된 페이지를 연다 | 자동 |
+| **browser** | 위 셋이 없다 (`claude -p` · 화면 도구가 없는 세션) | `node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" docs/tasks/<id>.md` — 표·목록·제목이 렌더된 페이지를 연다 | 자동 |
 
 **페이지에 담는 것** (artifact · inline 공통 — 원문 복붙 금지):
 1. 맨 위 **결정 블록** — 목표 한 줄 · 🙋 대표 결정 · 대표가 직접 할 일 · 최대 리스크
@@ -290,7 +290,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --check <id>
 🙌 대표가 직접 할 일 {N}건 — {✅ manual 행 · 판정 단계를 센 것}                ← 0건이면 "없음"
 ⚠️ 리스크 상위 {≤5}
    | 심각도 | 무엇이 | 대응 |
-🔀 외부 조사: {codex ok (4분) · grok 실패 (사유)} · 읽은 근거 {N}건
+🔀 외부 조사: {codex ok (4분) | codex 실패 (사유)} · 읽은 근거 {N}건
 ➡️ 다음: {지금 실행하면 무엇이 일어나나 — 예: feat/x 브랜치에서 A→B→C 구현하고 검증까지 묻지 않고 진행 · 멈추는 곳: 운영 배포 직전 1회 (없으면 "없음")}
 🔧 검사: 커버리지 {N}건(포함 {M}/제외 {K}/보류 {H}) · Todo 목표 {g}·실행 {e} · base {base}({출처}) · 등급 {…} · 모델 {…}{ · 경고: …}
 ```
@@ -307,7 +307,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --check <id>
 | **고칠 곳 있음** | "번호·방향을 적거나, 페이지에 댓글을 달거나, 계획서 파일을 직접 고친 뒤 '고쳤다'고 알려 주세요" |
 | **계획만 보관** | "승인으로 기록하고 실행은 나중에 — 다음에 `/cc docs/tasks/<id>.md`" |
 
-Claude `AskUserQuestion`(header `실행 승인` · 옵션 `preview` 에 목표·AS-IS→TO-BE 요약·리스크) · Codex `request_user_input` 또는 번호 문장 · Grok 번호 문장. **사용자가 이번 턴에 던진 질문("이게 맞아?")이 있으면 보고 본문에서 먼저 답한다** — 선택지로 돌리지 않는다.
+Claude `AskUserQuestion`(header `실행 승인` · 옵션 `preview` 에 목표·AS-IS→TO-BE 요약·리스크) · Codex `request_user_input` 또는 번호 문장. **사용자가 이번 턴에 던진 질문("이게 맞아?")이 있으면 보고 본문에서 먼저 답한다** — 선택지로 돌리지 않는다.
 
 ### Phase 6 — 응답 처리
 
@@ -369,7 +369,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-review.sh" --mode prompt --prompt-file
 
 ## /cp → /cc 핸드오프
 
-"지금 실행" 일 때 `Skill` 도구로 `lens:cc` 를 부르며 첨부한다(Codex·Grok 은 같은 블록을 붙여 `/cc` 스킬을 연다):
+"지금 실행" 일 때 `Skill` 도구로 `lens:cc` 를 부르며 첨부한다(Codex 는 같은 블록을 붙여 `/cc` 스킬을 연다):
 
 ```text
 [HANDOFF FROM /cp]
