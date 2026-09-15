@@ -8,7 +8,7 @@
  * "the user has seen this version" instead of "a path was printed".
  *
  * Usage:
- *   node scripts/show-report.js <plan-md|plan-id>                 browser lane: render + open (Grok CLI, claude -p)
+ *   node scripts/show-report.js <plan-md|plan-id>                 browser lane: render + open (claude -p, no native surface)
  *   node scripts/show-report.js --shown artifact <url>  <plan-id>  Claude Code Artifact tool
  *   node scripts/show-report.js --shown inline   <path> <plan-id>  Codex app visualize
  *   node scripts/show-report.js --shown sendfile <path> <plan-id>  a rendered file sent to the user

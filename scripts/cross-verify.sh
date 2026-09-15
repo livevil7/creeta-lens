@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
-# Lens — triple verification driver (v3.36).
+# Lens — cross verification driver (v3.36, Grok lane removed v3.41).
 #
 # Lane 1 is the Claude Supervisor, which runs inside the session and needs no
-# plumbing. This script owns lanes 2 and 3 — Codex and Grok — and exists so the
-# Leader types one line instead of orchestrating two backgrounded scripts, two
-# output paths and two verdict formats by hand.
+# plumbing. This script owns the external lane — Codex — and exists so the
+# Leader types one line instead of backgrounding a script, tracking its output
+# path and parsing its verdict format by hand.
 #
 # That ergonomic point is the whole lesson of v3.34: the 40-line inline recipe
 # for a single Codex call was measured at 7 uses across 3,065 transcripts and 0
-# inside /cc. Doubling the lanes doubles the plumbing, so the plumbing has to
-# disappear entirely or the third lane will go the way of the second.
+# inside /cc. The plumbing has to disappear entirely or the lane goes unused.
+#
+# v3.41 (2026-09-15): the Grok lane (v3.36–v3.40) was removed when the owner
+# cancelled the Grok subscription. `--lanes` stays so a future lane is one case
+# arm, not a rewrite.
 #
 # Usage:
 #   scripts/cross-verify.sh --mode review --tag p45 [--timeout 420] [--effort high]
 #   scripts/cross-verify.sh --mode prompt --tag p05 --prompt-file FILE [...]
 #
-#   --lanes codex,grok   which lanes to run (default both; a missing CLI is
+#   --lanes codex        which lanes to run (default codex; a missing CLI is
 #                        reported as unavailable, never fatal)
 #   --dir DIR            where lane outputs land (default .lens/verify, gitignored)
 #
@@ -40,7 +43,7 @@ TAG=""
 PROMPT_FILE=""
 TIMEOUT=420
 EFFORT=high
-LANES="codex,grok"
+LANES="codex"
 DIR=".lens/verify"
 
 while [ $# -gt 0 ]; do
@@ -52,7 +55,7 @@ while [ $# -gt 0 ]; do
     --effort)      EFFORT="${2:-}"; shift 2 ;;
     --lanes)       LANES="${2:-}"; shift 2 ;;
     --dir)         DIR="${2:-}"; shift 2 ;;
-    -h|--help)     sed -n '2,32p' "$0"; exit 0 ;;
+    -h|--help)     sed -n '2,35p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -68,8 +71,7 @@ declare -A PID RCF OUTF START
 for lane in ${LANES//,/ }; do
   case "$lane" in
     codex) script="$HERE/codex-review.sh" ;;
-    grok)  script="$HERE/grok-review.sh" ;;
-    *) echo "unknown lane: $lane" >&2; exit 1 ;;
+    *) echo "unknown lane: $lane (want codex)" >&2; exit 1 ;;
   esac
   [ -f "$script" ] || { echo "missing lane script: $script" >&2; exit 1; }
 

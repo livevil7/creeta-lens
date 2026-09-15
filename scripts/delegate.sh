@@ -3,33 +3,33 @@
 #
 # Why this exists. `/cc` had exactly one Claude-shaped lane for work: an `Agent`
 # subagent, billed in Claude tokens, for every sub-task including the ones that
-# only ever read. Meanwhile two other engines were already installed, already
-# authenticated and already flat-rate — Codex (the model cache's priority-1 slug,
-# currently gpt-6-astra) and Grok Build CLI — but the skill only reached for them
-# at the review gate (Phase 4.5). Reading a repo is the bulk of what a /cc run
-# spends, and spending it on the one metered engine was the whole cost problem.
+# only ever read. Meanwhile Codex was already installed, already authenticated and
+# already flat-rate (the model cache's priority-1 slug, currently gpt-6-astra) —
+# but the skill only reached for it at the review gate (Phase 4.5). Reading a repo
+# is the bulk of what a /cc run spends, and spending it on the one metered engine
+# was the whole cost problem. (A Grok engine ran v3.38–v3.40; removed in v3.41.)
 #
 # So this is cross-verify.sh's sibling: same ergonomics lesson (v3.34 measured a
 # 40-line inline recipe at 0 uses inside /cc), same one-line contract, but N
 # heterogeneous tasks instead of one shared prompt across lanes.
 #
-# READ-ONLY, deliberately. Both helpers run their engine with a read-only
-# posture, and this script does not add a write mode. Two reasons, in order:
+# READ-ONLY, deliberately. The helper runs its engine with a read-only posture,
+# and this script does not add a write mode. Two reasons, in order:
 #   1. If Codex writes code, Codex can no longer be an independent reviewer of
-#      that code in Phase 4.5 — the triple gate silently collapses to a double
-#      one, and that gate is the thing the owner said catches the bugs Claude
-#      misses. Saving tokens by weakening it is a bad trade.
+#      that code in Phase 4.5 — the Supervisor + Codex gate silently collapses to
+#      the Supervisor alone, and that gate is the thing the owner said catches the
+#      bugs Claude misses. Saving tokens by weakening it is a bad trade.
 #   2. Nothing in Lens observes an external write: no PreToolUse gate, no agent
 #      tracker, no gate ledger entry.
 # Writing stays on the Claude lane. What moves here is reading, and reading is
 # where the tokens were going.
 #
 # Usage:
-#   scripts/delegate.sh --task recon:grok:.lens/delegate/recon.txt \
+#   scripts/delegate.sh --task recon:codex:.lens/delegate/recon.txt \
 #                       --task audit:codex:.lens/delegate/audit.txt \
 #                       [--timeout 420] [--effort high] [--dir .lens/delegate]
 #
-#   --task ID:ENGINE:PROMPT_FILE   repeatable. ENGINE = codex | grok.
+#   --task ID:ENGINE:PROMPT_FILE   repeatable. ENGINE = codex.
 #                                  Split on the FIRST two colons, so a Windows
 #                                  prompt path like C:/tmp/p.txt still parses.
 #   --dir DIR                      where task outputs land (default .lens/delegate)
@@ -37,7 +37,7 @@
 # Output — one TASK line per task, then one DISPATCH line. Parse those; open a
 # task's `out=` file to read what the engine actually produced.
 #
-#   TASK recon engine=grok  status=ok     elapsed=14s  out=.lens/delegate/recon.out
+#   TASK recon engine=codex status=ok     elapsed=48s  out=.lens/delegate/recon.out
 #   TASK audit engine=codex status=empty  elapsed=91s  out=.lens/delegate/audit.out
 #   DISPATCH DONE ok=1 down=1
 #
@@ -77,8 +77,8 @@ while [ $# -gt 0 ]; do
         *[!A-Za-z0-9_.-]*) echo "bad --task id (allowed: A-Za-z0-9_.-): $id" >&2; exit 1 ;;
       esac
       case "$eng" in
-        codex|grok) ;;
-        *) echo "unknown engine: $eng (want codex|grok)" >&2; exit 1 ;;
+        codex) ;;
+        *) echo "unknown engine: $eng (want codex)" >&2; exit 1 ;;
       esac
       [ -f "$file" ] || { echo "prompt file not found: $file" >&2; exit 1; }
       # id+engine names the output file, so a repeat would have two concurrent
@@ -87,8 +87,8 @@ while [ $# -gt 0 ]; do
       # fine (that is "ask both"), and lands in two distinct files.
       #
       # Compared case-insensitively because the output path is what actually
-      # collides, and this runs on Windows where `A-grok.out` and `a-grok.out`
-      # are one file. A case-sensitive check would wave `A:grok` and `a:grok`
+      # collides, and this runs on Windows where `A-codex.out` and `a-codex.out`
+      # are one file. A case-sensitive check would wave `A:codex` and `a:codex`
       # through into exactly the clobber it exists to stop.
       key="$(printf '%s:%s' "$id" "$eng" | tr '[:upper:]' '[:lower:]')"
       for seen in ${PAIRS[@]+"${PAIRS[@]}"}; do
@@ -117,7 +117,6 @@ PIDS=(); RCFS=(); OUTS=(); STARTS=()
 for i in "${!IDS[@]}"; do
   case "${ENGINES[$i]}" in
     codex) script="$HERE/codex-review.sh" ;;
-    grok)  script="$HERE/grok-review.sh" ;;
   esac
   [ -f "$script" ] || { echo "missing engine script: $script" >&2; exit 1; }
 
@@ -133,9 +132,9 @@ for i in "${!IDS[@]}"; do
 
   # The finish time is stamped inside the subshell, not in the report loop. That
   # loop runs after `wait` on every task, so a clock read there hands each task
-  # the *slowest* task's wall clock — a 14-second Grok answer would be filed as
-  # 400 seconds beside a slow Codex one, and knowing which engine is worth
-  # waiting for is most of what these numbers are for.
+  # the *slowest* task's wall clock — a 14-second answer would be filed as 400
+  # seconds beside a slow one, and knowing which task is worth waiting for is
+  # most of what these numbers are for.
   ( bash "$script" --mode prompt --prompt-file "${PROMPTS[$i]}" --out "${OUTS[$i]}" \
       --timeout "$TIMEOUT" --effort "$EFFORT" >/dev/null 2>&1 </dev/null
     rc=$?; echo "$rc $(date +%s)" > "${RCFS[$i]}" ) &

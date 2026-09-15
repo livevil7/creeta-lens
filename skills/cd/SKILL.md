@@ -300,7 +300,7 @@ lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "
 > Phase 2.5(브랜치 정리)를 **삭제 성공 또는 정당한 skip** 으로 통과한 task 만 여기 도달한다. 삭제를 시도했다 거부·실패한 task 는 Phase 2.5 에서 멈춰 `docs/tasks/` 에 그대로 남아 있다.
 
 1. `docs/tasks/`에서 원본 Task 파일 **삭제**
-2. 그 엔진의 todo 도구(Claude `TodoWrite` · Codex `update_plan` · Grok `todo_write`, 없으면 계획서 `📌 진행 체크리스트`) 항목 전부 `completed` 처리
+2. 그 엔진의 todo 도구(Claude `TodoWrite` · Codex `update_plan`, 없으면 계획서 `📌 진행 체크리스트`) 항목 전부 `completed` 처리
 3. 완료 메시지 표시: 생성된 history 파일 경로 + 삭제된 task 파일 + **Phase 2.5 의 브랜치 정리 결과** — 삭제된 브랜치(로컬/원격) 또는 삭제하지 않은 사유(skip 사유 포함)
 
 ---

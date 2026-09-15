@@ -72,7 +72,7 @@
       "official_sources": [
         "https://code.claude.com/docs/en/release-notes"
       ],
-      "false_obsolete_risk": "plan mode는 인벤토리 게이트를 거친 영속 md 계획서·승인 기록을 안 만들고 Codex·Grok 과 공유되지 않음 — /cp 문서 라이프사이클은 비대체",
+      "false_obsolete_risk": "plan mode는 인벤토리 게이트를 거친 영속 md 계획서·승인 기록을 안 만들고 Codex 와 공유되지 않음 — /cp 문서 라이프사이클은 비대체",
       "last_reviewed": "2026-06-06"
     },
     {

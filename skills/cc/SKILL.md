@@ -1,6 +1,6 @@
 ---
 name: "cc"
-description: "Lens Multi v3.40.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex and Grok CLIs for read-only research — then runs them all at once, reviews quality in three independent lanes (Supervisor + Codex + Grok) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.40.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
@@ -43,8 +43,8 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 1. **Goal 절대 우위** — SUCCESS_CRITERIA 가 하나라도 미달이면 **done 보고 금지**. 재시도와 우회로 자동 전환(5.0)으로 계속하고, 그래도 미달이면 최종 보고 후 `실행 종료` 로 사용자에게 넘긴다. `/cc` 는 Goal 을 수정할 권한이 없다 — 약하면 "Goal 재정의 — /cp Modify 권장" 으로 회신. (Phase 0.3 · 6)
 2. **핸드오프 페이로드 검증** — plan 문서를 Read 로 직접 읽어 일치를 확인하고, 불일치하면 **plan 문서가 SoT**. (Phase 0.1)
 3. **승인은 실행 전에 한 번** — 예외 없음(`/cp` 에서 받은 승인이 그 한 번이다). 헤드리스는 승인 대신 **plan-only 종료**. **승인 뒤에는 끝까지 멈추지 않는다 — 멈추는 것은 정지 3종뿐.** (Phase 1.5 · 「무정지 실행」)
-4. **병렬 실행 + 엔진 배분** — Worker 는 한 턴에서 동시 spawn 하고, **읽기만 하는 서브태스크는 Claude 밖(Codex·Grok)으로 보낸다.** 순차 처리는 `/cc` 가 아니다. (엔진 배분 절 · Phase 1.35 · 3.2)
-5. **Supervisor·QA 분리 + 3중 검증** — 둘 다 Worker 와 별도 에이전트. **Supervisor pass AND Codex pass AND Grok pass** 여야 Phase 6 진입. 죽은 레인은 투표하지 않되, 침묵을 pass 로 세지 않는다. (Phase 4 · 4.5)
+4. **병렬 실행 + 엔진 배분** — Worker 는 한 턴에서 동시 spawn 하고, **읽기만 하는 서브태스크는 Claude 밖(Codex)으로 보낸다.** 순차 처리는 `/cc` 가 아니다. (엔진 배분 절 · Phase 1.35 · 3.2)
+5. **Supervisor·QA 분리 + 2중 검증** — 둘 다 Worker 와 별도 에이전트. **Supervisor pass AND Codex pass** 여야 Phase 6 진입. 죽은 레인은 투표하지 않되, 침묵을 pass 로 세지 않는다. (Phase 4 · 4.5)
 6. **실제 검증** — QA 는 텍스트 검토 금지. SUCCESS_CRITERIA 각 항목을 도구로 직접 증명한다. (Phase 6)
 7. **최대 5회 반복** — 6번째는 없다. 미달 상태로 끝나면 done 대신 최종 보고 후 `실행 종료` 로 사용자 개입을 요청한다. 통과한 서브태스크는 재수행하지 않는다. (Phase 5)
 8. **산출물은 풀 경로** — 최종 보고에서 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로. (Phase 7)
@@ -71,7 +71,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 - 멈출 때 보고: 무엇을 하려는가 · 왜 정지인가 · 지금까지 된 것 · 선택지마다 무슨 일이 일어나나. 답을 기다리는 동안 **그 행동과 무관한 서브태스크는 계속 돌린다.**
 - **그 외 판단은 Leader 가 내린다.** 해석이 갈리는 세부(이름·구현 방식·순서)는 목표 기준으로 고르고 `## 진행상황` 의 편차 기록에 적는다.
 - 정지가 아닌 질문 header 는 셋뿐이다: 실행 **전** 승인 `실행 승인` · 자동 검증을 다 끝낸 뒤 manual 검증 행을 **한 질문에 모아** 확인받는 `검증 확인` · 실행이 **끝났는데** 목표 미달(반복 5회 소진·우회로도 실패)일 때 후속을 묻는 `실행 종료`.
-- **강제**: Claude Code 에서는 `hooks/pre-tool-ask.js` 가 이 세션의 게이트 원장이 열려 있는 동안 위 여섯 header 가 아닌 질문창을 거부한다. header 는 모델이 붙이는 이름표라 훅은 **이름표만** 본다 — 이름표를 거짓으로 붙이면 막지 못한다. 텍스트로 묻고 턴을 끝내는 우회는 `hooks/stop.js` 가 미충족 게이트로 막는다. Codex·Grok 에는 훅이 없다 — 이 절이 규칙이다.
+- **강제**: Claude Code 에서는 `hooks/pre-tool-ask.js` 가 이 세션의 게이트 원장이 열려 있는 동안 위 여섯 header 가 아닌 질문창을 거부한다. header 는 모델이 붙이는 이름표라 훅은 **이름표만** 본다 — 이름표를 거짓으로 붙이면 막지 못한다. 텍스트로 묻고 턴을 끝내는 우회는 `hooks/stop.js` 가 미충족 게이트로 막는다. Codex 에는 훅이 없다 — 이 절이 규칙이다.
 - **헤드리스**(`LENS_NONINTERACTIVE=1`)에서 정지에 닿으면 묻지 않는다 — 그 행동을 하지 않은 채 무엇에서 멈췄는지 보고하고 실행을 끝낸다(원장은 7.2.5 대로 닫는다).
 
 | 종전에 멈추던 곳 | 이제 |
@@ -87,31 +87,31 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 
 ---
 
-## 엔진 배분 (3엔진 — v3.38)
+## 엔진 배분 (2엔진 — v3.38, v3.41 Grok 제거)
 
 > **사용자 지시 (2026-09-05)**: *"fable 5.1을 아무 데나 쓰면 너무 토큰 소모량이 크고, codex 도 astra 가 나와서 똑똑하거든, grok 은 빠르고 효율적으로 하니 — `/cc` 로 작업할 때 이걸 병렬로 효율적으로 배분하는 규칙을 넣어라."*
+> **v3.41 (2026-09-15)**: 대표가 Grok 구독을 해지해 Grok 레인을 뺐다. 외부 읽기 레인은 Codex 하나다.
 
-**난이도로 모델을 고르기 전에 엔진부터 고른다.** 종전 `/cc` 는 서브태스크를 전부 `Agent` 서브에이전트 한 종류로 처리했다 — 파일을 읽기만 하는 조사까지 전부 **유일한 종량 자원인 Claude 토큰**으로 샀다. 이 기계에는 이미 두 엔진이 설치·인증돼 있고 **둘 다 정액 구독이라 호출당 한계비용이 0** 인데, `/cc` 는 그 둘을 리뷰 게이트(Phase 4.5)에서만 썼다.
+**난이도로 모델을 고르기 전에 엔진부터 고른다.** 종전 `/cc` 는 서브태스크를 전부 `Agent` 서브에이전트 한 종류로 처리했다 — 파일을 읽기만 하는 조사까지 전부 **유일한 종량 자원인 Claude 토큰**으로 샀다. 이 기계에는 이미 Codex 가 설치·인증돼 있고 **정액 구독이라 호출당 한계비용이 0** 인데, `/cc` 는 그것을 리뷰 게이트(Phase 4.5)에서만 썼다.
 
 | 엔진 | 무엇에 쓰나 | 성질 | 비용 |
 |------|------------|------|------|
 | **Claude** (`Agent` 서브에이전트) | **쓰는 일 전부** · Skill 필요 · MCP 도구 필요 · 세션 컨텍스트/게이트 원장 필요 | 하네스 안 — 훅·원장·권한이 관측한다 | **종량 · 유일한 유료 자원** |
-| **Codex** (모델 캐시 priority 1 = 현재 `gpt-6-astra`) | 깊은 추론이 드는 **읽기**: 아키텍처 추적·결함 가설·데이터 흐름·정합성 검토 | 읽기 전용 샌드박스. 느리다(수십~수백 초) | 구독 정액 · 0 |
-| **Grok** (Build CLI) | 넓고 빠른 **읽기**: 위치 찾기·전수 나열·사용처 수집·대량 요약·초안 | 읽기 전용 툴 허용목록. 빠르다(십수 초) | 구독 정액 · 0 |
+| **Codex** (모델 캐시 priority 1 = 현재 `gpt-6-astra`) | 조사·분석 **읽기** 전부: 위치 찾기·전수 나열·사용처 수집·아키텍처 추적·결함 가설·데이터 흐름·정합성 검토 | 읽기 전용 샌드박스. 느리다(수십~수백 초) | 구독 정액 · 0 |
 
 **판정 순서 — 서브태스크마다 이 순서로 묻는다**
 
 1. **파일을 쓰는가? Skill(`ui-ux-pro-max` 등)이나 MCP 도구가 필요한가? 세션 컨텍스트·게이트 원장을 봐야 하는가?** → 하나라도 예면 **Claude 레인**. 그 다음에야 난이도 사다리로 모델을 고른다.
-2. **아니면(= 읽고 답하는 일이면) 외부 레인이다.** 깊은 추론이면 Codex, 넓고 빠른 조회면 Grok. **"Claude 도 할 수 있다"는 Claude 레인에 남길 이유가 아니다** — 같은 품질이면 정액이 이긴다.
-3. **모호하면 Grok 부터.** 십수 초에 답이 나오고 틀려도 손해가 없다. Grok 이 못 하면 Codex, 그래도 안 되면 Claude.
+2. **아니면(= 읽고 답하는 일이면) Codex 레인이다.** **"Claude 도 할 수 있다"는 Claude 레인에 남길 이유가 아니다** — 같은 품질이면 정액이 이긴다.
+3. **Codex 가 못 하면(`empty`·`timeout`·`unavailable`) 그 서브태스크만 Claude 레인으로 되돌린다.**
 
-**왜 외부 레인은 읽기 전용인가 (양보 불가)**: Codex 가 코드를 쓰면 Codex 는 Phase 4.5 에서 **자기가 쓴 코드의 독립 리뷰어일 수 없다** — 3중 게이트가 조용히 2중으로 무너진다. 소유자가 *"그 규칙으로 클로드 못 잡은 버그를 아주 많이 잡았어"* 라고 한 그 게이트다. 토큰을 아끼자고 그걸 깎는 것은 나쁜 거래다. 게다가 외부 쓰기는 Lens 의 어떤 것도 관측하지 못한다 — PreToolUse 게이트·agent tracker·게이트 원장이 전부 밖이다. **쓰기는 Claude 레인에 남고 읽기가 옮겨 간다. 토큰이 가던 곳이 읽기다.**
+**왜 외부 레인은 읽기 전용인가 (양보 불가)**: Codex 가 코드를 쓰면 Codex 는 Phase 4.5 에서 **자기가 쓴 코드의 독립 리뷰어일 수 없다** — Supervisor + Codex 게이트가 조용히 Supervisor 단독으로 무너진다. 소유자가 *"그 규칙으로 클로드 못 잡은 버그를 아주 많이 잡았어"* 라고 한 그 게이트다. 토큰을 아끼자고 그걸 깎는 것은 나쁜 거래다. 게다가 외부 쓰기는 Lens 의 어떤 것도 관측하지 못한다 — PreToolUse 게이트·agent tracker·게이트 원장이 전부 밖이다. **쓰기는 Claude 레인에 남고 읽기가 옮겨 간다. 토큰이 가던 곳이 읽기다.**
 
 **호출은 한 줄이다.** 프롬프트를 파일로 쓰고 `--task` 를 태스크 수만큼 붙인다. N개가 **동시에** 돌아서 벽시계는 합이 아니라 max(엔진) 이다:
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/delegate.sh" \
-  --task recon:grok:.lens/delegate/recon.txt \
+  --task recon:codex:.lens/delegate/recon.txt \
   --task audit:codex:.lens/delegate/audit.txt \
   --timeout 420
 ```
@@ -119,7 +119,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/delegate.sh" \
 출력은 두 종류의 줄뿐이다 (전문을 읽지 말고 이 줄만 본다):
 
 ```
-TASK recon engine=grok  status=ok    elapsed=14s out=.lens/delegate/recon-grok.out
+TASK recon engine=codex status=ok    elapsed=48s out=.lens/delegate/recon-codex.out
 TASK audit engine=codex status=empty elapsed=91s out=.lens/delegate/audit-codex.out
 DISPATCH DONE ok=1 down=1
 ```
@@ -135,13 +135,13 @@ DISPATCH DONE ok=1 down=1
 
 > **모델 슬러그를 하드코딩하지 마라.** Codex 레인은 `~/.codex/models_cache.json` 의 priority 1 을 자동 선택한다(현재 `gpt-6-astra`). 리더보드가 움직이면 자동으로 따라 올라가고, 이름을 박으면 조용히 강등된다.
 
-**보고 필수**: Phase 7 최종 보고에 `엔진 배분: claude N / codex M / grok K — 위임 실패 J건({사유})` 을 **한 줄로 반드시 넣는다.** 눈에 보이는 산출물이 되어야 산문 지시가 이행된다.
+**보고 필수**: Phase 7 최종 보고에 `엔진 배분: claude N / codex M — 위임 실패 J건({사유})` 을 **한 줄로 반드시 넣는다.** 눈에 보이는 산출물이 되어야 산문 지시가 이행된다.
 
 ---
 
 ## 모델 할당 테이블 (난이도 사다리 — v3.24+)
 
-> **적용 범위 (v3.38): Claude 레인만.** 위 엔진 배분에서 `claude` 로 판정된 서브태스크에만 이 사다리를 적용한다. 외부 레인(Codex·Grok)은 각 CLI 가 모델을 고르므로 여기 사다리의 대상이 아니다.
+> **적용 범위 (v3.38): Claude 레인만.** 위 엔진 배분에서 `claude` 로 판정된 서브태스크에만 이 사다리를 적용한다. 외부 레인(Codex)은 CLI 가 모델을 고르므로 여기 사다리의 대상이 아니다.
 > **난이도 기반 배분 (v3.24, 사용자 지시)**: 최고 모델 무차별 배정 금지 — Worker 모델은 **업무 난이도**로 정한다. 사다리의 각 칸은 이름이 아니라 **상대 위치**라서 모델 세대가 바뀌면 자동으로 올라간다. **사다리는 4단** — `Agent` 도구 model enum 의 4개 티어(`haiku`/`sonnet`/`opus`/`fable`)와 1:1 대응: Easy=**경량 티어**(현재 haiku) / Medium=**중간 티어**(현재 sonnet) / Hard=**상위 티어**(현재 opus) / Critical=**최상위 티어(TOP)**(현재 fable). 구 3단 사다리는 opus 칸이 비어 있어 "사고과정은 필요하지만 최고난도는 아닌" 작업이 전부 sonnet 으로 떨어졌다(사용자 지적). **판정 한 줄: 사고과정(트레이드오프 판단)이 들어가면 상위 티어 이상, 정형 반복이면 중간 티어 이하.** (구 v3.11 "품질 우선 — 전 역할 opus 고정" 철학은 폐기.)
 > **TOP 판정 절차 (v3.25 — 상속 폐기)**: **모든 spawn 은 모델을 명시한다. 지정 생략(상속) 금지.** TOP = `Agent` 도구 model enum 의 최상위 티어를 **명시 지정**(현재 `fable`, enum 에 없으면 `opus`).
 > **왜 상속을 폐기했나**: 지정을 생략하면 훅이 실제 실행 모델을 관측할 수 없어(`tool_input.model` = undefined) 사용량 계측에 구멍이 생기고, 세션이 최상위 모델일 때 **모든 Hard 역할이 자동으로 최상위를 먹는다** — 이것이 최상위 티어 과소비의 직접 원인이었다(실측 2026-07-20). 명시하면 기록되고, 기록되면 통제된다.
@@ -212,7 +212,7 @@ scope: {포함 항목 수} · 정지 지점: {이 계획에서 멈출 단계 —
 
 > **왜 여기인가**: 계획 *작성* 시점 검사는 우회 경로가 많다 — 다른 파일 쓰기 경로는 훅을 안 거치고, 파일 없이 응답 본문으로만 낸 계획은 검사가 아예 안 돌며, **외부에서 수정됐거나 예전 버전으로 만들어진 계획은 생성 시점 검사를 통과한 적이 없다.** 반면 **실행 진입은 우회할 수 없다** — 어떤 경로로 만들어진 계획이든 실행하려면 여기를 지난다. 그래서 과거 문서·수동 작성분까지 전부 커버되고, 소급 정리가 불필요해진다.
 
-실행 시작 전 아래 4개를 검사한다. **v3.39: 미달이어도 거부하지 않는다** — 워크스페이스 실측(2026-09-14)으로 진행 중 계획서 41건 중 39건이 구조 검사에서, 41건 전부가 Todo 검사에서 떨어졌다(Codex·Grok·손으로 쓴 계획서). 거부하면 사용자는 "게이트 우회" 를 타이핑하는 일만 늘었다. 대신 **빠진 것을 실행 전에 채워 넣고**(목표가 산문이면 목표 불릿으로, 인벤토리가 없으면 서브태스크 표로) **보고 첫 줄에 무엇을 채웠는지 적고 진행한다.** 섹션 제목이 다른 표기라 못 읽은 것이면 채우지 말고 그대로 읽는다:
+실행 시작 전 아래 4개를 검사한다. **v3.39: 미달이어도 거부하지 않는다** — 워크스페이스 실측(2026-09-14)으로 진행 중 계획서 41건 중 39건이 구조 검사에서, 41건 전부가 Todo 검사에서 떨어졌다(외부 엔진·손으로 쓴 계획서). 거부하면 사용자는 "게이트 우회" 를 타이핑하는 일만 늘었다. 대신 **빠진 것을 실행 전에 채워 넣고**(목표가 산문이면 목표 불릿으로, 인벤토리가 없으면 서브태스크 표로) **보고 첫 줄에 무엇을 채웠는지 적고 진행한다.** 섹션 제목이 다른 표기라 못 읽은 것이면 채우지 말고 그대로 읽는다:
 
 1. **필수 섹션** — `validatePlanStructure` 를 실제로 실행한다(산문 자기점검 아님):
 
@@ -345,7 +345,7 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JS
 
 3.0 이 요구하는 "fan-out 전 인라인 정찰"과 1.5 승인표의 `건드릴 파일`·`읽은 근거 문서` 칸은 **누군가 레포를 읽어야** 채워진다. 그런데 Leader 는 세션 모델(대개 최상위)이라 **레포를 읽는 가장 비싼 방법**이다. 같은 읽기를 정액 엔진이 하면 값이 0 이다.
 
-- **기본: Grok 에 정찰을 위임한다.** 질문은 셋 — ① 이 작업이 건드릴 파일 목록과 각 파일의 현재 역할, ② 관련된 기존 구현·규칙 문서 경로(`docs/rules/`·`docs/history/` 포함), ③ 건드리면 같이 깨질 곳.
+- **기본: Codex 에 정찰을 위임한다**(`run_in_background: true` 로 띄우고, 기다리는 동안 Leader 는 분해 초안을 만든다). 질문은 셋 — ① 이 작업이 건드릴 파일 목록과 각 파일의 현재 역할, ② 관련된 기존 구현·규칙 문서 경로(`docs/rules/`·`docs/history/` 포함), ③ 건드리면 같이 깨질 곳.
 - 산출물은 승인표의 두 칸과 **Worker 프롬프트의 `관련 파일` 슬롯**을 채운다 — v3.34 가 *"그 슬롯을 무엇으로 채울지 정의한 문장이 어디에도 없어 배관이 끊겨 있다"* 고 지적한 그 배관이 여기서 이어진다.
 - **위임 결과를 그대로 믿지 않는다.** Leader 는 받은 목록의 **경로 존재만 직접 확인**하고(`ls`/`test -f`) 승인표에 싣는다. 없는 경로가 섞여 있으면 그 항목을 지우고 그 사실을 승인 화면에 적는다. 외부 엔진의 산출물은 근거지 판정이 아니다.
 - `status` 가 `ok` 가 아니면(`empty`·`timeout`·`unavailable`) **Leader 가 직접 정찰한다.** 정찰을 건너뛰는 것은 폴백이 아니다 — work-list 없이 나눈 분해는 Worker 간 영역이 겹친다.
@@ -353,7 +353,7 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JS
 
 #### 1.4 모델 할당 (난이도 사다리 — v3.24+)
 
-**엔진 배분이 먼저다 (v3.38).** 각 서브태스크에 「엔진 배분」 절의 판정 순서를 먼저 적용해 `claude`/`codex`/`grok` 을 정하고, **`claude` 로 판정된 것에만** 아래 사다리를 적용합니다. 외부 레인 서브태스크는 모델 칸이 `—` 입니다.
+**엔진 배분이 먼저다 (v3.38).** 각 서브태스크에 「엔진 배분」 절의 판정 순서를 먼저 적용해 `claude`/`codex` 를 정하고, **`claude` 로 판정된 것에만** 아래 사다리를 적용합니다. 외부 레인 서브태스크는 모델 칸이 `—` 입니다.
 
 Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모델 무차별 배정 금지 — 사용자 지시). 난이도 라벨(Easy/Medium/Hard/Critical)이 곧 배정 기준. **판정 한 줄: 사고과정(트레이드오프 판단)이 들어가면 상위 티어 이상, 정형 반복이면 중간 티어 이하.**
 - **Easy** (반복·조회·기계적 작업 — 파일 읽기·검색·자료 수집·단순 수정. 사고과정 없음): 경량 티어 (현재 haiku)
@@ -390,9 +390,9 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 | # | 서브태스크 | 엔진 | 할당 스킬 | 모델 | 난이도 | 건드릴 파일 |
 |---|---|---|---|---|---|---|
 | 1 | 구현 | claude | /skill | sonnet | Medium | src/a.ts |
-| 2 | 조사·나열 | grok | — | — | Easy | (읽기 전용) |
+| 2 | 조사·나열 | codex | — | — | Easy | (읽기 전용) |
 
-엔진 배분: claude {N} / codex {M} / grok {K} · TOP(fable) {n}/2 {· TOP 사유: …}
+엔진 배분: claude {N} / codex {M} · TOP(fable) {n}/2 {· TOP 사유: …}
 정찰: {1.35 위임 결과 | Leader 직접 정찰(사유)} · 읽은 근거 문서: {실제로 Read 한 경로}
 검증: Supervisor 리뷰 + QA · 2분 주기 보고 · 최대 반복 5회
 ➡️ 지금 실행하면: {무엇이 어떤 순서로} — 검증까지 묻지 않고 진행 · 멈추는 곳: {정지 3종에 해당하는 단계, 없으면 "없음"}
@@ -407,7 +407,7 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 
 ### Phase 2: TodoWrite 준비 (Goal 우선 구조)
 
-**도구는 그 엔진의 네이티브 todo** — Claude `TodoWrite` · Codex `update_plan` · Grok `todo_write`. Claude 5 세션에 TodoWrite 가 안 보이면 `~/.claude/settings.json` env `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` 이 빠진 것이다. 도구가 없으면 계획서 `## 📌 진행 체크리스트` 를 원장으로 쓴다 — "도구가 없다" 로 되묻지 않는다. 항목 앞에 `[목표]` / `[실행]` 을 붙인다(Codex `update_plan` 에는 목표·실행 층이 없어서 성공 기준이 QA 전에 닫혔다).
+**도구는 그 엔진의 네이티브 todo** — Claude `TodoWrite` · Codex `update_plan`. Claude 5 세션에 TodoWrite 가 안 보이면 `~/.claude/settings.json` env `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` 이 빠진 것이다. 도구가 없으면 계획서 `## 📌 진행 체크리스트` 를 원장으로 쓴다 — "도구가 없다" 로 되묻지 않는다. 항목 앞에 `[목표]` / `[실행]` 을 붙인다(Codex `update_plan` 에는 목표·실행 층이 없어서 성공 기준이 QA 전에 닫혔다).
 
 상태 전이(pending → in_progress → completed)는 도구 설명이 강제하므로 여기서 재서술하지 않는다. **`/cc` 고유값은 셋이다:**
 
@@ -445,7 +445,7 @@ N+2. 서브태스크 #1: [설명] — execution level
 
 **같은 메시지에서 모든 Worker 를 시작합니다 (= `Agent` 도구 N회 병렬 호출).** Worker 간 대기 없음.
 
-**위임 서브태스크도 같은 턴에서 출발한다 (v3.38).** 엔진 배분에서 `codex`·`grok` 으로 판정된 서브태스크는 프롬프트를 `.lens/delegate/{id}.txt` 에 쓰고 `delegate.sh` 를 **한 번** 호출한다(`--task` 를 태스크 수만큼 붙인다). Claude Worker N회 병렬 spawn 과 `delegate.sh` 1회 호출이 **같은 어시스턴트 턴**에 들어가야 벽시계가 합이 아니라 max(레인) 이 된다. `delegate.sh` 는 `run_in_background: true` 로 띄우거나 `timeout: 450000` 을 준다 — 하네스 기본 120초로는 Codex 가 끝나기 전에 죽는다.
+**위임 서브태스크도 같은 턴에서 출발한다 (v3.38).** 엔진 배분에서 `codex` 로 판정된 서브태스크는 프롬프트를 `.lens/delegate/{id}.txt` 에 쓰고 `delegate.sh` 를 **한 번** 호출한다(`--task` 를 태스크 수만큼 붙인다). Claude Worker N회 병렬 spawn 과 `delegate.sh` 1회 호출이 **같은 어시스턴트 턴**에 들어가야 벽시계가 합이 아니라 max(레인) 이 된다. `delegate.sh` 는 `run_in_background: true` 로 띄우거나 `timeout: 450000` 을 준다 — 하네스 기본 120초로는 Codex 가 끝나기 전에 죽는다.
 
 **위임 결과 수령**: `status=ok` 인 태스크는 `out=` 파일을 Read 해서 Leader 가 Phase 7 에서 **재서술**한다 — 서브에이전트와 같은 계약이다. 외부 엔진의 출력도 사용자에게 자동 전달되지 않는다. `ok` 가 아닌 태스크(`empty`·`timeout`·`unavailable`)는 **그 서브태스크만** Claude 레인으로 되돌려 재실행하고, 사유를 최종 보고에 적는다. **위임 실패를 조용히 "완료"로 닫지 마라** — 산출물이 빈 위임은 아무 말도 하지 않은 것이다.
 
@@ -626,15 +626,15 @@ Supervisor 모델 = **변경의 규모·위험도로 판정** (v3.25 개정 — 
 
 ---
 
-### Phase 4.5: 교차 코드리뷰 (3중 검증 — trivial 제외 항상)
+### Phase 4.5: 교차 코드리뷰 (2중 검증 — trivial 제외 항상)
 
-> Claude Supervisor 와 **병렬로**, Codex 와 Grok 이 이번 반복의 코드 변경을 각각 독립 리뷰한다. **레인 3개 = Supervisor(세션 내) ‖ Codex ‖ Grok.** 모두 pass 여야 Phase 6 진입.
+> Claude Supervisor 와 **병렬로**, Codex 가 이번 반복의 코드 변경을 독립 리뷰한다. **레인 2개 = Supervisor(세션 내) ‖ Codex.** 둘 다 pass 여야 Phase 6 진입.
 
-**왜 3중인가 (v3.36)**: 종전 게이트는 Supervisor AND Codex 두 레인이었다. 둘 다 프론티어 추론 모델이라 학습 분포가 겹치고, **겹치는 블라인드 스팟에서는 둘이 나란히 통과시킨다** — 게이트가 있는데도 조용히 새는 경우다. Grok 은 벤더·학습셋·툴 루프가 모두 달라서, 그가 반대하는 지점이 정확히 앞의 둘이 볼 수 없던 지점이다. Grok Build CLI 는 구독이라 호출당 추가 비용이 0 이다.
+**왜 Codex 인가**: Supervisor 는 Worker 와 같은 Claude 라 같은 블라인드 스팟을 공유한다. Codex 는 벤더·학습셋이 달라서, 그가 반대하는 지점이 Claude 끼리는 볼 수 없던 지점이다. (v3.36~v3.40 은 Grok 을 세 번째 레인으로 붙였다 — 2026-09-15 구독 해지로 제거.)
 
 **적용 범위**: trivial(오타·한 줄) 또는 비-코드 작업(조사·문서만)은 skip. 그 외 모든 코드 변경.
 
-**호출 — 여전히 한 줄이다.** 레인 2개를 동시에 띄우고 판정을 합치는 것까지 스크립트가 갖는다. **프로젝트 루트에서**:
+**호출 — 여전히 한 줄이다.** Codex 레인을 띄우고 판정을 읽어 합치는 것까지 스크립트가 갖는다. **프로젝트 루트에서**:
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode review --tag p45
@@ -646,9 +646,8 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode review --tag p45
 
 ```
 LANE codex status=ok      verdict=fail findings=3 elapsed=256s out=.lens/verify/p45-codex.out
-LANE grok  status=ok      verdict=pass findings=0 elapsed=14s  out=.lens/verify/p45-grok.out
 FINDING codex path/to/file.ts:120 — 무엇이 왜 틀렸나
-VERDICT FAIL lanes_ok=2 lanes_down=0
+VERDICT FAIL lanes_ok=1 lanes_down=0
 ```
 
 | `status` | 뜻 | 행동 |
@@ -658,9 +657,9 @@ VERDICT FAIL lanes_ok=2 lanes_down=0
 | `unavailable` | 미설치·미인증·실패 | 동일 — **블로킹 금지** |
 | `unparsable` | 돌긴 했는데 판정을 못 읽었다 | 동일. 침묵을 pass 로 세지 않는다 |
 
-**판정**: `VERDICT FAIL` 이면 (= 살아있는 레인 중 하나라도 `fail`, 또는 `high_findings` 가 비지 않음) → Phase 5 재할당. `VERDICT PASS` + `supervisor.overall_pass == true` 여야 Phase 6. `VERDICT UNVERIFIED`(모든 레인 다운)는 pass 가 아니다 — Supervisor 단독 진행임을 최종 보고에 명시한다.
+**판정**: `VERDICT FAIL` 이면 (= 살아있는 레인 중 하나라도 `fail`, 또는 `high_findings` 가 비지 않음) → Phase 5 재할당. `VERDICT PASS` + `supervisor.overall_pass == true` 여야 Phase 6. `VERDICT UNVERIFIED`(Codex 레인 다운·판정 불가)는 pass 가 아니다 — Supervisor 단독 진행임을 최종 보고에 명시한다.
 
-**보고 필수**: Phase 7 최종 보고에 `교차검증: codex {pass|fail|사유}, grok {pass|fail|사유} — 지적 N건 → 반영 M건` 을 **한 줄로 반드시 넣는다.** 눈에 보이는 산출물이 되어야 산문 지시가 이행된다.
+**보고 필수**: Phase 7 최종 보고에 `교차검증: codex {pass|fail|사유} — 지적 N건 → 반영 M건` 을 **한 줄로 반드시 넣는다.** 눈에 보이는 산출물이 되어야 산문 지시가 이행된다.
 
 
 ### Phase 5: Leader — 반복 또는 진행
@@ -680,7 +679,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 
 → **Phase 6 (QA Verification)** 으로 진행
 
-**3중 게이트 (v3.36)**: `supervisor.overall_pass == true` **그리고** Phase 4.5 의 `VERDICT PASS` 여야 Phase 6 진입. 어느 레인이든 FAIL(또는 high 지적)이면 Supervisor 가 pass 여도 진행 금지 → 5.2 로 가서 해당 레인의 `FINDING` 줄을 서브태스크 `fix_instructions` 에 병합해 재할당. 레인 부재/실패/타임아웃은 그 레인만 빠지고 게이트는 나머지로 계속한다 — 비-코드 작업은 애초에 skip.
+**2중 게이트 (v3.36, v3.41 Grok 제거)**: `supervisor.overall_pass == true` **그리고** Phase 4.5 의 `VERDICT PASS` 여야 Phase 6 진입. 어느 레인이든 FAIL(또는 high 지적)이면 Supervisor 가 pass 여도 진행 금지 → 5.2 로 가서 해당 레인의 `FINDING` 줄을 서브태스크 `fix_instructions` 에 병합해 재할당. 레인 부재/실패/타임아웃은 그 레인만 빠지고 게이트는 나머지로 계속한다 — 비-코드 작업은 애초에 skip.
 
 #### 5.2 (Supervisor fail OR 교차 리뷰 fail) AND 반복 횟수 < 5
 
@@ -967,8 +966,8 @@ Goal 달성이 N == M 이면 `/cd` 로 이어서 마감한다(7.3). `/cp done` �
 ```
 Lens Multi — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-반복: {n}/5  |  Supervisor: {점수}/100  |  교차검증: codex {pass|fail|사유} · grok {pass|fail|사유} — 지적 N건→반영 M건
-엔진 배분: claude {N} / codex {M} / grok {K} — 위임 실패 {J}건({사유})  |  TOP(fable) {n}/2
+반복: {n}/5  |  Supervisor: {점수}/100  |  교차검증: codex {pass|fail|사유} — 지적 N건→반영 M건
+엔진 배분: claude {N} / codex {M} — 위임 실패 {J}건({사유})  |  TOP(fable) {n}/2
 
 ✓ {완료한 서브태스크}  (…)
 

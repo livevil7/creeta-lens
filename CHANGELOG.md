@@ -1,3 +1,22 @@
+## [3.41.0] - 2026-09-15
+
+**Grok 레인 제거.** 대표 지시(2026-09-15): *"lens 스킬에 Grok 들어가 있는거 제거해. 그거 구독 취소했어."* 구독이 끝난 CLI 를 기본 레인으로 두면 `/cc` 정찰·위임은 매번 `unavailable` 로 떨어져 Claude 로 되돌아가고, Phase 4.5 는 죽은 레인을 매 반복 띄운다.
+
+### Removed (v3.41.0)
+
+- `scripts/grok-review.sh`.
+- `/cc`: 엔진 배분의 Grok 행과 "모호하면 Grok 부터" 규칙, Phase 1.35 정찰의 Grok 기본값, Phase 4.5 의 세 번째 레인, 보고 서식의 `grok` 칸.
+- `/cp`: Phase 0.5 외부 조사의 Grok 레인, 엔진 목록·Todo 도구·질문 도구·`planner_model` 의 Grok 항목. `/cd`: Todo 도구 목록의 Grok.
+
+### Changed (v3.41.0)
+
+- `/cc` 엔진 배분 = Claude(쓰기·Skill·MCP) + Codex(읽기 전부). Codex 가 `empty`·`timeout`·`unavailable` 이면 그 서브태스크만 Claude 로 되돌린다. Phase 1.35 정찰은 Codex 에 background 로 위임한다.
+- Phase 4.5 = **Supervisor + Codex 2중 검증**. Codex 가 다운이면 `VERDICT UNVERIFIED` — pass 가 아니고 Supervisor 단독 진행임을 보고한다(종전 규칙 그대로).
+- `scripts/cross-verify.sh` 기본 레인 `codex`, `scripts/delegate.sh` 엔진 `codex`. 둘 다 `grok` 을 받으면 usage 오류(exit 1)로 거부한다 — 남은 호출이 반쯤 돈 게이트를 판정으로 보고하지 않게.
+- 문서: `docs/rules/codex-integration.md` §8.6 을 제거 기록으로, `docs/rules/harness-rules.md` §4.9, `CLAUDE.md`, `README.md`, `lib/md-render.js`·`lib/report-viewer.js`·`scripts/show-report.js` 주석.
+- 테스트: `tests/test_cross_verify.sh` 13/13 (제거 레인 거부 · 기본 레인 1개 추가), `tests/test_delegate.sh` 22/22 (Grok 거부 추가 · 두 엔진이 필요하던 케이스는 프롬프트별로 다르게 동작하는 스텁으로 재작성).
+- 이력(과거 버전 노트·CHANGELOG·계획서·"Grok 리뷰 레인이 잡은 버그" 주석)은 사실 기록이라 그대로 둔다.
+
 ## [3.40.0] - 2026-09-14
 
 **승인 한 번이면 끝까지 — `/cc` 무정지 실행.** 대표 지시(2026-09-14): *"맞아 그건 필요해. 진행해."* 근거가 된 말 — *"1,2,3 다 해. 싹다 해 멀 자꾸 하나하나 할라그래 싹 다 하라고."*(2026-09-04) · *"이제 그만 물어보고 구현하지?"*(2026-08-14). v3.39 가 `/cp`→`/cc` 사이의 두 번째 승인은 없앴지만, 실행 도중 멈추는 곳이 남아 있었다. 계획서: `docs/tasks/2026-09-14-cc-nonstop-execution.md` (kind 개선, 인벤토리 12 → 포함 10 / 보류 2).

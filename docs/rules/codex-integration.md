@@ -23,7 +23,7 @@ Codex 는 단순 "Claude 결과 검토자"가 아니라 **공동 조사자·공�
 - `/cp PLAN` **Phase 0.5 — 병렬 독립 조사**: Goal 정의 직후 Codex 가 레포를 스스로 읽고 자기 접근안+리스크를 제시 (Claude 의 Plan A 설계와 병렬). 결과는 Phase 2.4 에서 합성.
 - `/cp PLAN` **Phase 2.4 — 듀얼 합성·교차검증**: Claude 안과 Codex 안의 합의/분기 분류 → 분기 재검증.
 - `/cp PLAN` **Phase 3 — Pre-mortem**: 통합안의 최종 리스크 점검 (Phase 0.5 에서 Codex 조사가 이미 돌았으면 Opus 단독, 아니면 Codex 병렬).
-- `/cc` **Phase 4.5 — 코드리뷰 게이트**: 매 반복의 코드 변경을 Codex 와 Grok 이 각각 독립 리뷰. **Supervisor pass + Codex pass + Grok pass** 셋 다여야 진행 (v3.36 — 3중 검증, §8.6). 죽은 레인은 투표하지 않되 침묵을 pass 로 세지 않는다.
+- `/cc` **Phase 4.5 — 코드리뷰 게이트**: 매 반복의 코드 변경을 Codex 가 독립 리뷰. **Supervisor pass + Codex pass** 둘 다여야 진행 (v3.41 — Grok 레인 제거, §8.6). 죽은 레인은 투표하지 않되 침묵을 pass 로 세지 않는다.
 
 **trivial 작업(오타·변수명·한 줄 수정)은 모든 지점 skip** — 불필요한 호출 회피. Codex 부재/실패는 항상 graceful degrade (Claude/Supervisor 단독 진행 + 플래그 기록, 블로킹 금지). **단 예외 — `/cp deep` S4 교차 협의는 하드 게이트**(Constitution 2조): 미감지/미인증 시 degrade 하지 않고 **정지·보고**한다(사용자가 "Codex 없이 진행" 명시 시만 1회 우회). 위 graceful degrade 는 `/cp`·`/cc` 의 듀얼검증 지점에 적용된다.
 
@@ -33,7 +33,7 @@ Codex 는 단순 "Claude 결과 검토자"가 아니라 **공동 조사자·공�
 
 ### ① stdin 을 반드시 닫는다 — `</dev/null`
 
-`codex exec` 와 `grok -p` 는 **파이프된 stdin 을 프롬프트에 덧붙인다** (`codex exec --help`: "If stdin is piped and a prompt is also provided, stdin is appended as a `<stdin>` block"). Claude Code Bash 도구의 stdin 은 EOF 가 오지 않는 열린 파이프라, codex 는 첫 토큰을 내기 전에 **영구 대기**한다 — 세션 배너조차 찍히지 않는다.
+`codex exec` 는 **파이프된 stdin 을 프롬프트에 덧붙인다** (`codex exec --help`: "If stdin is piped and a prompt is also provided, stdin is appended as a `<stdin>` block"). Claude Code Bash 도구의 stdin 은 EOF 가 오지 않는 열린 파이프라, codex 는 첫 토큰을 내기 전에 **영구 대기**한다 — 세션 배너조차 찍히지 않는다.
 
 실측(동일 프롬프트·동일 모델·순차 실행):
 
@@ -55,7 +55,7 @@ Claude Code Bash 도구의 기본 상한은 **120초**(최대 600초)다. 스크
 - **`run_in_background: true`** (기본 — Claude 는 자기 작업을 계속하고 완료 알림에서 수거한다)
 - 동기라면 Bash 도구의 `timeout` 을 스크립트 상한보다 **크게 명시** (`--timeout 420` 이면 `timeout: 450000`)
 
-> 이 세 불변식은 전부 `scripts/codex-review.sh` · `scripts/grok-review.sh` 안에 들어가 있다. 호출자는 `scripts/cross-verify.sh` 한 줄만 쓰면 되고, 지켜야 할 것은 ③(background 또는 명시 timeout) 하나뿐이다.
+> 이 세 불변식은 전부 `scripts/codex-review.sh` 안에 들어가 있다. 호출자는 `scripts/cross-verify.sh` 한 줄만 쓰면 되고, 지켜야 할 것은 ③(background 또는 명시 timeout) 하나뿐이다.
 
 ## 2. 사전 조건 감지
 
@@ -276,33 +276,29 @@ Pre-mortem 은 repo 무관(`--skip-git-repo-check`)이지만, **조사·코드�
 
 - **합성/게이트**: 조사 결과는 Claude 가 합의/분기로 분류해 통합 (Phase 2.4). 리뷰 결과는 Supervisor 와 AND 게이트 (둘 다 pass 여야 진행).
 
-## 8.6 세 번째 레인 — Grok (v3.36)
+## 8.6 세 번째 레인 — Grok (v3.36 ~ v3.40, 제거됨)
 
-게이트가 Supervisor + Codex 두 레인이던 동안, **둘 다 프론티어 추론 모델이라 학습 분포가 겹쳤다.** 겹치는 블라인드 스팟에서는 둘이 나란히 통과시킨다 — 게이트가 있는데도 조용히 새는 경우다. Grok 은 벤더·학습셋·툴 루프가 모두 달라서 그가 반대하는 지점이 정확히 앞의 둘이 볼 수 없던 지점이다. Grok Build CLI 는 **구독**(세션 인증, API 키 아님)이라 호출당 추가 비용이 0 이다.
+**v3.41 (2026-09-15) 에 제거했다 — 대표가 Grok 구독을 해지했다.** `scripts/grok-review.sh` 는 삭제됐고, `cross-verify.sh`·`delegate.sh` 는 `grok` 을 받으면 usage 오류로 거부한다(반쯤 돈 게이트가 판정을 보고하지 않게).
 
-- **스크립트**: `scripts/grok-review.sh` — 플래그·종료 코드가 `codex-review.sh` 와 **동일**하다. 네 번째 레인이 필요하면 이 파일을 복사하는 것이 추가 절차의 전부다.
-- **인증 감지**: `~/.grok/auth.json` 이 비어있지 않은지만 본다. 네트워크 프로브는 호출마다 왕복을 더하므로 쓰지 않는다.
-- **읽기 전용 자세**: `--tools read_file,grep,list_dir --disable-web-search`. 리뷰 대상 diff 는 **신뢰할 수 없는 입력**이고, `--always-approve` 와 `bash`·`search_replace` 가 함께 있으면 남의 패치에 심긴 프롬프트 인젝션이 로컬 코드 실행이 된다. 허용목록이라 오타가 나면 **시끄럽게** 실패한다(거부목록은 조용히 위험한 툴을 남긴다).
-- **`--sandbox strict` 는 쓰지 않는다**: 그 아래서 `read_file` 이 `tool_output_error` 를 내고 에이전트가 실패한 호출을 상한까지 재시도했다 — 300초·0바이트 대 14초·정상 판정(2026-09-01 실측). 쓰기·실행 표면을 없애는 것은 허용목록이지 strict 가 아니다.
-- **구조화 출력**: `--json-schema` 는 `--output-format json` 을 함의하며, 모델의 답은 봉투의 `.text` 에 **JSON 문자열로** 들어온다. 스크립트가 이걸 벗겨서 codex 레인과 **같은 `{verdict, high_findings}` 모양**으로 `$OUT` 에 쓴다 — 호출자가 봉투 형식 두 개를 배울 일이 없다.
+- **붙였던 이유(기록)**: Supervisor 와 Codex 가 둘 다 프론티어 추론 모델이라 겹치는 블라인드 스팟을 벤더가 다른 세 번째 레인으로 메우려 했다. 레인을 다시 붙이려면 `codex-review.sh` 와 같은 플래그·종료 코드 계약의 헬퍼를 만들고 두 스크립트의 `case` 에 한 줄씩 넣는다.
+- **다른 CLI 에도 쓸 교훈(실측)**: 리뷰 레인은 **읽기 전용 툴 허용목록**으로 좁힌다 — 거부목록은 조용히 위험한 툴을 남긴다. 샌드박스 옵션이 읽기 툴까지 깨뜨리면 에이전트가 실패한 호출을 상한까지 재시도한다(Grok `--sandbox strict`: 300초·0바이트 대 해제 시 14초·정상 판정, 2026-09-01). 봉투 형식이 다른 CLI 는 헬퍼가 벗겨서 `{verdict, high_findings}` 한 모양으로 쓴다.
 
 ### 남은 리스크 — 읽기 노출 (수용, v3.36)
 
-리뷰 대상 diff 는 원리적으로 신뢰할 수 없는 입력이고, 두 레인 모두 **읽기 도구는 계속 쥐고 있다.** 따라서 악의적 diff 에 심긴 프롬프트 인젝션이 로컬 파일을 읽어 외부 모델 요청에 실을 여지는 남는다 (`-s read-only` 는 *쓰기*를 막을 뿐 읽기 범위를 좁히지 않는다). 막은 것과 남긴 것을 분명히 해 둔다:
+리뷰 대상 diff 는 원리적으로 신뢰할 수 없는 입력이고, Codex 레인은 **읽기 도구는 계속 쥐고 있다.** 따라서 악의적 diff 에 심긴 프롬프트 인젝션이 로컬 파일을 읽어 외부 모델 요청에 실을 여지는 남는다 (`-s read-only` 는 *쓰기*를 막을 뿐 읽기 범위를 좁히지 않는다). 막은 것과 남긴 것을 분명히 해 둔다:
 
-- **막았다**: 쓰기·셸 실행(허용목록에 `bash`·`search_replace` 없음, codex 는 `-s read-only`), 그리고 **심볼릭 링크 역참조** — 레포 밖을 가리키는 미추적 링크 하나면 그 대상 파일이 통째로 프롬프트에 실렸다.
+- **막았다**: 쓰기·셸 실행(codex `-s read-only`), 그리고 **심볼릭 링크 역참조** — 레포 밖을 가리키는 미추적 링크 하나면 그 대상 파일이 통째로 프롬프트에 실렸다.
 - **남겼다**: 레포 내 파일 읽기. 리뷰어에게서 읽기를 뺏으면 지적의 근거를 확인할 수 없어 "정보 부족으로 판단 불가"만 내놓는 레인이 된다(실측 — 그 응답이 high 지적으로 올라가 게이트를 거짓 차단했다).
 - **전제**: `/cc` 가 리뷰하는 diff 는 **자기 Worker 가 방금 쓴 것**이다. 외부 PR 처럼 제3자가 쓴 diff 를 이 레인에 물릴 때는 이 전제가 깨지므로, 그때는 시크릿이 레포 안에 없는지 먼저 확인한다.
 
 ### 오케스트레이터 — `scripts/cross-verify.sh`
 
-레인 2개를 **동시에** 띄우고 판정을 합쳐 세 종류의 줄로 보고한다. 이게 호출자가 아는 전부다:
+Codex 레인을 띄우고 판정을 읽어 세 종류의 줄로 보고한다. 이게 호출자가 아는 전부다:
 
 ```
 LANE codex status=ok      verdict=fail findings=3 elapsed=256s out=.lens/verify/p45-codex.out
-LANE grok  status=ok      verdict=pass findings=0 elapsed=14s  out=.lens/verify/p45-grok.out
 FINDING codex path/to/file.ts:120 — 무엇이 왜 틀렸나
-VERDICT FAIL lanes_ok=2 lanes_down=0
+VERDICT FAIL lanes_ok=1 lanes_down=0
 ```
 
 - **죽은 레인은 투표하지 않는다** — `timeout`·`unavailable`·`unparsable` 은 `lanes_down` 으로 세고 게이트는 나머지로 계속한다. 침묵을 pass 로 세면 도구가 깨지는 바로 그 순간에 게이트가 약해진다.

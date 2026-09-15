@@ -5,8 +5,9 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 ## Version
 
 - Current: **v3.40.0**
-- Updated: 2026-09-14
+- Updated: 2026-09-15
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.41.0 breaking: **Grok 레인 제거.** 대표 지시 *"lens 스킬에 Grok 들어가 있는거 제거해. 그거 구독 취소했어."*(2026-09-15). `/cc` 읽기 위임·Phase 1.35 정찰은 Codex 하나로, Phase 4.5 는 **Supervisor + Codex 2중 검증**으로, `/cp` Phase 0.5 외부 조사도 Codex 만. `scripts/grok-review.sh` 삭제, `delegate.sh`·`cross-verify.sh` 는 `grok` 을 usage 오류로 거부한다. 과거 버전 노트·CHANGELOG·계획서의 Grok 언급은 이력이라 그대로 둔다. 상세: `CHANGELOG.md` · `docs/rules/codex-integration.md` §8.6.
 - v3.40.0 feat: **승인 한 번이면 끝까지 — `/cc` 무정지 실행.** 대표 지시 *"맞아 그건 필요해. 진행해."*(2026-09-14) · 근거 *"1,2,3 다 해. 싹다 해 멀 자꾸 하나하나 할라그래 싹 다 하라고."*(2026-09-04). 승인 뒤 마지막 검증까지 묻지 않고, **정지 3종**(되돌리기 어려운 행동 · 돈/외부 발송 · 범위 변경)만 멈추고, 그중 배포·머지=배포·DB 변경·대량 삭제·force push·발송은 계획에 있어도 멈춘다(대표가 "묻지 말고 하라" 고 한 것만 예외). `/cc` 5.0 경로 전환은 자동, manual 검증은 끝에 한 번 `검증 확인`. `hooks/pre-tool-ask.js` 가 이 세션의 게이트 원장이 열린 동안 허용 header 6개(`실행 승인`·`정지:비가역`·`정지:외부영향`·`정지:범위변경`·`검증 확인`·`실행 종료`) 외 질문창을 거부한다. 상세: `CHANGELOG.md` · `docs/rules/harness-rules.md` §4.11.
 - v3.39.0 feat/breaking: **`/cp` 가 세 엔진의 네이티브 화면으로 계획서를 보여준다 + 양식 강제 해제 + UX 소음 제거.** 대표 지적 *"cp 양식이 너무 템플렛화, md·html 강제 때문에 각 플랫폼 기획문서 아티팩트를 못 쓰고 보기 어려운 md 로만 기획서가 나온다"* · *"개선할 때는 AS-IS → TO-BE"* · *"update todo 하면 없다고만 찡찡"* · *"보고도 없이 질문부터"*(2026-09-14) + UX 전수 조사(발굴 145건 → 101후보). ① **슬라이드 덱·보드·`_shared.css` 파이프라인 삭제**(`lib/board-builder.js`·템플릿 5종·`/cp html`) — 표시는 엔진 네이티브 레인 artifact → inline(Codex visualize) → sendfile → browser(`lib/md-render.js` 가 md 를 렌더). `show-report.js --shown <method> <ref> <id>`, 기록에 md 해시 → **띄운 뒤 바뀌면 stale** ② **166줄 리터럴 골격 → 계약 카드 60줄**(Codex 는 앞 200줄만 읽는다 — 세션 로그 실측). 계약 섹션 6(+deep 3)만 제목으로 요구, 순서·나머지는 주제가 정한다 ③ **kind: 신규 · 개선(AS-IS → TO-BE 필수) · 조사보고** — `validatePlanStructure(content, grade, kind)` ④ **Todo = 엔진 네이티브 도구**(TodoWrite · update_plan · todo_write, 없으면 계획서 📌 체크리스트). `deriveTodoItems` 는 단계 없음을 경고로 내리고, 번호·표 목표와 🛠 어떻게 블록을 읽고, `problems`(사람 말)/`hints`(Phase) 두 층. Claude 5 세션의 TodoWrite 부재 원인 = `CLAUDE_CODE_ENABLE_TODO_TOOLS` ⑤ **승인**: 보고 → 질문 순서를 `hooks/pre-tool-ask.js` 가 강제, 선택지는 결과 문장(지금 실행/고칠 곳 있음/계획만 보관), 승인 기록(status·approved_at·🧭 결정), `/cc` 가 `[APPROVED]` 계획을 다시 승인받지 않음, `/goal` 복붙 안내 삭제, 죽은 `/cp done` → `/cd` ⑥ **게이트 오탐 4종**(자리표시자·셀 안 파이프·상태 부분일치·목표 이중 계산) — 워크스페이스 계획서 105건 기준 회귀 0, 완전 통과 19→33 ⑦ **훅 루트 = `resolveProjectRoot`**(파일 경로 → git toplevel → env → cwd) — 워크스페이스 세션의 `.lens/` 오판·Stop 게이트 거짓 통과 해소, 원장 사용자 색인, Stop 차단에 사용자 메시지·상한 2, 진행보고 "대기 N초" 정직화, 계획서 훅 반복 억제, 세션 배너 compact 재출력 금지, `/cp …?` 질문은 강제 실행 안 함. 상세: `CHANGELOG.md` + `docs/tasks/2026-09-14-cp-native-artifacts.md` + `docs/rules/harness-rules.md` §4.8·§4.10.
 - v3.38.0 feat: **엔진 배분(3엔진) + 실행 Todo 파생.** 사용자 지시 2건(2026-09-05). ① `/cc` 는 난이도로 모델을 고르기 **전에 엔진**을 고른다 — `claude` 레인은 쓰기·Skill·MCP·세션 컨텍스트가 필요한 것만이고, 읽고 답하는 일은 **구독 정액이라 한계비용 0** 인 Codex(현재 `gpt-6-astra`)·Grok 으로 간다. 배관은 `scripts/delegate.sh` 하나(`--task ID:ENGINE:FILE` 를 붙인 만큼 동시 실행, 벽시계 = max(엔진)). **외부 레인은 읽기 전용 — 양보 불가**: Codex 가 쓰면 Phase 4.5 에서 자기 코드의 독립 리뷰어일 수 없어 3중 게이트가 조용히 2중이 된다. Phase 1.35 는 fan-out 전 정찰을 Grok 에 위임한다(Leader 가 세션 최상위 모델로 레포를 읽는 것이 가장 비싸다). TOP(`fable`) 상한 **3→2**. ② `/cp` Phase 4 는 산문 15줄에서 **명령 한 줄**로 바뀌었다 — `deriveTodoItems()` 가 성공기준 + 인벤토리 `포함` 전건 + Plan A 단계를 결정론으로 뽑고, 게이트 9 가 그 개수를 승인 화면에 표시한다(인벤토리 14행 → Todo 3개로 줄던 지점). 테스트: `plan-coverage` 47/47 · `test_delegate.sh` 17/17 · 실엔진 동시 디스패치 35초 실측. SoT: `docs/rules/harness-rules.md` §4.9 · §4.1.
@@ -98,10 +99,9 @@ lens/
 │   └── stop.js                # Stop handler
 ├── scripts/
 │   ├── user-prompt-handler.js # UserPromptSubmit handler
-│   ├── cross-verify.sh        # Phase 4.5 triple review driver (codex ‖ grok)
+│   ├── cross-verify.sh        # Phase 4.5 cross review driver (codex lane)
 │   ├── codex-review.sh        # Codex lane (review | prompt) — read-only
-│   ├── grok-review.sh         # Grok lane (review | prompt) — read-only
-│   ├── delegate.sh            # v3.38 — N read-only tasks fanned out to codex/grok in parallel
+│   ├── delegate.sh            # v3.38 — N read-only tasks fanned out to codex in parallel
 │   └── show-report.js         # Records/opens the plan on the user's screen (/cp Phase 4.5: --shown · --check)
 ├── lib/
 │   ├── skill-scanner.js       # Plugin scanner (Skills, MCP, LSP)
