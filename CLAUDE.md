@@ -76,9 +76,8 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 | Memory Store | `memory-store.js` | `loadMemory()`, `saveMemory()`, `recordSessionStart()`, `recordSkillUsage()`, `recordPlanCreation()` | Persists at `~/.claude/lens/.lens-memory.json`. Usage counts, recent skills, plan history |
 | Agent Tracker | `agent-tracker.js` | `initSession()`, `registerAgent()`, `completeAgent()`, `endSession()` | Tracks Task agent lifecycle in `.lens/agent-dashboard.json`. Atomic writes, error logs |
 | Plan Manager | `plan-manager.js` | `getPlansDir()`, `ensurePlansDir()`, `getStatePath()`, `generateSlug()`, `generateFileName()`, `generatePlanId()`, `savePlanState()`, `loadPlanState()`, `listPlans()`, `formatPlanSummary()`, `generatePlanContent()`, `parsePlanFrontmatter()`, `updatePlanStatus()`, `validatePlanStructure()`, `validatePlanCoverage()`, `deriveTodoItems()`, `readInventoryTable()`, `REQUIRED_SECTIONS`, `extractGoal()`, `extractPlanBTriggers()` | Plan file naming (`YYYY-MM-DD-slug.md`), Goal-first document generation (8-lang headers), YAML frontmatter parsing, status lifecycle, state at `.lens/plan-state.json`. v3.4+ `extractGoal` / `extractPlanBTriggers` 는 `/cc` 핸드오프 진입 시 SUCCESS_CRITERIA 와 Plan B Trigger 매칭에 사용. **v3.32+ `validatePlanCoverage` = 커버리지 원장 게이트** — `validatePlanStructure` 가 섹션의 *존재*를 보는 반면 이쪽은 **항목의 누락**을 본다(📋 작업 인벤토리 표: 포함이면 반영 위치, 제외면 사유). `/cp` Phase 5.0 게이트 4.6 · Deep S7 에서 호출. **v3.38+ `deriveTodoItems` = 실행 Todo 파생** — 성공기준(최상위) + 인벤토리 `포함` 행 전건 + Plan A 단계를 결정론으로 뽑는다. `/cp` Phase 4 가 손으로 짜는 대신 이걸 돌리고, Phase 5.0 게이트 9 가 개수를 승인 화면에 표시한다(인벤토리 14행 → Todo 3개로 줄던 지점). 표 파서 `readInventoryTable` 은 커버리지 게이트와 공유. 테스트 `lib/plan-coverage.test.js` (47단언) |
-| MD Render | `md-render.js` | `render()`, `renderPage()` | **v3.39** — dependency-free markdown → HTML for the browser lane (headings with anchors, tables with code-span pipes, nested/task lists, fences, frontmatter badges). Escapes everything; script-capable link schemes stay text. Test `lib/md-render.test.js` |
 | Hook Utils | `hook-utils.js` | `resolveProjectRoot()`, `safeWriteJson()`, … | **v3.39 `resolveProjectRoot({filePath, cwd})`** — the repo a hook acts for: a `docs/tasks`·`history`·`rules` path → git toplevel → `CLAUDE_PROJECT_DIR` → cwd (never home). Every hook and `.lens/` state file uses it. Test `lib/hook-utils.test.js` |
-| Report Viewer | `report-viewer.js` | `showReport()`, `recordShown()`, `showState()`, `wasShown()`, `recordArtifact()`, `resolveTarget()`, `isRemoteSession()`, `openerFor()` | **v3.39 — engine-native lanes**: `artifact` · `inline` (Codex visualize) · `sendfile` are recorded via `recordShown`; `browser` renders the md with `md-render` and opens it. Records carry the md sha → `showState` returns `stale` after an edit. md is the document; a legacy `.html` deck is only a fallback. v3.37 history: **v3.37 — 계획서를 사용자 화면에 실제로 띄운다.** 소유자 지적(2026-09-04) *"저장했으니 승인해라 이렇게만 보고를 해 … 맨날 계획서 찾는다고 탐색기 찾고"*. `docs/tasks/{id}.html`(없으면 `.lens/preview/{id}.html` 로 원문을 감싼 페이지)을 OS 기본 프로그램으로 열고 `.lens/report-shown.json` 에 기록. **win32 는 확장자 연결을 먼저 확인한다** — `.md` 는 연결이 없으면 `start` 가 exit 0 을 내면서 아무것도 안 연다(v3.37.1 실측). **`browser`·`artifact` 만 "봤다"로 친다** — SSH·헤드리스는 `remote` 로 정직하게 남기고 게이트를 통과시키지 않는다(Artifact 폴백 필요). CLI = `scripts/show-report.js` (`--check` / `--artifact`). `/cp` Phase 4.5 + Phase 5.0 게이트 §7 + `hooks/post-tool-plan-doc.js`. 테스트 `lib/report-viewer.test.js` (20단언) |
+| Report Viewer | `report-viewer.js` | `recordShown()`, `showState()`, `wasShown()`, `recordArtifact()`, `resolveTarget()`, `documentSha()` | **v3.42 — 기록만 한다.** 표시 방식은 `artifact` · `inline` (Codex visualize) · `sendfile` 셋뿐이고 **전부 엔진이 수행**한다. 브라우저 레인·md 렌더러·OS opener 는 삭제(대표: "보드나 html 이건 안 해도 돼"). Records carry the md sha → `showState` returns `stale` after an edit. md is the document; a legacy `.html` deck is only a fallback. v3.37 history: **v3.37 — 계획서를 사용자 화면에 실제로 띄운다.** 소유자 지적(2026-09-04) *"저장했으니 승인해라 이렇게만 보고를 해 … 맨날 계획서 찾는다고 탐색기 찾고"*. `docs/tasks/{id}.html`(없으면 `.lens/preview/{id}.html` 로 원문을 감싼 페이지)을 OS 기본 프로그램으로 열고 `.lens/report-shown.json` 에 기록. **win32 는 확장자 연결을 먼저 확인한다** — `.md` 는 연결이 없으면 `start` 가 exit 0 을 내면서 아무것도 안 연다(v3.37.1 실측). **`browser`·`artifact` 만 "봤다"로 친다** — SSH·헤드리스는 `remote` 로 정직하게 남기고 게이트를 통과시키지 않는다(Artifact 폴백 필요). CLI = `scripts/show-report.js` (`--check` / `--artifact`). `/cp` Phase 4.5 + Phase 5.0 게이트 §7 + `hooks/post-tool-plan-doc.js`. 테스트 `lib/report-viewer.test.js` (20단언) |
 
 ## Folder Structure
 
@@ -92,9 +91,10 @@ lens/
 │   ├── cp/SKILL.md            # /cp — plans on each engine's native surface (2 grades · 3 kinds)
 │   └── …                      # ci, cps, cr, crv, cs, cu, lens-upgrade
 ├── hooks/
-│   ├── hooks.json             # Hook registration (5 hooks)
+│   ├── hooks.json             # Hook registration
 │   ├── session-start.js       # SessionStart handler
-│   ├── pre-tool-task.js       # PreToolUse (Task) handler
+│   ├── pre-tool-task.js       # PreToolUse (Task) — denies a spawn with no model (v3.42)
+│   ├── pre-tool-plan-doc.js   # PreToolUse (Write|Edit) — the plan is written by the top tier or not at all (v3.42)
 │   ├── post-tool-task.js      # PostToolUse (Task) handler
 │   └── stop.js                # Stop handler
 ├── scripts/
@@ -108,8 +108,7 @@ lens/
 │   ├── memory-store.js        # Session memory persistence
 │   ├── agent-tracker.js       # Agent dashboard state management
 │   ├── plan-manager.js        # Plan document management
-│   ├── md-render.js           # v3.39 — md → readable page for the browser lane
-│   └── report-viewer.js       # show record · stale detection
+│   └── report-viewer.js       # show record · stale detection (v3.42 — records only; Lens opens nothing)
 ├── templates/                     # AI reference only — code (generatePlanContent) does NOT read these at runtime
 │   ├── plan.template.md           # /cp work plan structure reference
 │   ├── execution-result.template.md # Post-execution result structure reference
