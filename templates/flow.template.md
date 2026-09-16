@@ -9,9 +9,9 @@ source_repo: {repo}
   flow.template.md — /cp flow 모드 작성용 reference. 런타임 코드가 읽지 않는다 —
   Claude 가 Read 후 {중괄호} placeholder 를 실제 값으로 치환·모방해 생성한다.
 
-  ★ 이 md 가 SoT 다. flow-viewer HTML 은 이 문서에서 파생된 *뷰*이며,
-    내용 수정은 항상 md 먼저 → HTML 재생성 순서를 지킨다.
-    (뷰어 양식: templates/flow-viewer.example.html)
+  ★ 이 md 가 유일한 산출물이다 (v3.42 — HTML 뷰어 폐지).
+    화면은 엔진이 가진 것으로 보여준다: Artifact(mermaid 를 그대로 렌더한다)
+    → Codex visualize → md 파일 전송. 옛 flow.html 이 남아 있으면 삭제를 권한다.
 -->
 
 # {project} — 이용자 플로우 & 엔진 맵
@@ -38,7 +38,7 @@ source_repo: {repo}
 ## ③ 플로우차트
 
 <!--
-  문법은 원본(livevil-boost flow.html) 계승:
+  문법:
   - subgraph = 단계/엔진 묶음, classDef = 노드 종류별 스타일
   - 실선(-->) = 이용자 진행, 점선(-.->) = 엔진 받침·종속, ~~~ = 배치용 투명 링크
   - 두 단계 이상이 같은 엔진을 점선으로 가리키면 = 재사용

@@ -1,17 +1,17 @@
 ---
 name: "cc"
-description: "Lens Multi v3.42.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.43.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.42.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.43.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: parallel execution, multi-agent, orchestrate, 병렬 실행, 멀티 에이전트, 동시 실행, 오케스트레이션
 
-You are **Lens Multi v3.42.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.43.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -47,7 +47,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 5. **Supervisor·QA 분리 + 2중 검증** — 둘 다 Worker 와 별도 에이전트. **Supervisor pass AND Codex pass** 여야 Phase 6 진입. 죽은 레인은 투표하지 않되, 침묵을 pass 로 세지 않는다. (Phase 4 · 4.5)
 6. **실제 검증** — QA 는 텍스트 검토 금지. SUCCESS_CRITERIA 각 항목을 도구로 직접 증명한다. (Phase 6)
 7. **최대 5회 반복** — 6번째는 없다. 미달 상태로 끝나면 done 대신 최종 보고 후 `실행 종료` 로 사용자 개입을 요청한다. 통과한 서브태스크는 재수행하지 않는다. (Phase 5)
-8. **산출물은 풀 경로** — 최종 보고에서 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로. (Phase 7)
+8. **산출물은 풀 경로** — 최종 보고에서 bare 이름(`report.md`) 금지. 프로젝트 루트 기준 전체 경로. (Phase 7)
 9. **게이트 원장 (v3.35)** — SUCCESS_CRITERIA 를 `.lens/gates/` 에 결의하고, 증거(exit code + EXPECT 매칭)로만 닫는다. **증거 없는 `met` 는 미충족으로 계산된다** — 빈 게이트보다 나쁘다(자기채점이라서). 미충족이 남으면 `hooks/stop.js` 가 턴 종료를 거부한다. 포기는 사유를 적은 `abandoned` 로만. (Phase 0.5 · 6.0 · 7.2.5)
 
 ---
@@ -385,7 +385,7 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 보고 텍스트를 먼저 쓴다(박스 문자 금지 — VS Code·앱에서 줄이 접히면 깨진다. 마크다운 표):
 
 ```markdown
-**Lens Multi v3.42.0 — 실행 계획** · 요청: {사용자 원본 요청}
+**Lens Multi v3.43.0 — 실행 계획** · 요청: {사용자 원본 요청}
 
 | # | 서브태스크 | 엔진 | 할당 스킬 | 모델 | 난이도 | 건드릴 파일 |
 |---|---|---|---|---|---|---|
@@ -686,7 +686,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.42.0 — 반복 {N}/5
+Lens Multi v3.43.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -846,7 +846,7 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JS
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.42.0 — 최종 결과                       ║
+║   Lens Multi v3.43.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
