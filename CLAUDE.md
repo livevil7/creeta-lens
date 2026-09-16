@@ -4,7 +4,7 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.43.0**
+- Current: **v3.44.0**
 - Updated: 2026-09-16
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.41.0 breaking: **Grok 레인 제거.** 대표 지시 *"lens 스킬에 Grok 들어가 있는거 제거해. 그거 구독 취소했어."*(2026-09-15). `/cc` 읽기 위임·Phase 1.35 정찰은 Codex 하나로, Phase 4.5 는 **Supervisor + Codex 2중 검증**으로, `/cp` Phase 0.5 외부 조사도 Codex 만. `scripts/grok-review.sh` 삭제, `delegate.sh`·`cross-verify.sh` 는 `grok` 을 usage 오류로 거부한다. 과거 버전 노트·CHANGELOG·계획서의 Grok 언급은 이력이라 그대로 둔다. 상세: `CHANGELOG.md` · `docs/rules/codex-integration.md` §8.6.
