@@ -76,10 +76,22 @@ test('TOP 티어는 Agent enum 최상위 슬러그 하나로만 적혀 있다', 
   assert.match(HOOK, /const\s+TOP_TIER\s*=\s*'[a-z0-9-]+'/);
 });
 
-// The hook is advisory by design: refusing a spawn here would strand a run that
-// the user already approved.
-test('훅은 경고만 한다 — spawn 을 막지 않는다', () => {
-  assert.ok(!/permissionDecision\s*:\s*'deny'/.test(HOOK), '훅이 spawn 을 거부하고 있다');
+// v3.42: the missing-model warning lost twice in one turn (owner's session,
+// 2026-09-15), so it became a refusal. The fix is one argument — refusing costs
+// the run nothing, and the cap warning stays advisory because refusing *there*
+// would strand a run the user already approved.
+test('model 없는 spawn 은 거부한다 (v3.42)', () => {
+  assert.match(HOOK, /permissionDecision:\s*'deny'/, '훅이 model 없는 spawn 을 거부하지 않는다');
+  assert.match(HOOK, /function modelDenial/);
+});
+
+test('TOP 상한 초과는 거부가 아니라 경고다', () => {
+  const notice = HOOK.slice(HOOK.indexOf('function modelNotice'), HOOK.indexOf('function main'));
+  assert.ok(!/permissionDecision/.test(notice), '상한 경고가 거부로 바뀌어 있다');
+});
+
+test('끄는 방법이 있다 (LENS_MODEL_GATE)', () => {
+  assert.match(HOOK, /LENS_MODEL_GATE/);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

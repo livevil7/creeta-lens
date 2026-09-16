@@ -8,7 +8,6 @@
  * "the user has seen this version" instead of "a path was printed".
  *
  * Usage:
- *   node scripts/show-report.js <plan-md|plan-id>                 browser lane: render + open (claude -p, no native surface)
  *   node scripts/show-report.js --shown artifact <url>  <plan-id>  Claude Code Artifact tool
  *   node scripts/show-report.js --shown inline   <path> <plan-id>  Codex app visualize
  *   node scripts/show-report.js --shown sendfile <path> <plan-id>  a rendered file sent to the user
@@ -45,7 +44,7 @@ function main() {
   if (args.help || !args.target) {
     console.log(JSON.stringify({
       ok: false,
-      note: 'usage: show-report.js <plan-md|plan-id> | --shown <artifact|inline|sendfile> <url|path> <plan-id> | --check <plan-id> [--project <root>]',
+      note: 'usage: show-report.js --shown <artifact|inline|sendfile> <url|path> <plan-id> | --check <plan-id> [--project <root>]',
     }));
     process.exit(1);
   }
@@ -74,9 +73,16 @@ function main() {
     process.exit(result.ok ? 0 : 1);
   }
 
-  const result = viewer.showReport(projectRoot, args.target);
-  console.log(JSON.stringify(result));
-  process.exit(result.ok ? 0 : 1);
+  // v3.42: Lens no longer renders or opens anything — the engine shows the plan
+  // on the surface it already has, and this CLI only records what it did.
+  console.log(JSON.stringify({
+    ok: false,
+    method: 'no-lane',
+    planId: viewer.planIdOf(args.target),
+    note: '띄우기는 엔진이 한다 — Artifact 로 발행하거나 Codex visualize 로 띄운 뒤 --shown 으로 기록하라. '
+      + '둘 다 없으면 md 파일을 보내고(--shown sendfile), 그것도 안 되면 승인 보고 본문에 결정 블록을 쓴다.',
+  }));
+  process.exit(1);
 }
 
 main();

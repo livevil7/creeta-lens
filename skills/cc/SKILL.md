@@ -1,17 +1,17 @@
 ---
 name: "cc"
-description: "Lens Multi v3.41.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.42.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.41.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.42.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: parallel execution, multi-agent, orchestrate, 병렬 실행, 멀티 에이전트, 동시 실행, 오케스트레이션
 
-You are **Lens Multi v3.41.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.42.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -158,7 +158,7 @@ DISPATCH DONE ok=1 down=1
 
 > **TOP 상한: 2** (`/cc` 1회 실행 기준 — Worker(Critical)·Supervisor·QA 포함 전체. **v3.38 에서 3 → 2 로 강화**, 사용자 지시 *"fable 5.1 을 아무 데나 쓰면 너무 토큰 소모량이 크다"*). 근거: 읽기 서브태스크가 외부 레인으로 빠지면서 Claude 레인에는 쓰기와 판단만 남는다 — 같은 실행에서 TOP 이 세 자리나 필요한 분해라면 그건 분해가 잘못된 것이지 예산이 모자란 것이 아니다. **상위 티어(opus)는 이 상한에 포함되지 않는다** — 상한은 최상위 티어(TOP)만 센다. 초과가 필요하면 실행 전이면 **1.5 승인표에 사유와 함께 싣고**, 이미 승인된 실행(`[APPROVED]`)이면 묻지 않고 다시 쪼개거나 상위 티어(opus)로 내린 뒤 편차 기록에 적는다(「무정지 실행」).
 > **TOP 을 쓴 행은 사유 한 줄을 승인표 아래 적는다** — 왜 상위 티어(opus)로는 안 되는가. 사유 없는 TOP 은 승인 화면에서 그대로 보인다.
-> **모델 명시 의무**: 모든 Task spawn 은 `model` 을 명시한다. 생략(상속)하면 계측이 불가능하고 세션 모델이 그대로 번진다.
+> **모델 명시 의무**: 모든 Task spawn 은 `model` 을 명시한다. 생략(상속)하면 계측이 불가능하고 세션 모델이 그대로 번진다. **v3.42: 경고가 아니라 거부다** — `hooks/pre-tool-task.js` 가 model 없는 spawn 을 막는다(경고였던 2026-09-15 에 한 턴에서 두 번 무시됐다). 끄려면 `LENS_MODEL_GATE=0`.
 
 ---
 
@@ -385,7 +385,7 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 보고 텍스트를 먼저 쓴다(박스 문자 금지 — VS Code·앱에서 줄이 접히면 깨진다. 마크다운 표):
 
 ```markdown
-**Lens Multi v3.41.0 — 실행 계획** · 요청: {사용자 원본 요청}
+**Lens Multi v3.42.0 — 실행 계획** · 요청: {사용자 원본 요청}
 
 | # | 서브태스크 | 엔진 | 할당 스킬 | 모델 | 난이도 | 건드릴 파일 |
 |---|---|---|---|---|---|---|
@@ -686,7 +686,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.41.0 — 반복 {N}/5
+Lens Multi v3.42.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -846,7 +846,7 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JS
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.41.0 — 최종 결과                       ║
+║   Lens Multi v3.42.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝

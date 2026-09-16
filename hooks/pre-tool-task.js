@@ -49,13 +49,28 @@ function topTierUsed() {
   }
 }
 
-/** Advisory only — never blocks. A refusal here would strand a legitimate run. */
+/**
+ * A spawn with no model is refused (v3.42).
+ *
+ * The warning shipped in v3.25 and was measured in the owner's own session on
+ * 2026-09-15: the hook said "model 이 지정되지 않았다" twice in one turn and the
+ * model spawned twice anyway ("두 번 다 무시했습니다"). An advisory that loses
+ * twice in the same turn is not a rule, and the cost is exactly what v3.25 set
+ * out to stop — the session model (usually the top tier) spreads to every spawn
+ * and the tracker records `null`.
+ *
+ * The fix is one argument, so refusing costs the run nothing.
+ */
+function modelDenial(model) {
+  if (model) return null;
+  return `[Lens] 이 spawn 에 model 이 없다 — 붙이고 다시 불러라. 세션 모델이 그대로 상속되면 계측에서 사라지고 (${TOP_TIER} 세션이면 전 워커가 ${TOP_TIER} 가 된다). `
+    + `난이도로 배정한다: 정형 반복=haiku · 조회·수집=sonnet · 사고과정=opus · 비가역·보안·아키텍처·계획서=${TOP_TIER}. `
+    + `끄려면 LENS_MODEL_GATE=0.`;
+}
+
+/** Advisory only — a refusal on the cap would strand a run the user approved. */
 function modelNotice(model) {
-  if (!model) {
-    return `[Lens] 이 spawn 에 model 이 지정되지 않았다 — 세션 모델이 그대로 상속되고 계측에서 사라진다. `
-      + `난이도로 배정하라: 정형 반복=sonnet / 사고과정=opus / 비가역·보안·아키텍처=${TOP_TIER}.`;
-  }
-  if (model !== TOP_TIER) return null;
+  if (!model || model !== TOP_TIER) return null;
   // registerAgent() has already put this spawn on the board, so the count
   // includes it — adding one here would report the 3rd spawn as the 4th.
   const used = topTierUsed();
@@ -74,6 +89,22 @@ function main() {
     // `name` is Workflow's label for a predefined run; without it a workflow
     // entry lands nameless and the dashboard row reads as noise.
     const description = toolInput.description || toolInput.prompt || toolInput.task || toolInput.name || '';
+
+    // Refuse before registering: a spawn that never runs must not sit on the board.
+    // Workflow has no per-call model (the script sets it per agent()), so the gate
+    // applies to Task/Agent only.
+    const gateOff = /^(0|false|off|no)$/i.test(String(process.env.LENS_MODEL_GATE || ''));
+    const denial = input?.tool_name === 'Workflow' || gateOff ? null : modelDenial(toolInput.model);
+    if (denial) {
+      writeJson({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: denial,
+        },
+      });
+      process.exit(0);
+    }
 
     // Register the agent in dashboard.
     // v3.25: record the spawn model so TOP-tier usage is auditable. An omitted

@@ -1,3 +1,20 @@
+## [3.42.0] - 2026-09-16
+
+**계획서는 최상위 티어가 쓴다 — 이제 훅이 막는다. 그리고 Lens 는 HTML 을 만들지 않는다.** 대표 지적(2026-09-16): *"보드나 html 이건 안 해도 돼. 그건 쓸데없는 짓인 거 같아."* · *"존나 어려운 건데 왜 fable 5.1 은 하나도 안 쓰지? … 제대로 cp 를 못 만든 거 같은데? 무시하고 실행하는 거 보니까."*
+
+실측이 근거다. 같은 세션에서 Opus 가 443,680장 전량 재분류(비가역 · 운영 DB 쓰기 · 4개 시스템) 계획서를 직접 쓰고, frontmatter 에 `planner_model: opus-5 (세션 자체)` 라고 **위반을 기록만** 했다. 같은 턴에 `pre-tool-task.js` 의 "model 이 지정되지 않았다" 경고는 **두 번 떴고 두 번 다 무시**됐다. v3.37 부터 산문이던 규칙이 진 것이고, 이 레포가 v3.32·v3.37·v3.40 에서 세 번 배운 것과 같은 결론이다 — **모델이 잊을 수 있는 것은 훅이 막는다.**
+
+### Added (v3.42.0)
+
+- **`hooks/pre-tool-plan-doc.js`** — `docs/tasks/*.md` 쓰기를 가로채 **대화 기록의 실제 모델**을 읽는다(하네스가 쓰는 값이라 모델이 못 고친다). 최상위(`fable`)가 아니고 이 세션에 최상위 위임 기록(`.lens/agent-dashboard.json`)도 없으면 **쓰기를 거부**하고, 무엇을 실어 위임해야 하는지(원본 요청·목표/왜·조사·인벤토리 전량) 문구로 돌려준다. 통과시키는 경우: 승인된 계획서의 진행 갱신 · `kind: 조사보고` · 대화 기록을 못 읽을 때(fail-open). 끄기 `LENS_PLANNER_GATE=0`. 테스트 10건.
+- `/cp` Phase 5.0 「작성 모델」 게이트가 `planner_model:` 줄의 **존재**가 아니라 **실제 작성 모델**을 본다.
+
+### Changed (v3.42.0)
+
+- **`hooks/pre-tool-task.js`: model 없는 spawn 은 경고가 아니라 거부.** 고치는 비용이 인자 하나라 거부가 실행을 망치지 않는다. TOP 상한 초과는 **계속 경고** — 거기서 막으면 승인된 실행이 멈춘다. 끄기 `LENS_MODEL_GATE=0`.
+- **표시 레인에서 HTML 을 걷어냈다**: `lib/md-render.js`(+테스트) 삭제, `lib/report-viewer.js` 의 브라우저 레인(`showReport`·`renderPreview`·OS opener·Windows 연결 확인) 삭제, `scripts/show-report.js` 는 `--shown`·`--check` 전용. 남은 레인은 **artifact → inline(Codex visualize) → sendfile(md 파일 그대로) → 없으면 승인 보고 본문**.
+- 문서: `/cp` 계약 카드 6·12, 「계획은 TOP 티어가 쓴다」 강제 절, `/cc` 모델 명시 의무, `docs/rules/harness-rules.md` §4.1, `CLAUDE.md`, `README.md`.
+
 ## [3.41.0] - 2026-09-15
 
 **Grok 레인 제거.** 대표 지시(2026-09-15): *"lens 스킬에 Grok 들어가 있는거 제거해. 그거 구독 취소했어."* 구독이 끝난 CLI 를 기본 레인으로 두면 `/cc` 정찰·위임은 매번 `unavailable` 로 떨어져 Claude 로 되돌아가고, Phase 4.5 는 죽은 레인을 매 반복 띄운다.

@@ -1,4 +1,4 @@
-# Lens v3.41.0
+# Lens v3.42.0
 
 **Never wonder which plugin to use again.**
 
@@ -105,7 +105,7 @@ Key behaviors:
 
 Unlike `/cc`, which starts building immediately, `/cp` generates a **work plan document** before any execution. Every plan is built on four themes — **What (goal) → Why (the problem/motivation) → How (Plan A/B) → Review (verification)** — with **Why** a required gate so you never finely solve the wrong problem. The plan is saved as a markdown file and presented for your approval. `/cp` is the **fast/standard lane** — quick fixes and standard plans. Grades scale the ceremony to the risk of the task.
 
-**The plan opens on the running engine's own surface before you are asked to approve it (v3.37, reworked v3.39).** A saved path is not a report. The plan is a markdown file the gates read; what you see is whatever the engine already has — a **Claude Code Artifact** URL, a **Codex app inline visualization**, or (`claude -p`, sessions with no native surface) a **rendered page** in your browser built from the markdown by `lib/md-render.js`. The show is recorded with the document's hash, so a plan edited after it was shown goes `stale` and must be shown again before approval. There are no slide decks or boards any more (v3.39). Approval is a report first, then one question with outcome-named choices — *run now* / *change something* / *keep the plan for later* — and `/cc` does not ask again for a plan you approved. Plans come in three kinds: **new**, **improvement** (must carry an AS-IS → TO-BE section) and **research report**. **And the plan itself is written by the top model tier** (currently `fable`): if the session is running on something lower, `/cp` delegates Plan A/B design and the document to a top-tier agent with the full research payload, and records which model wrote it in the plan's `planner_model` frontmatter.
+**The plan opens on the running engine's own surface before you are asked to approve it (v3.37, reworked v3.39).** A saved path is not a report. The plan is a markdown file the gates read; what you see is whatever the engine already has — a **Claude Code Artifact** URL, a **Codex app inline visualization**, or, where neither exists, the markdown file delivered to you (Lens builds no HTML of its own since v3.42). The show is recorded with the document's hash, so a plan edited after it was shown goes `stale` and must be shown again before approval. There are no slide decks or boards any more (v3.39). Approval is a report first, then one question with outcome-named choices — *run now* / *change something* / *keep the plan for later* — and `/cc` does not ask again for a plan you approved. Plans come in three kinds: **new**, **improvement** (must carry an AS-IS → TO-BE section) and **research report**. **And the plan itself is written by the top model tier** (currently `fable`): if the session is running on something lower, `/cp` delegates Plan A/B design and the document to a top-tier agent with the full research payload, and records which model wrote it in the plan's `planner_model` frontmatter.
 
 | You type | What happens |
 | --- | --- |
@@ -278,7 +278,6 @@ Leader --> Workers (parallel) --> Supervisor --> QA --> Final Report
 ```json
 {
   "autoRecommend": true,
-  "showReport": true,
   "minMatchScore": 5,
   "memoryPath": null,
   "customKeywords": [],
