@@ -1,3 +1,26 @@
+## [3.43.0] - 2026-09-16
+
+**에이전트 파일에 남아 있던 HTML·보드 지시 일소.** 대표 지적: *"html 로 작성을 하라는 규칙들이나 지시사항들이 agent 파일들에 있을 텐데, 그거 다 점검하고 수정한 거 맞아?"* — v3.42 는 `/cp` 의 표시 경로만 고쳤고, **다른 스킬과 다른 레포의 지시는 그대로 살아 있었다.** 전수 검사로 찾은 것을 전부 고쳤다.
+
+### Removed (v3.43.0)
+
+- `/cps flow` 의 **HTML 뷰어 생성(F4)** — `docs/rules/flow.html` 을 더 이상 만들지 않는다. md 하나가 산출물이고, 그림은 Artifact 가 mermaid 를 그대로 렌더한다. `templates/flow-viewer.example.html` 삭제.
+- `docs/board_creeta-lens.html` — v3.39 에 생성기가 사라진 뒤 갱신되지 않던 옛 보드.
+
+### Changed (v3.43.0)
+
+- `/crv` Phase 4 — 리포트 띄우기에서 `show-report.js` 브라우저 렌더 참조 제거(그 기능은 v3.42 에 삭제돼 **깨진 지시**였다). artifact → inline → sendfile → 보고 본문.
+- `templates/flow.template.md` — "md 먼저 → HTML 재생성" 순서 규칙을 걷어내고 md 가 유일한 산출물임을 명시.
+- `docs/START_HERE.md` — 죽은 `/cp flow`·`flow.html` 안내를 `/cps flow`(md) 로 교정.
+- `/cc` 최종 보고 예시의 bare 파일명 `board.html` → `report.md`.
+
+### 레포 밖에서 고친 것 (Lens 가 박아 둔 죽은 규칙)
+
+- `livevil-contents/CLAUDE.md` — task/history 문서를 `.html` 로 쓰고 `board-builder.js` 로 보드를 재생성하라는 `/cp` override 를 md 기준으로 교체.
+- `namane-mkt/CLAUDE.md` — 작업 보드 `board_namane-mkt.html` 링크를 폐지 표기로 교체.
+- `Returns_ERP_v20/docs/rules/flow.md` — `/cp html` 뷰어 재생성 규칙을 `/cps flow`(md) 로 교정. **미커밋** — staging 브랜치가 배포와 연결돼 있어 대표 확인 대기.
+- 메모리 3건 — "띄울 땐 HTML 로 감싸라"(trap-windows-md-no-association) · Lens 필수 단계 · MEMORY.md 색인.
+
 ## [3.42.0] - 2026-09-16
 
 **계획서는 최상위 티어가 쓴다 — 이제 훅이 막는다. 그리고 Lens 는 HTML 을 만들지 않는다.** 대표 지적(2026-09-16): *"보드나 html 이건 안 해도 돼. 그건 쓸데없는 짓인 거 같아."* · *"존나 어려운 건데 왜 fable 5.1 은 하나도 안 쓰지? … 제대로 cp 를 못 만든 거 같은데? 무시하고 실행하는 거 보니까."*

@@ -182,24 +182,15 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 - `${CLAUDE_PLUGIN_ROOT}/templates/flow.template.md` 를 **Read** 후 그 구조대로 `docs/rules/flow.md` 작성.
 - 기존 `docs/rules/flow.md` 가 있으면 **diff 요약을 표시하고 덮어쓰기 승인**(AskUserQuestion) — 사용자가 손으로 고친 내용을 승인 없이 덮지 않는다.
 
-### F4: HTML 뷰어 생성
+### F4: 보고 (v3.42 — HTML 뷰어 폐지)
 
-- `${CLAUDE_PLUGIN_ROOT}/templates/flow-viewer.example.html` 을 **Read** 후 참조해 `docs/rules/flow.html` 생성. 디자인은 뷰어 템플릿에 임베드된 05-dark-developer 토큰 준수.
-- `<head>` 필수 메타:
-  ```html
-  <meta name="lens:source" content="docs/rules/flow.md">
-  <meta name="lens:source-hash" content="{md sha256 앞 12자}">
-  <meta name="lens:builder" content="lens-cp-flow">
-  ```
-- 노드 click 링크는 **실존 확인된 파일만** 연결 — 화면 노드는 가능하면 그 화면 실물(목업 html·라우트 템플릿·페이지 파일)로. **click 줄은 HTML 전용** (md 의 mermaid 는 구조만 — SoT 에 click 줄을 넣지 않는다).
-- **Fallback**: 노드 50+ 또는 렌더 위험 시 mermaid 를 복수 블록(메인 단계층 + 단계별 드릴다운)으로 분할해 뷰어에 섹션 렌더.
+> **`docs/rules/flow.html` 을 만들지 않는다.** 대표 지시(2026-09-16) *"보드나 html 이건 안 해도 돼. 그건 쓸데없는 짓인 거 같아."* md 하나가 SoT 이고, 화면은 엔진이 이미 가진 것으로 보여준다. 옛 `flow.html` 이 남아 있으면 갱신하지 말고 **삭제를 권한다**(md 와 어긋난 그림이 더 나쁘다).
 
-### F5: 보고
+- **Fallback**: 노드 50+ 또는 렌더 위험 시 mermaid 를 복수 블록(메인 단계층 + 단계별 드릴다운)으로 분할해 md 안에 섹션으로 나눈다.
+- 띄우기는 `/cp` Phase 4.5 와 같은 레인 — **Artifact**(mermaid 를 그대로 렌더한다) → **Codex `visualize`** → **md 파일 전송**. 셋 다 없으면 보고 본문에 단계 목록을 쓴다. 경로만 적지 않는다.
+- 산출물(`docs/rules/flow.md`)을 풀 경로로 보고한다.
 
-- `docs/rules/flow.html` 을 사용자 화면에 띄운다 — Artifact 도구가 있으면 발행해 링크로, 없으면 OS 브라우저로. 경로만 적지 않는다.
-- 산출물(`docs/rules/flow.md`, `docs/rules/flow.html`)을 풀 경로로 함께 보고.
-
-**한계**: 코드가 바뀌면 `/cps flow` 재실행으로 갱신한다. (v3.39: 보드 파이프라인 폐지)
+**한계**: 코드가 바뀌면 `/cps flow` 재실행으로 갱신한다. (v3.39: 보드 폐지 · v3.42: HTML 뷰어 폐지)
 
 ---
 

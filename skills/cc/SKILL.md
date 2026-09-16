@@ -47,7 +47,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 5. **Supervisor·QA 분리 + 2중 검증** — 둘 다 Worker 와 별도 에이전트. **Supervisor pass AND Codex pass** 여야 Phase 6 진입. 죽은 레인은 투표하지 않되, 침묵을 pass 로 세지 않는다. (Phase 4 · 4.5)
 6. **실제 검증** — QA 는 텍스트 검토 금지. SUCCESS_CRITERIA 각 항목을 도구로 직접 증명한다. (Phase 6)
 7. **최대 5회 반복** — 6번째는 없다. 미달 상태로 끝나면 done 대신 최종 보고 후 `실행 종료` 로 사용자 개입을 요청한다. 통과한 서브태스크는 재수행하지 않는다. (Phase 5)
-8. **산출물은 풀 경로** — 최종 보고에서 bare 이름(`board.html`) 금지. 프로젝트 루트 기준 전체 경로. (Phase 7)
+8. **산출물은 풀 경로** — 최종 보고에서 bare 이름(`report.md`) 금지. 프로젝트 루트 기준 전체 경로. (Phase 7)
 9. **게이트 원장 (v3.35)** — SUCCESS_CRITERIA 를 `.lens/gates/` 에 결의하고, 증거(exit code + EXPECT 매칭)로만 닫는다. **증거 없는 `met` 는 미충족으로 계산된다** — 빈 게이트보다 나쁘다(자기채점이라서). 미충족이 남으면 `hooks/stop.js` 가 턴 종료를 거부한다. 포기는 사유를 적은 `abandoned` 로만. (Phase 0.5 · 6.0 · 7.2.5)
 
 ---

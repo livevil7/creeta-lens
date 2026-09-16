@@ -77,7 +77,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 
 `docs/history/YYYY-MM-DD-lens-modernization-audit.md` 작성. 구조(Pass 1 양식):
 - 한 줄 결론 → 기능별 판정 표(KEEP/THIN/OBSOLETE/UNCERTAIN) → 우선순위 실행목록(임팩트×저비용) → (deep) 수요 측 제안 + DROP 사유 → 검증된 코드 드리프트 → /crv 관계.
-- 그다음 리포트를 사용자 화면에 띄운다 — `/cp` Phase 4.5 와 같은 레인(Artifact → Codex visualize → `scripts/show-report.js` 브라우저 렌더). 슬라이드 덱·보드는 만들지 않는다(v3.39 폐지).
+- 그다음 리포트를 사용자 화면에 띄운다 — `/cp` Phase 4.5 와 같은 레인(Artifact → Codex visualize → md 파일 전송 → 없으면 보고 본문). **HTML 은 만들지 않는다** — 슬라이드 덱·보드(v3.39 폐지)도, 렌더 페이지도(v3.42 폐지).
 
 ## Phase 5 — `/cp` 핸드오프 (고신뢰 건)
 
