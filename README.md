@@ -136,7 +136,7 @@ Unlike `/cc`, which starts building immediately, `/cp` generates a **work plan d
 > and repair loop are now covered by native Claude Code: `/code-review` (and `claude ultrareview`
 > for a cloud multi-agent pass), `/security-review`, and the Workflow tool's built-in quality
 > patterns. The "prove it really runs" axis stays in `/cc` Phase 6 QA, which executes the
-> verification commands directly (Playwright / curl / tests).
+> verification commands directly (Aside browser / curl / tests).
 
 ### `/cps` — Generate a repo orientation document
 

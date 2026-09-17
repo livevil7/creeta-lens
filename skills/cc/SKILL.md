@@ -748,7 +748,7 @@ Lens Multi v3.44.0 — 반복 {N}/5
 | {신호 1} | {명령/관측} | {pass 판정} | auto/manual |
 
 각 SUCCESS_CRITERIA(= 사람 목표) 항목에 대해:
-1. VERIFICATION 에 확인 방법이 명시돼 있으면 **그대로 실행**, 없으면 어떤 도구로 검증할지 결정 (Bash/Read/Glob/curl/Playwright 등)
+1. VERIFICATION 에 확인 방법이 명시돼 있으면 **그대로 실행**, 없으면 어떤 도구로 검증할지 결정 (Bash/Read/Glob/curl/Aside 브라우저 등)
 2. `종류=auto` → 명령을 직접 실행해 증거 확보. `종류=manual` → 자동 실행 불가하므로 관측 결과를 적어 두고, **auto 검증을 전부 끝낸 뒤 manual 행을 한 질문에 모아** 확인받는다(header `검증 확인` — 행마다 무엇을 어디서 보면 되는지·링크) + transcript 에 "manual 확인 대기" 명시 (**manual 항목을 자동으로 pass 처리 금지**)
 3. 결과를 evidence 로 기록
 4. pass/fail 판정
@@ -765,8 +765,9 @@ Lens Multi v3.44.0 — 반복 {N}/5
 - Bash로 린터, 빌드 명령, 테스트 실행
 
 ### 브라우저 / UI
-- Playwright로 URL 네비게이션, 요소 확인, 렌더링 검증
-- 콘솔 에러 확인
+- **브라우저는 Aside 가 기본이다.** 확인은 `mcp__aside__exec`(또는 `aside exec "…"`)에 맡기고, DOM·스크린샷을 직접 봐야 할 때만 `mcp__aside__repl`(또는 `aside repl`)로 URL 이동·요소 확인·렌더링 검증
+- Playwright 는 느리고 토큰을 많이 먹는다 — Aside 로 안 되는 **화면 폭 변경(반응형)·콘솔 에러·네트워크 요청·alert 처리**에만 쓴다
+- 콘솔 에러 확인 (Playwright)
 
 ### 서비스 / API
 - curl/Bash로 엔드포인트 호출, 응답 검증
@@ -804,7 +805,7 @@ Lens Multi v3.44.0 — 반복 {N}/5
 ## 규칙
 - 텍스트 검토 금지 — 실제 명령어/도구 실행 필수
 - "작동할 것 같음" ← 불가능. 증명 필수.
-- UI 관련 && Playwright 사용 가능 → 반드시 사용
+- UI 관련 → 브라우저로 실제 확인 필수. 도구는 Aside 기본, 반응형·콘솔·네트워크 검사만 Playwright
 - 검증 불가능한 항목은 명시 및 이유 설명
 - **verified = true 의 필요조건**: success_criteria_results 의 모든 항목이 pass
 ```
