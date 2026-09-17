@@ -4,8 +4,8 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.44.0**
-- Updated: 2026-09-16
+- Current: **v3.44.1**
+- Updated: 2026-09-17
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.41.0 breaking: **Grok 레인 제거.** 대표 지시 *"lens 스킬에 Grok 들어가 있는거 제거해. 그거 구독 취소했어."*(2026-09-15). `/cc` 읽기 위임·Phase 1.35 정찰은 Codex 하나로, Phase 4.5 는 **Supervisor + Codex 2중 검증**으로, `/cp` Phase 0.5 외부 조사도 Codex 만. `scripts/grok-review.sh` 삭제, `delegate.sh`·`cross-verify.sh` 는 `grok` 을 usage 오류로 거부한다. 과거 버전 노트·CHANGELOG·계획서의 Grok 언급은 이력이라 그대로 둔다. 상세: `CHANGELOG.md` · `docs/rules/codex-integration.md` §8.6.
 - v3.40.0 feat: **승인 한 번이면 끝까지 — `/cc` 무정지 실행.** 대표 지시 *"맞아 그건 필요해. 진행해."*(2026-09-14) · 근거 *"1,2,3 다 해. 싹다 해 멀 자꾸 하나하나 할라그래 싹 다 하라고."*(2026-09-04). 승인 뒤 마지막 검증까지 묻지 않고, **정지 3종**(되돌리기 어려운 행동 · 돈/외부 발송 · 범위 변경)만 멈추고, 그중 배포·머지=배포·DB 변경·대량 삭제·force push·발송은 계획에 있어도 멈춘다(대표가 "묻지 말고 하라" 고 한 것만 예외). `/cc` 5.0 경로 전환은 자동, manual 검증은 끝에 한 번 `검증 확인`. `hooks/pre-tool-ask.js` 가 이 세션의 게이트 원장이 열린 동안 허용 header 6개(`실행 승인`·`정지:비가역`·`정지:외부영향`·`정지:범위변경`·`검증 확인`·`실행 종료`) 외 질문창을 거부한다. 상세: `CHANGELOG.md` · `docs/rules/harness-rules.md` §4.11.

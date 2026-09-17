@@ -1,3 +1,12 @@
+## [3.44.1] - 2026-09-17
+
+**`/cc` QA 의 브라우저 검증 기본 도구를 Aside 로 바꿨다.** 대표 지시: *"앞으로 브라우저 작업을 할 때 aside를 쓰라는 거야. playwright 너무 느리고 토큰을 많이 먹는다고."*
+
+### Changed (v3.44.1)
+
+- `skills/cc/SKILL.md` Phase 6 QA — 「UI 관련 && Playwright 사용 가능 → 반드시 사용」을 「브라우저로 실제 확인 필수, 도구는 Aside 기본」으로. 확인은 `mcp__aside__exec` 에 맡기고 DOM·스크린샷을 볼 때만 `mcp__aside__repl`. **Playwright 는 Aside 로 안 되는 화면 폭 변경·콘솔 에러·네트워크 요청·alert 처리에만** (2026-09-17 SJ-ROG 실측: Aside repl 에 `setViewportSize`·`waitForResponse`·`route` 가 없고 console/request/dialog 이벤트가 0건).
+- `README.md` 검증 도구 예시.
+
 ## [3.44.0] - 2026-09-16
 
 **`/cp` 조사 에이전트에 난이도 배분을 넣었다 — fable 은 관제만.** 대표 지시: *"fable 이 토큰을 사악하게 먹어서 그래. opus 정도까진 써도 돼."*
