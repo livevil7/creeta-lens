@@ -67,7 +67,14 @@ mkdir -p "$DIR" || { echo "cannot create $DIR" >&2; exit 1; }
 # ── Run the lanes concurrently ───────────────────────────
 # Backgrounded and waited on here rather than left to the caller: two lanes are
 # only worth having if they cost one lane's wall clock.
-declare -A PID RCF OUTF START
+# ⚠️ 연상배열(declare -A)을 쓰지 않는다 — macOS 기본 bash 는 3.2 이고 거기서
+# `declare -A` 는 실패한다. 그 뒤 `PID[$lane]` 의 문자열 첨자는 산술식으로
+# 평가돼 "expression recursion level exceeded" 로 터지고, 레인 관리가 통째로
+# 무너진다. 실측(2026-09-20): macmini·mac-001 둘 다 /bin/bash 3.2.57 이고
+# mac-001 에는 새 bash 가 없다. 레인 목록은 순서가 고정이므로 같은 순서로
+# 도는 세 루프에 인덱스를 태우면 연상배열이 필요 없다.
+LANE_PID=(); LANE_RCF=(); LANE_OUTF=(); LANE_START=()
+li=0
 for lane in ${LANES//,/ }; do
   case "$lane" in
     codex) script="$HERE/codex-review.sh" ;;
@@ -75,29 +82,30 @@ for lane in ${LANES//,/ }; do
   esac
   [ -f "$script" ] || { echo "missing lane script: $script" >&2; exit 1; }
 
-  OUTF[$lane]="$DIR/$TAG-$lane.out"
-  RCF[$lane]="$(mktemp "${TMPDIR:-/tmp}/lane_rc_XXXXXX")"
-  START[$lane]="$(date +%s)"
+  LANE_OUTF[$li]="$DIR/$TAG-$lane.out"
+  LANE_RCF[$li]="$(mktemp "${TMPDIR:-/tmp}/lane_rc_XXXXXX")"
+  LANE_START[$li]="$(date +%s)"
 
   # Truncate before launching. A helper that exits at the detect/auth step never
   # reaches its own `: > $OUT`, so last run's verdict would still be sitting at
   # this path — and a stale FAIL read as a fresh one is the worst kind of wrong,
   # because it looks like the gate working.
-  : > "${OUTF[$lane]}"
+  : > "${LANE_OUTF[$li]}"
 
   if [ "$MODE" = "prompt" ]; then
-    ( bash "$script" --mode prompt --prompt-file "$PROMPT_FILE" --out "${OUTF[$lane]}" \
+    ( bash "$script" --mode prompt --prompt-file "$PROMPT_FILE" --out "${LANE_OUTF[$li]}" \
         --timeout "$TIMEOUT" --effort "$EFFORT" >/dev/null 2>&1 </dev/null
-      echo $? > "${RCF[$lane]}" ) &
+      echo $? > "${LANE_RCF[$li]}" ) &
   else
-    ( bash "$script" --mode review --out "${OUTF[$lane]}" \
+    ( bash "$script" --mode review --out "${LANE_OUTF[$li]}" \
         --timeout "$TIMEOUT" --effort "$EFFORT" >/dev/null 2>&1 </dev/null
-      echo $? > "${RCF[$lane]}" ) &
+      echo $? > "${LANE_RCF[$li]}" ) &
   fi
-  PID[$lane]=$!
+  LANE_PID[$li]=$!
+  li=$((li+1))
 done
 
-for lane in ${LANES//,/ }; do wait "${PID[$lane]}" 2>/dev/null; done
+for p in ${LANE_PID[@]+"${LANE_PID[@]}"}; do wait "$p" 2>/dev/null; done
 
 # ── Read each lane's verdict ─────────────────────────────
 # Both review lanes are supposed to write {verdict, high_findings}, but a lane
@@ -132,10 +140,12 @@ f.forEach(x=>console.log("F "+String(x).replace(/[\r\n]+/g," ")));
 any_fail=0; lanes_ok=0; lanes_down=0
 SUMMARY="$(mktemp "${TMPDIR:-/tmp}/lane_sum_XXXXXX")"
 
+li=0
 for lane in ${LANES//,/ }; do
-  rc="$(cat "${RCF[$lane]}" 2>/dev/null || echo 2)"; rm -f "${RCF[$lane]}"
-  out="${OUTF[$lane]}"
-  el=$(( $(date +%s) - ${START[$lane]} ))
+  rc="$(cat "${LANE_RCF[$li]}" 2>/dev/null || echo 2)"; rm -f "${LANE_RCF[$li]}"
+  out="${LANE_OUTF[$li]}"
+  el=$(( $(date +%s) - ${LANE_START[$li]} ))
+  li=$((li+1))
 
   case "$rc" in
     0) status=ok ;;
