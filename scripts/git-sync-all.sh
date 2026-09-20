@@ -164,6 +164,7 @@ nonbase=()          # base 밖 미머지 브랜치 — 정보 표시 (v3.31 T6)
 pruned=()           # 병합 증명돼 이번 런이 삭제한 브랜치 (v3.45 T7)
 prune_hold=()       # 정리가 fail-closed 로 막힌 repo (v3.45 T7)
 secret_hold=()      # 시크릿 후보가 있어 commit 을 보류한 repo (v3.46)
+fleet_lines=()      # 함대 동기화 결과 (v3.47) — 플러그인·스킬·CLI
 
 # --json 모드에선 사람용 출력은 전부 stderr 로, stdout 은 마지막 JSON 한 줄만.
 log() { if [ "$JSON_MODE" = 1 ]; then printf "%s\n" "$*" >&2; else printf "%s\n" "$*"; fi; }
@@ -795,6 +796,42 @@ if [ ${#unchanged[@]} -gt 0 ] && [ ${#unchanged[@]} -lt 20 ]; then
   log ""
   log "○ 변경 없음 (${#unchanged[@]}): ${unchanged[*]}"
 fi
+# ── T9: 함대 동기화 (v3.47) ────────────────────────────────────────────
+# /cs 는 "이 머신을 클라우드와 같게" 만드는 명령이다. 레포만 맞추고 플러그인·
+# 스킬·도구가 머신마다 다르면 같은 명령이 머신마다 다르게 동작한다 — 실측
+# (2026-09-20): Lens 가 3.37.1/3.38.0/3.40.0/없음/3.45.0 으로 다섯 대가 전부
+# 달랐고, macOS 두 대에서는 /cs 자신이 레포를 0개로 세면서 성공을 보고했다.
+# 그래서 레포 동기화 끝에 같은 런에서 함대 상태까지 맞춘다.
+#
+# SoT 는 Lens 가 아니라 사용자의 livevil-setting 이다 — 플러그인 목록은
+# 사용자 자산이지 이 플러그인의 것이 아니다. 없으면 조용히 건너뛴다.
+# 끄기: LENS_SYNC_FLEET=0
+if [ "${LENS_SYNC_FLEET:-1}" = "1" ] && [ "$ACTION" != "pull" ]; then
+  _fleet_sh=""
+  for _d in "$HOME/livevil-setting" "$HOME/Documents/GIT/livevil-setting" \
+            "$HOME/projects/livevil-setting"; do
+    if [ -f "$_d/scripts/fleet-sync.sh" ]; then _fleet_sh="$_d/scripts/fleet-sync.sh"; break; fi
+  done
+  if [ -n "$_fleet_sh" ]; then
+    _fl_out=$(bash "$_fleet_sh" 2>&1)
+    _fl_rc=$?
+    # 요약 두 줄만 끌어온다. 전체를 쏟으면 레포 리포트가 묻힌다.
+    _fl_sum=$(printf '%s\n' "$_fl_out" | sed -n 's/^\([a-z0-9-]*\) · 변경 \(.*\)$/\1 · 변경 \2/p' | tail -1)
+    [ -n "$_fl_sum" ] && fleet_lines+=("$_fl_sum")
+    printf '%s\n' "$_fl_out" | grep -E '^   (✔|⚠️) ' | while read -r _l; do printf '%s\n' "$_l"; done \
+      > "${TMPDIR:-/tmp}/lens-fleet.$$" 2>/dev/null
+    while read -r _l; do [ -n "${_l:-}" ] && fleet_lines+=("$_l"); done < "${TMPDIR:-/tmp}/lens-fleet.$$"
+    rm -f "${TMPDIR:-/tmp}/lens-fleet.$$"
+    [ "$_fl_rc" != 0 ] && [ ${#fleet_lines[@]} -eq 0 ] && fleet_lines+=("fleet-sync 실패 (rc=$_fl_rc)")
+  fi
+fi
+
+if [ ${#fleet_lines[@]} -gt 0 ]; then
+  log ""
+  log "🧩 함대 동기화 (플러그인·스킬·CLI) — SoT: livevil-setting/claude-code/skills.json"
+  for x in "${fleet_lines[@]}"; do log "   $x"; done
+fi
+
 # ── 시크릿 보류 (v3.46) ──
 if [ ${#secret_hold[@]} -gt 0 ]; then
   log ""
