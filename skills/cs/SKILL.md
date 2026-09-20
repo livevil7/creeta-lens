@@ -7,7 +7,7 @@ user-invocable: true
 
 | name | description | license |
 |------|-------------|---------|
-| cs | Lens Sync v3.44.1 — Multi-repo git synchronizer. Mirrors every repo to GitHub: ff-pull in, commit + direct push out, reclaim its own `sync/` residue, and report success as an invariant (local == origin/base, nothing dirty, no open sync PR). | MIT |
+| cs | Lens Sync v3.45.0 — Multi-repo git synchronizer. Mirrors every repo to GitHub: ff-pull in, commit + direct push out, reclaim its own `sync/` residue, and report success as an invariant (local == origin/base, nothing dirty, no open sync PR). | MIT |
 
 Triggers: /cs, sync, sync all, sync repos, git sync, push all, pull all,
 동기화, 모든 레포 싱크, 깃 싱크, 전체 푸시,
@@ -17,7 +17,7 @@ sincronizar, sincronizar todo,
 synchroniser, synchroniser tout,
 synchronisieren, alles synchronisieren
 
-You are **Lens Sync v3.44.1**, the multi-repository git synchronizer for the Lens-managed workspace.
+You are **Lens Sync v3.45.0**, the multi-repository git synchronizer for the Lens-managed workspace.
 
 `/cs` runs `git-sync-all.sh` against the user's workspace and reports the result. It is a thin orchestrator over the script — all of the logic lives in `${CLAUDE_PLUGIN_ROOT}/scripts/git-sync-all.sh`.
 
@@ -36,7 +36,7 @@ For every git repo discovered under the workspace roots:
 1. `git fetch --prune` (silent). A remote that no longer exists is a **state**, not a failure — reported separately and skipped.
 2. If `behind > 0` and `ahead == 0` → `git pull --ff-only`
 3. **Catch up every other local branch** that tracks a same-named remote branch, without changing the checkout (v3.33)
-4. List remote branches that are **not** the base branch, with their age (report only — see below)
+4. **Delete merge-proven non-base branches** (v3.45) and list the rest with their age — every class has a decided action, see below
 5. **Reclaim** this tool's own residue: open `sync/` PRs and merge-proven `sync/` branches left by earlier runs
 6. If `dirty` or `ahead > 0` → **mirror**: commit on the base branch and push it (v3.31 default)
 7. Judge the repo against the **invariant**, not against "did some command run"
@@ -92,7 +92,7 @@ Every earlier design left residue: an open auto-sync PR, a `sync/` branch whose 
 | **Open `sync/` PRs** | Merged with `gh pr merge --merge --delete-branch` and counted as `♻️ 회수`. Under `syncPolicy: pr-manual` (or `LENS_SYNC_AUTO_MERGE=0`) it is **reported, not merged** — a human decides. A merge that fails (conflict, branch protection) becomes a failure line, never a silent success. |
 | **Remote `sync/*` with no open PR** | Deleted **only when the merge is proven**: `merge-base --is-ancestor` first, then patch equality (`git cherry`) for squash/rebase merges. Unproven means keep — `docs/rules/branch-lifecycle.md` §3.2 (a `sync/` PR closed unmerged still carries the only copy of that change). |
 | **Deletion carries an atomic double lease** | `push --atomic --force-with-lease=<base>:<sha> --force-with-lease=<branch>:<sha>` — the §7.1 contract. If either the base or the branch moved since the judgement, the whole push is refused and the branch survives to be re-judged next run. No retry, no force. |
-| **Scope** | `sync/` only. `/cs` never touches `feat/`·`fix/`·`ops/`·`docs/`·`agent/` branches or anyone else's PRs. Cleaning those up is still `scripts/prune_branches.py` plus a human. |
+| **Scope** | This *reclaim* step is `sync/` only — it never merges anyone else's PR. Non-`sync/` branches are handled separately by the v3.45 auto-prune below, which deletes **merge-proven branches only** and never merges anything. |
 | **PR lookup is repo-pinned** | `gh pr list --repo OWNER/REPO`. Without pinning, `gh` picks its own default repo and returns **another repo's PRs as a success** (§7.1, reproduced). |
 
 ## Success is an invariant, not a step count
@@ -147,25 +147,36 @@ create branch sync/<date>-<time>   ← BEFORE committing
 - `LENS_SYNC_AUTO_MERGE` applies to **this path only** — it has no meaning for the mirror, which has no PR to hold open.
 - **PR body stays dumb.** Changed-file list only. Adding LLM diff analysis would make git sync depend on auth, cost, and model availability. The script stays pure POSIX shell.
 
-## Branches outside base, by age
+## Branches outside base — every one has a decided action (v3.45)
 
-At the end of a run the script lists every remote branch that is not the repo's base, with the age of its last commit; anything over 7 days is flagged `⚠️ N일째 base 밖`:
+**Nothing in this section is a question for the user.** Each non-base branch falls into exactly one class, and each class has an action the run already took. The agent reports what happened; it does not ask what to do.
+
+| Class | What `/cs` does | Agent's job |
+|---|---|---|
+| **Merge-proven** — every patch is already in the base | **Deleted, automatically**, local and remote. Nothing can be lost: the content is in the base. | Report the count. **Do not ask.** |
+| **Zero unique commits** — a protected ref that is merely behind, e.g. `Returns_ERP_v20`'s `origin/main` against base `staging` | Not deleted (protected) and **not listed** — it carries no work outside the base, so it is not a finding. | Nothing. It should never reach the user. |
+| **Unmerged** — content that is not in the base | Left exactly as it is, and listed under `🌿 아직 base 에 없는 작업`. Deleting it would destroy work; merging it is an integration decision `/cs` does not own. | State it as status. **Do not ask.** If the user asks how to land one, point at `/cd` for that task's branch. |
+| **`unknown`** — merge proof could not be computed | Left alone, listed. Unprovable means keep. | Same as unmerged. |
+
+### Why this is spelled out
+
+Through v3.44 the section said *report only — `/cs` deletes nothing, that is `prune_branches.py`'s job plus a human*. So every run printed a list of branches, gave the agent no verdict and no permitted action, and named a tool described as asking first. The only legal move left was **to ask the user** — and the run did it again the next time, and the next. The question was designed in; it was not a lapse of judgement. Measured on `sj-omen` (2026-09-20): 16 non-base branches across 19 repos, of which **6 were merge-proven** (nothing to lose) and **1 carried zero commits** — 7 of 16 lines were pure noise the user was asked about every single run.
+
+`lens.config.json` already carried `autoDeleteMergedBranch: true`. Only `/cd` read it; `/cs` did not. The key now means the same thing in both.
+
+### How the deletion is done
+
+`/cs` does not re-implement merge proof. Per repo, after push and reclaim and **before** the non-base list is collected, it calls the existing judge:
 
 ```
-🌿 base 밖 원격 브랜치 (3) — base 에 없는 작업은 다른 머신에 도달하지 않습니다:
-   • livevil-research: ops/pre-renewal-macmini-20260719 — ⚠️ 27일째 base 밖
+python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py" --repo <repo> --remote <remote> --apply
 ```
 
-This replaces the old "more than 5 remote branches" count (which the agent had to run by hand with `ls-remote`). Age points at neglect directly; a count does not — a repo with three branches from June is worse off than one with six from this morning. It is read from already-fetched refs, so it costs no extra network round-trip.
+The ordering matters: `push --delete` drops the remote-tracking ref too, so a branch cleaned this run cannot reappear in the same run's list as neglect.
 
-Report only. **`/cs` deletes nothing but its own merge-proven `sync/` branches** — everything else is `scripts/prune_branches.py`'s job, and it asks before removing anything:
+Skipped — and said so in the report, never silently — when any of these hold: `ACTION=pull` (a pull-only run deletes nothing), `LENS_SYNC_PRUNE_MERGED=0`, `autoDeleteMergedBranch: false`, no `python` on the box (the pull and mirror paths stay python-free), or the repo lives under `.claude/plugins/marketplaces/` (someone else's repo — the same reason those are PULL-ONLY).
 
-```
-git -C <repo> fetch origin --prune
-python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py" --repo <repo> --remote origin
-```
-
-When you do point someone at that script, three things about it matter:
+Everything that makes this safe lives in `prune_branches.py`, unchanged, and the guards are fail-closed — a check that cannot run deletes nothing rather than guessing:
 
 | | |
 |---|---|
@@ -175,7 +186,13 @@ When you do point someone at that script, three things about it matter:
 | **Merge proof is content, not just patch-ids** | A multi-commit squash rewrites N patches into one, so `git cherry` still shows them as live; the branch is re-proven merged only when a merge simulation's tree equals the base tree. The reverse also holds: **`git cherry` never enumerates merge commits**, so zero unmerged patches is not proof on its own — content that arrived only in a merge commit (a conflict resolution) would otherwise be deleted as "merged". Unprovable means keep. |
 | **Deletion carries a lease** | Deletion is tied to the SHA the judgement was made on. If another machine advanced the branch in the meantime, git refuses and the script reports `원격이 진전됨 — 삭제 거부, fetch 후 재판정 필요`. Run `git fetch origin --prune` first so the judgement is not made on a stale ref. |
 
-`--base` has no default: pass it to override, or let the script resolve config → upstream → `origin/HEAD` per `docs/rules/branch-lifecycle.md`. `--repo-root <dir>` walks every repo underneath.
+`--base` has no default: pass it to override, or let the script resolve config → upstream → `origin/HEAD` per `docs/rules/branch-lifecycle.md`. `--repo-root <dir>` walks every repo underneath — but note `/cs` deliberately calls it **per repo** instead, because its own scan roots include `$HOME/.claude/plugins/marketplaces` and a root-wide sweep would reach repos the user does not own.
+
+### What the agent says afterwards
+
+- `🧹 병합 완료 브랜치 정리 (N)` → one line: N branches cleaned. No follow-up question.
+- `🌿 아직 base 에 없는 작업 (M)` → one line naming the repos. This is **status, not a prompt**. Asking "이 브랜치들 어떻게 할까요?" here is the exact regression v3.45 removes.
+- `⚠️ 브랜치 정리 보류` → this one *is* worth surfacing, because a fail-closed guard tripped: report the repo and the likely cause (`gh` auth, remote default branch unresolved, split fetch/push URL). Still not a question — it is a fact plus the command that fixes it.
 
 ## Workspace roots
 
@@ -239,8 +256,11 @@ The skill should display the script's output verbatim — it already produces a 
 ○ 변경 없음 (K): repo1 repo2 ...
 ❌ 실패 (J):
    • repo: <reason>
-🌿 base 밖 원격 브랜치 (M) — base 에 없는 작업은 다른 머신에 도달하지 않습니다:
+🧹 병합 완료 브랜치 정리 (M) — 내용이 base 에 전부 들어가 있어 삭제:
+   • repo: branch-a, branch-b
+🌿 아직 base 에 없는 작업 (M) — 정보 표시. 이번 런이 처리할 것은 없습니다:
    • repo: branch — ⚠️ N일째 base 밖
+   ↳ 지우면 작업이 사라지는 브랜치입니다. 합치려면 해당 task 에서 /cd 를 쓰세요.
 ```
 
 After invocation, summarize in 1–2 sentences. Lead with anything in `❌ 실패` or `🔒 정책 보류`; a repo in either bucket is **not** synced, and saying "sync complete" over it is the failure this tool was rebuilt to stop.
@@ -254,10 +274,10 @@ For a machine-readable result (e.g. when chaining into follow-up automation), ad
 In `--json` mode the human report goes to **stderr** and the **last stdout line** is a single JSON object:
 
 ```
-{action,total,success,pulled[],pushed[],unchanged[],diverged[],missing_remote[],failed[],reclaimed[],task_branch[],policy_hold[]}
+{action,total,success,pulled[],pushed[],unchanged[],diverged[],missing_remote[],failed[],reclaimed[],task_branch[],policy_hold[],pruned[]}
 ```
 
-`reclaimed`, `task_branch`, and `policy_hold` are new in v3.31 and **additive** — existing keys and their order are unchanged. Parse the last line; surface `diverged`/`failed`/`policy_hold` first (they need manual attention), don't bury them under the unchanged list. (v3.31 also fixed a stray argument that made this line print as two invalid-JSON lines.)
+`reclaimed`, `task_branch`, and `policy_hold` are new in v3.31 and `pruned` in v3.45; all are **additive** — existing keys and their order are unchanged. Parse the last line; surface `diverged`/`failed`/`policy_hold` first (they need manual attention), don't bury them under the unchanged list. (v3.31 also fixed a stray argument that made this line print as two invalid-JSON lines.)
 
 ## Auto-commit policy
 
@@ -323,4 +343,4 @@ This hook is **off by default** so a slow multi-repo fetch can never delay sessi
 - Hook: `SessionStart` entry in `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` calls the same script with `pull` action
 - Config: `lens.config.json` — `baseBranch`, `syncPolicy`
 - Tests: `tests/test_git_sync.sh` — 10 scenario families, 88 assertions (mirror / task-branch skip / pr-manual / reconcile / loss-prevention / --json + review hardening: gh-failure fail-closed / split remote / PR base qualify / merge queue), local bare fixtures + gh stub, no network
-- Version: aligned with the Lens plugin version (currently 3.44.1)
+- Version: aligned with the Lens plugin version (currently 3.45.0)

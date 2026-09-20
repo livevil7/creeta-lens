@@ -80,9 +80,32 @@ _arg_after() { # $1=플래그 → 그 뒤 인자 (없으면 빈 문자열)
 
 case "$1 $2" in
   "pr list")
-    # 호출부 2곳을 구분: --head 는 PR 생성 직전 중복확인, 나머지는 회수(T4①) 조회
+    # 호출부 3곳을 구분:
+    #   --head            → PR 생성 직전 중복확인
+    #   --json 만(--jq X) → prune_branches.py 의 열린 PR head 보호 조회.
+    #                       그쪽은 응답을 JSON 으로 파싱하므로 회수용 평문을
+    #                       주면 파싱 실패 → fail-closed 로 삭제 경로가 아예
+    #                       안 열린다. 유효 JSON 배열을 따로 돌려준다.
+    #   그 외              → 회수(T4①) 조회. --jq 로 이미 가공된 평문을 받는다.
     case " $* " in
       *" --head "*) cat "${GH_STUB_PR_HEAD:-/dev/null}" 2>/dev/null; exit 0 ;;
+      *" --jq "*)   cat "${GH_STUB_PR_LIST:-/dev/null}" 2>/dev/null
+                    exit "${GH_STUB_LIST_RC:-0}" ;;
+      *" --json "*) # 같은 canned 목록("번호 head base" 줄)에서 JSON 을 만든다.
+                    # 회수(T4①)와 prune 이 **같은 PR 집합**을 보게 하는 것이
+                    # 핵심이다 — 한쪽에만 PR 이 보이면 열린 PR head 보호가
+                    # 테스트 안에서만 사라져 초록불이 거짓이 된다.
+                    # GH_STUB_PR_JSON 파일이 있으면 그쪽이 우선(명시 제어용).
+                    if [ -n "${GH_STUB_PR_JSON:-}" ] && [ -s "${GH_STUB_PR_JSON}" ]; then
+                      cat "$GH_STUB_PR_JSON"
+                    else
+                      awk 'BEGIN{printf "["; n=0}
+                           NF>=2 {if(n++) printf ","; printf "{\"number\":%s,\"headRefName\":\"%s\"}", $1, $2}
+                           END{print "]"}' "${GH_STUB_PR_LIST:-/dev/null}" 2>/dev/null || printf '[]\n'
+                    fi
+                    # 조회 실패도 함께 흉내 낸다 — 실패하면 prune 은 fail-closed
+                    # 로 아무것도 지우지 않아야 한다(S7).
+                    exit "${GH_STUB_JSON_RC:-${GH_STUB_LIST_RC:-0}}" ;;
       *)            cat "${GH_STUB_PR_LIST:-/dev/null}" 2>/dev/null
                     exit "${GH_STUB_LIST_RC:-0}" ;;
     esac ;;
@@ -113,6 +136,14 @@ esac
 exit 0
 STUB
 chmod +x "$STUB_DIR/gh"
+
+# Windows 셔틀 — prune_branches.py 는 python 이라 gh 를 CreateProcess 로 띄운다.
+# 그 호출은 PATHEXT 를 보지 않고 확장자 없는 이름에 `.exe` 만 붙여 보므로,
+# 위의 확장자 없는 셸 스텁을 건너뛰고 뒤쪽의 **진짜 gh.exe** 를 집는다(실측:
+# lens-fixture/... 로 GraphQL 조회가 나가 fail-closed 로 막혔다). `.cmd` 를
+# 같이 깔아 두면 그쪽이 먼저 잡히고 같은 셸 스텁으로 되돌아온다.
+# 리눅스·macOS 에는 아무 영향이 없다(그쪽은 확장자 없는 쪽이 잡힌다).
+printf '@echo off\r\nbash "%%~dp0gh" %%*\r\n' > "$STUB_DIR/gh.cmd"
 
 # ── 가짜 ssh: github 형태 URL 의 전송만 로컬 bare 로 돌린다 ──
 # gh 를 타는 경로는 원격 URL 이 github 형태여야 스크립트가 레포를 식별한다.
@@ -169,6 +200,7 @@ new_fx() { # $1=이름 → fixture 경로 출력 (시나리오마다 독립)
   fx=$(mktemp -d "$ROOT/$1.XXXXXX") || return 1
   mkdir -p "$fx/work" "$fx/remotes" || return 1
   : > "$fx/gh.log"; : > "$fx/gh-pr-list.txt"; : > "$fx/gh-pr-head.txt"
+  : > "$fx/gh-pr-json.txt"   # 비어 있으면 canned 목록에서 생성 (위 gh 스텁 참조)
   printf '%s' "$fx"
 }
 
@@ -213,6 +245,7 @@ run_cs() { # $1=fixture, 나머지=스크립트 인자 → RUN_OUT / RUN_JSON / 
     GH_STUB_LOG="$fx/gh.log" \
     GH_STUB_PR_LIST="$fx/gh-pr-list.txt" \
     GH_STUB_PR_HEAD="$fx/gh-pr-head.txt" \
+    GH_STUB_PR_JSON="${GH_PR_JSON:-$fx/gh-pr-json.txt}" \
     GH_STUB_MERGE_RC="${GH_MERGE_RC:-0}" \
     GH_STUB_CREATE_RC="${GH_CREATE_RC:-0}" \
     GH_STUB_LIST_RC="${GH_LIST_RC:-0}" \
@@ -622,6 +655,102 @@ t_false "S12 사라진 원격의 트래킹 ref 가 정리됐다" \
         git -C "$W" rev-parse -q --verify refs/remotes/origin/dead-branch
 t_true  "S12 살아있는 원격 ref 는 보존된다" \
         git -C "$W" rev-parse -q --verify refs/remotes/origin/master
+
+# =============================================
+# S13 자동 정리 (v3.45) — 병합 증명된 base 밖 브랜치는 지우고, 미머지는 남긴다
+# 이 시나리오가 없으면 v3.45 의 요점("묻지 않는다")이 코드로 잠기지 않는다.
+# =============================================
+scenario "S13 자동 정리: 병합 증명 브랜치는 삭제, 미머지 브랜치는 보존"
+FX=$(new_fx s13prune) || die "fixture 생성 실패"
+mkrepo "$FX" prunemerged main || die "S13 repo 생성 실패"
+gh_remote "$FX" prunemerged || die "S13 github 형태 원격 설정 실패"
+W="$FX/work/prunemerged"; B="$FX/remotes/prunemerged.git"
+
+# feat/proven — main 에 이미 들어간 내용 (ancestor → delete 판정)
+git -C "$W" checkout -q -b feat/proven
+printf 'proven\n' > "$W/proven.txt"
+git -C "$W" add -A && git -C "$W" commit -qm "feat: proven"
+git -C "$W" push -q origin feat/proven
+git -C "$W" checkout -q main
+git -C "$W" merge -q --ff-only feat/proven
+git -C "$W" push -q origin main
+
+# feat/live — main 에 없는 내용 (keep 판정)
+git -C "$W" checkout -q -b feat/live
+printf 'live\n' > "$W/live.txt"
+git -C "$W" add -A && git -C "$W" commit -qm "feat: live"
+git -C "$W" push -q origin feat/live
+git -C "$W" checkout -q main
+git -C "$W" branch -qD feat/proven feat/live 2>/dev/null
+
+# prune 의 열린 PR 보호 조회(`--json number,headRefName`, --jq 없음)는 스텁의
+# JSON 분기가 받는다 — 기본값이 빈 배열이라 별도 준비가 필요 없다. 회수(T4①)용
+# 평문 목록(gh-pr-list.txt)과 섞으면 fail-closed 로 삭제 경로가 안 열린다.
+git -C "$W" remote set-head origin --auto >/dev/null 2>&1
+git -C "$W" fetch -q origin --prune
+
+t_true "S13 준비: 원격에 feat/proven 이 있다" \
+       git -C "$B" rev-parse -q --verify refs/heads/feat/proven
+t_true "S13 준비: 원격에 feat/live 가 있다" \
+       git -C "$B" rev-parse -q --verify refs/heads/feat/live
+
+run_cs "$FX" sync --json
+
+t_false "S13 병합 증명된 feat/proven 이 원격에서 삭제됐다" \
+        git -C "$B" rev-parse -q --verify refs/heads/feat/proven
+t_true  "S13 미머지 feat/live 는 원격에 보존된다" \
+        git -C "$B" rev-parse -q --verify refs/heads/feat/live
+t_true  "S13 base(main) 는 그대로 살아 있다" \
+        git -C "$B" rev-parse -q --verify refs/heads/main
+TOTAL=$((TOTAL+1))
+if bucket_has "$RUN_JSON" pruned prunemerged; then ok "S13 pruned 버킷에 집계된다"
+else ng "S13 pruned 버킷에 집계된다" "json=$RUN_JSON"; fi
+# --json 모드에선 사람용 리포트가 stderr 로 나간다(stdout 은 JSON 한 줄뿐).
+S13_REPORT=$(cat "$FX/stderr.log" 2>/dev/null)
+TOTAL=$((TOTAL+1))
+case "$S13_REPORT" in
+  *"아직 base 에 없는 작업"*feat/live*) ok "S13 미머지 브랜치는 정보 목록에 남는다" ;;
+  *) ng "S13 미머지 브랜치는 정보 목록에 남는다" "리포트에 없음" ;;
+esac
+TOTAL=$((TOTAL+1))
+case "$S13_REPORT" in
+  *"아직 base 에 없는 작업"*feat/proven*) ng "S13 삭제한 브랜치는 방치 목록에 다시 안 나온다" "feat/proven 이 목록에 남음" ;;
+  *) ok "S13 삭제한 브랜치는 방치 목록에 다시 안 나온다" ;;
+esac
+TOTAL=$((TOTAL+1))
+case "$S13_REPORT" in
+  *"병합 완료 브랜치 정리"*) ok "S13 정리 결과가 리포트에 남는다" ;;
+  *) ng "S13 정리 결과가 리포트에 남는다" "리포트: $S13_REPORT" ;;
+esac
+t_true "S13 JSON 유효" json_valid "$RUN_JSON"
+
+# =============================================
+# S14 스위치 — LENS_SYNC_PRUNE_MERGED=0 이면 아무것도 지우지 않는다
+# =============================================
+scenario "S14 스위치: LENS_SYNC_PRUNE_MERGED=0 이면 병합 증명 브랜치도 보존"
+FX=$(new_fx s14off) || die "fixture 생성 실패"
+mkrepo "$FX" pruneoff main || die "S14 repo 생성 실패"
+gh_remote "$FX" pruneoff || die "S14 github 형태 원격 설정 실패"
+W="$FX/work/pruneoff"; B="$FX/remotes/pruneoff.git"
+
+git -C "$W" checkout -q -b feat/proven
+printf 'proven\n' > "$W/proven.txt"
+git -C "$W" add -A && git -C "$W" commit -qm "feat: proven"
+git -C "$W" push -q origin feat/proven
+git -C "$W" checkout -q main
+git -C "$W" merge -q --ff-only feat/proven
+git -C "$W" push -q origin main
+git -C "$W" branch -qD feat/proven 2>/dev/null
+git -C "$W" remote set-head origin --auto >/dev/null 2>&1
+git -C "$W" fetch -q origin --prune
+
+LENS_SYNC_PRUNE_MERGED=0 run_cs "$FX" sync --json
+
+t_true "S14 스위치 off 면 병합 증명 브랜치도 원격에 남는다" \
+       git -C "$B" rev-parse -q --verify refs/heads/feat/proven
+TOTAL=$((TOTAL+1))
+if bucket_empty "$RUN_JSON" pruned; then ok "S14 pruned 버킷이 비어 있다"
+else ng "S14 pruned 버킷이 비어 있다" "json=$RUN_JSON"; fi
 
 # ── 요약 ──
 printf '\n────────────────────────────────────────\n'

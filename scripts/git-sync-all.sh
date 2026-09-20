@@ -97,8 +97,29 @@ _cfg_get() {
     | head -1
 }
 
+# _cfg_flag <키> → true|false (최상위 스칼라 불리언, 없으면 빈 문자열)
+# _cfg_get 은 맵("baseBranch": {...}) 전용이라 최상위 불리언을 읽지 못한다.
+_cfg_flag() {
+  [ -n "$CFG_FILE" ] || return 0
+  sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$CFG_FILE" 2>/dev/null | head -1
+}
+
 # gh 가용성 — 회수(T4①)·PR 경로만 gh 를 쓴다. 미러 push 는 gh 무의존.
 if command -v gh >/dev/null 2>&1; then GH_OK=1; else GH_OK=0; fi
+
+# ── 병합 완료 브랜치 자동 정리 (T7, v3.45) ─────────────────────────
+# 판정·보호·lease 는 prune_branches.py 에 전부 있다. 셸로 다시 구현하지 않고
+# 호출한다 — 병합 증명은 patch-id + merge-tree 2단이라 두 벌로 갈라지면 한쪽이
+# 반드시 틀린다. python 이 없으면 정리를 건너뛰고 보고만 한다(pull·미러 push
+# 경로가 python 무의존이라는 성질은 그대로 유지된다).
+PY=""
+for _c in python3 python; do command -v "$_c" >/dev/null 2>&1 && { PY="$_c"; break; }; done
+PRUNE_SCRIPT="$(cd "$(dirname "$0")" 2>/dev/null && pwd)/prune_branches.py"
+# 스위치 우선순위: 환경변수 > lens.config.json autoDeleteMergedBranch > 기본 on
+PRUNE_MERGED="${LENS_SYNC_PRUNE_MERGED:-}"
+if [ -z "$PRUNE_MERGED" ]; then
+  if [ "$(_cfg_flag autoDeleteMergedBranch)" = "false" ]; then PRUNE_MERGED=0; else PRUNE_MERGED=1; fi
+fi
 
 # ── 로그 함수 ─────────────────────────────
 total=${#REPOS[@]}
@@ -111,7 +132,9 @@ unchanged=()
 reclaimed=()        # 이전 런이 남긴 sync/ 잔여물 회수 (v3.31 T4)
 task_branch=()      # task 브랜치 체크아웃 — commit·push 건너뜀 (v3.31 T3)
 policy_hold=()      # PR 생성까지만, 머지는 사람 (pr-manual 등, v3.31 T2)
-nonbase=()          # base 밖 원격 브랜치 — 사람 리포트 전용 (v3.31 T6)
+nonbase=()          # base 밖 미머지 브랜치 — 정보 표시 (v3.31 T6)
+pruned=()           # 병합 증명돼 이번 런이 삭제한 브랜치 (v3.45 T7)
+prune_hold=()       # 정리가 fail-closed 로 막힌 repo (v3.45 T7)
 
 # --json 모드에선 사람용 출력은 전부 stderr 로, stdout 은 마지막 JSON 한 줄만.
 log() { if [ "$JSON_MODE" = 1 ]; then printf "%s\n" "$*" >&2; else printf "%s\n" "$*"; fi; }
@@ -574,6 +597,42 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$sync_branch" 
         ;;
     esac
   fi
+  # ── T7: 병합 증명된 base 밖 브랜치 자동 정리 (v3.45) ──
+  # 왜 필요한가: 이 목록을 "리포트 전용" 으로만 두니 매 런 같은 브랜치가 다시
+  # 떴고, 스킬은 "지우지 마라 — prune_branches.py + 사람 몫" 이라고만 해서
+  # 에이전트에게 남는 합법 수단이 **사용자에게 묻는 것** 하나뿐이었다. 질문이
+  # 설계로 박혀 있던 것이다. 내용이 base 에 전부 들어간 브랜치는 잃을 것이
+  # 없으므로 판단 대상이 아니다 — 지운다. lens.config.json 의
+  # autoDeleteMergedBranch 는 이미 true 였는데 /cs 만 그걸 안 읽고 있었다.
+  #
+  # 안전은 전부 prune_branches.py 가 진다(여기서 재구현하지 않는다):
+  # `delete` 판정(모든 패치가 base 에 있음)만 삭제하고, 열린 PR 의 head ·
+  # 레포 기본 브랜치 · protectedBranches · base 아닌 통합 브랜치 이름 ·
+  # `keep` · `unknown` 은 건드리지 않으며, gh 조회 실패 / 기본 브랜치 미확인 /
+  # fetch≠push URL 이면 fail-closed 로 아무것도 지우지 않는다. 삭제는 판정
+  # 시점 SHA 에 묶인 lease 로 나가고, 원격이 움직였으면 거부되고 살아남는다.
+  #
+  # T6 수집 **앞에** 둔다 — push --delete 가 트래킹 ref 까지 지우므로, 방금
+  # 정리한 브랜치가 아래 "미머지" 목록에 남아 방치로 오인되지 않는다.
+  # marketplace 는 남의 레포다 — 절대 제외(PULL-ONLY 와 같은 이유).
+  _pr_ok=1
+  [ "$ACTION" = "pull" ] && _pr_ok=0
+  [ "$PRUNE_MERGED" = "1" ] || _pr_ok=0
+  [ -n "$PY" ] && [ -f "$PRUNE_SCRIPT" ] || _pr_ok=0
+  [ -n "$_t6_base" ] || _pr_ok=0
+  case "$repo" in */.claude/plugins/marketplaces/*) _pr_ok=0 ;; esac
+  if [ "$_pr_ok" = 1 ]; then
+    _pr_out=$("$PY" "$PRUNE_SCRIPT" --repo "$repo" --remote "${upstream%%/*}" --apply 2>&1)
+    _pr_del=$(printf '%s
+' "$_pr_out" | sed -n 's/^삭제 완료: //p' | head -1)
+    if [ -n "$_pr_del" ] && [ "$_pr_del" != "없음" ]; then
+      pruned+=("$name: $_pr_del")
+    fi
+    if printf '%s' "$_pr_out" | grep -q -- '--apply 차단 (fail-closed)'; then
+      prune_hold+=("$name: 정리 차단(fail-closed) — 삭제된 것 없음. gh 인증·원격 기본 브랜치 확인")
+    fi
+  fi
+
   if [ -n "$_t6_base" ]; then
     # 패턴은 glob 이 아니라 prefix — for-each-ref 의 `*` 는 슬래시를 넘지
     # 않아 sync/x 같은 중첩 이름을 놓친다 (실측). prefix 는 하위 전부 매칭.
@@ -588,6 +647,12 @@ $(git -C "$repo" diff --name-only "$upstream_remote/$base_branch..$sync_branch" 
         _short=${_rn#*/}
         [ "$_short" = "$_t6_base" ] && continue
         [ "$_short" = "HEAD" ] && continue
+        # base 대비 고유 커밋이 없으면 "base 밖 작업" 이 아니다. 보호돼 삭제되지
+        # 않는 ref(레포 기본 브랜치 등)가 0커밋·0파일로 매 런 목록에 남던 노이즈를
+        # 없앤다 — 실측: Returns_ERP_v20 의 origin/main 은 base(staging) 대비
+        # 0커밋인데도 영구히 "base 밖" 으로 찍혔다.
+        _uniq=$(git -C "$repo" rev-list --count "${upstream%%/*}/$_t6_base".."$_rn" 2>/dev/null || echo 1)
+        [ "${_uniq:-1}" = "0" ] && continue
         _days=$(( (_now_ts - ${_ct:-$_now_ts}) / 86400 ))
         if [ "$_days" -gt 7 ]; then
           nonbase+=("$name: $_short — ⚠️ ${_days}일째 base 밖")
@@ -691,11 +756,36 @@ if [ ${#unchanged[@]} -gt 0 ] && [ ${#unchanged[@]} -lt 20 ]; then
   log ""
   log "○ 변경 없음 (${#unchanged[@]}): ${unchanged[*]}"
 fi
-# ── T6: base 밖 원격 브랜치 — 방치 가시화 (사람 리포트 전용) ──
+# ── T7: 병합 완료 브랜치 자동 정리 결과 ──
+if [ ${#pruned[@]} -gt 0 ]; then
+  log ""
+  log "🧹 병합 완료 브랜치 정리 (${#pruned[@]}) — 내용이 base 에 전부 들어가 있어 삭제:"
+  for x in "${pruned[@]}"; do log "   • $x"; done
+fi
+if [ ${#prune_hold[@]} -gt 0 ]; then
+  log ""
+  log "⚠️ 브랜치 정리 보류 (${#prune_hold[@]}):"
+  for x in "${prune_hold[@]}"; do log "   • $x"; done
+fi
+if [ "$ACTION" != "pull" ]; then
+  if [ "$PRUNE_MERGED" != "1" ]; then
+    log ""
+    log "ℹ️ 병합 완료 브랜치 자동 정리 꺼짐 (autoDeleteMergedBranch=false 또는 LENS_SYNC_PRUNE_MERGED=0)."
+  elif [ -z "$PY" ]; then
+    log ""
+    log "ℹ️ python 없음 — 병합 완료 브랜치 자동 정리 건너뜀 (동기화 자체는 영향 없음)."
+  fi
+fi
+# ── T6: 아직 base 에 없는 작업 — 정보 표시 ──
+# 여기 남는 것은 **내용이 base 에 없는** 브랜치뿐이다(병합 증명된 것은 위에서
+# 이미 지웠고, 0커밋 ref 는 목록에서 뺐다). 즉 지우면 작업이 사라지는 것들이라
+# 이 런이 처리할 일은 없다. 이 목록은 상태 표시이지 질문거리가 아니다 —
+# 매 런 "이거 어떻게 할까요" 를 만들지 않기 위해 문구로 못 박는다.
 if [ ${#nonbase[@]} -gt 0 ]; then
   log ""
-  log "🌿 base 밖 원격 브랜치 (${#nonbase[@]}) — base 에 없는 작업은 다른 머신에 도달하지 않습니다:"
+  log "🌿 아직 base 에 없는 작업 (${#nonbase[@]}) — 정보 표시. 이번 런이 처리할 것은 없습니다:"
   for x in "${nonbase[@]}"; do log "   • $x"; done
+  log "   ↳ 지우면 작업이 사라지는 브랜치입니다. 합치려면 해당 task 에서 /cd 를 쓰세요."
 fi
 if [ "$GH_OK" = 0 ] && [ "$ACTION" != "pull" ]; then
   log ""
@@ -726,7 +816,7 @@ if [ "$JSON_MODE" = 1 ]; then
   # printf 인자 수 == %s 수 (12개). 과거 stray `\n` 인자가 끼어 포맷이 재사용돼
   # 무효 JSON 2줄이 나오던 결함 수정 (T5④). 신규 3필드는 additive — 기존
   # 필드·순서 불변.
-  printf '{"action":"%s","total":%s,"success":%s,"pulled":%s,"pushed":%s,"unchanged":%s,"diverged":%s,"missing_remote":%s,"failed":%s,"reclaimed":%s,"task_branch":%s,"policy_hold":%s}\n' \
+  printf '{"action":"%s","total":%s,"success":%s,"pulled":%s,"pushed":%s,"unchanged":%s,"diverged":%s,"missing_remote":%s,"failed":%s,"reclaimed":%s,"task_branch":%s,"policy_hold":%s,"pruned":%s}\n' \
     "$ACTION" "$total" "$success" \
     "$(_json_arr ${pulled[@]+"${pulled[@]}"})" \
     "$(_json_arr ${pushed[@]+"${pushed[@]}"})" \
@@ -736,5 +826,6 @@ if [ "$JSON_MODE" = 1 ]; then
     "$(_json_arr ${real_failed[@]+"${real_failed[@]}"})" \
     "$(_json_arr ${reclaimed[@]+"${reclaimed[@]}"})" \
     "$(_json_arr ${task_branch[@]+"${task_branch[@]}"})" \
-    "$(_json_arr ${policy_hold[@]+"${policy_hold[@]}"})"
+    "$(_json_arr ${policy_hold[@]+"${policy_hold[@]}"})" \
+    "$(_json_arr ${pruned[@]+"${pruned[@]}"})"
 fi

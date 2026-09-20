@@ -179,6 +179,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -196,6 +197,20 @@ GIT_DEFAULT_BRANCH_NAMES = frozenset({"main", "master"})
 # 잘려 나간 열린 PR 의 head 는 보호받지 못한 채 삭제될 수 있으므로, 한도
 # 도달은 "보호 검사 불완전"으로 취급해 --apply 를 fail-closed 로 차단한다.
 OPEN_PR_LIMIT = 200
+
+
+def _gh_exe() -> str:
+    """PATH 에서 찾은 gh 의 실제 경로. 못 찾으면 "gh" 그대로.
+
+    Windows 의 CreateProcess 는 확장자 없는 이름에 `.exe` 만 붙여 본다 —
+    PATHEXT 를 보지 않으므로 `gh.cmd` / `gh.bat` 형태의 shim(scoop·npm·테스트
+    스텁이 흔히 쓰는 형태)이 PATH 앞에 있어도 건너뛰고 뒤쪽의 `gh.exe` 를
+    집는다. 그러면 "PATH 를 바꿔 gh 를 갈아끼웠다" 는 전제가 조용히 깨지고,
+    열린 PR 보호 검사가 의도하지 않은 계정·레포를 향해 나간다. shutil.which
+    는 PATHEXT 를 따르므로 그 불일치를 없앤다. 못 찾으면 이름을 그대로 넘겨
+    기존과 똑같이 실패(→ fail-closed)하게 둔다.
+    """
+    return shutil.which("gh") or "gh"
 
 # 원격 기본 브랜치 라이브 조회(git ls-remote)의 상한. 이 도구의 유일한 바깥
 # 방향 git 호출이고 27레포 순회에서 레포당 한 번 돈다 — 응답 없는 호스트
@@ -607,7 +622,7 @@ def _gh_pr_list(repo: Path, repo_id: str) -> str:
     # 인증 프롬프트가 영원히 기다릴 수 있고, timeout 이 없으면 멈춘 gh 하나가
     # 순회 전체를 세운다. 둘 다 평범한 검사 실패(fail-closed)로 강등된다.
     return subprocess.run(
-        ["gh", "pr", "list", "--repo", repo_id, "--state", "open", "--limit", str(OPEN_PR_LIMIT), "--json", "number,headRefName"],
+        [_gh_exe(), "pr", "list", "--repo", repo_id, "--state", "open", "--limit", str(OPEN_PR_LIMIT), "--json", "number,headRefName"],
         cwd=repo,
         check=True,
         capture_output=True,

@@ -100,7 +100,7 @@ function main() {
     // 6. Output response
     const response = {
       ...(newConversation
-        ? { systemMessage: `Lens v3.44.1 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready` }
+        ? { systemMessage: `Lens v3.45.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready` }
         : {}),
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
@@ -120,7 +120,7 @@ function main() {
   } catch (err) {
     // Fail gracefully - don't break the session
     const fallback = {
-      systemMessage: 'Lens v3.44.1 activated (scan skipped)',
+      systemMessage: 'Lens v3.45.0 activated (scan skipped)',
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         error: err.message,
@@ -194,7 +194,7 @@ function clearPreviousSessionProgressClock(newConversation, projectRoot) {
 // What remains is Lens-only state the host cannot know: session memory, plan
 // history, and the /crv staleness nudge.
 function buildAdditionalContext({ memorySummary, planSummary, auditNudge }) {
-  let ctx = `# Lens v3.44.1 - Session Startup\n\n`;
+  let ctx = `# Lens v3.45.0 - Session Startup\n\n`;
 
   // /crv capability-audit nudge (Lens repo only; muted single line)
   if (auditNudge) {
@@ -215,7 +215,7 @@ function buildAdditionalContext({ memorySummary, planSummary, auditNudge }) {
 }
 
 function buildFallbackContext() {
-  return `# Lens v3.44.1 - Session Startup
+  return `# Lens v3.45.0 - Session Startup
 
 Session memory could not be loaded (scan or read error). Lens skills still work; run \`/cp\` or \`/cc\` directly.
 `;
