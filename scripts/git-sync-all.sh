@@ -69,14 +69,22 @@ done
 
 # 중복 제거 — device:inode 로 dedup 하여 Windows 케이스 무차별 / 심볼릭 링크
 # 같은 가짜 중복까지 흡수. GNU stat (Linux/Git Bash) 와 BSD stat (macOS) 모두 지원.
+# ⚠️ 연상배열(declare -A)을 쓰면 안 된다 — macOS 기본 bash 는 3.2 이고 거기서
+# `declare -A` 는 실패한다. 그 뒤 `_seen_id[$id]` 의 문자열 첨자는 산술식으로
+# 평가돼 "expression recursion level exceeded" 로 매 항목이 터지고, 결과적으로
+# **REPOS 가 0개**가 된다 — /cs 가 아무 레포도 동기화하지 않고 조용히 성공한다.
+# 실측(2026-09-20): macmini·mac-001 둘 다 /bin/bash 3.2.57, mac-001 에는 새
+# bash 가 아예 없다. 그래서 개행 구분 문자열 + case 로 bash 3.2 에서도 도는
+# 방식으로 바꾼다 (동작은 동일, 레포 수십 개 규모에서 비용 차이 없음).
 _dedup=()
-declare -A _seen_id=()
+_seen_ids=$'\n'
 for p in "${REPOS[@]}"; do
   id=$(stat -c '%d:%i' "$p" 2>/dev/null || stat -f '%d:%i' "$p" 2>/dev/null || echo "$p")
-  if [ -z "${_seen_id[$id]:-}" ]; then
-    _seen_id[$id]=1
-    _dedup+=("$p")
-  fi
+  _idkey=$'\n'"$id"$'\n'
+  case "$_seen_ids" in
+    *"$_idkey"*) ;;
+    *) _seen_ids="$_seen_ids$id"$'\n'; _dedup+=("$p") ;;
+  esac
 done
 REPOS=("${_dedup[@]}")
 
@@ -102,6 +110,26 @@ _cfg_get() {
 _cfg_flag() {
   [ -n "$CFG_FILE" ] || return 0
   sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$CFG_FILE" 2>/dev/null | head -1
+}
+
+# ── 시크릿 게이트 (v3.46) ────────────────────────────────────
+# `git add -A` 는 .gitignore 에 안 걸린 것을 전부 담는다. 평소에는 그게 계약
+# 이지만, **원격 머신을 대신 커밋해 줄 때**는 얘기가 다르다 — 그 머신의
+# .gitignore 상태를 여기서 알 수 없고, 잘못 올라간 시크릿은 되돌릴 수 없다.
+# 실측(2026-09-20, 4대): `.env.mirror` · `.env.bak-YYYYMMDD` 처럼 **변형 이름**
+# 이라 패턴을 빠져나간 미추적 시크릿이 여러 레포에 있었다.
+# 걸리면 **커밋하지 않고 보고만** 한다 — 막는 쪽이 틀렸을 때의 대가(한 번 더
+# 손으로 커밋)가, 통과시켰을 때의 대가(공개 유출)보다 압도적으로 싸다.
+SECRET_GUARD="${LENS_SYNC_SECRET_GUARD:-1}"
+SECRET_RE="${LENS_SYNC_SECRET_RE:-(^|/)\.env($|\.|-)|\.env\.|\.bak($|-|\.)|\.pem$|\.key$|\.p12$|\.pfx$|id_rsa|id_ed25519|secret|credential|\.mirror($|\.)}"
+
+# _secret_hits <repo> → 걸린 경로들 (없으면 빈 문자열)
+_secret_hits() {
+  [ "$SECRET_GUARD" = "1" ] || return 0
+  git -C "$1" status --porcelain 2>/dev/null \
+    | sed 's/^...//' \
+    | grep -Ei "$SECRET_RE" 2>/dev/null \
+    | head -5
 }
 
 # gh 가용성 — 회수(T4①)·PR 경로만 gh 를 쓴다. 미러 push 는 gh 무의존.
@@ -135,6 +163,7 @@ policy_hold=()      # PR 생성까지만, 머지는 사람 (pr-manual 등, v3.31
 nonbase=()          # base 밖 미머지 브랜치 — 정보 표시 (v3.31 T6)
 pruned=()           # 병합 증명돼 이번 런이 삭제한 브랜치 (v3.45 T7)
 prune_hold=()       # 정리가 fail-closed 로 막힌 repo (v3.45 T7)
+secret_hold=()      # 시크릿 후보가 있어 commit 을 보류한 repo (v3.46)
 
 # --json 모드에선 사람용 출력은 전부 stderr 로, stdout 은 마지막 JSON 한 줄만.
 log() { if [ "$JSON_MODE" = 1 ]; then printf "%s\n" "$*" >&2; else printf "%s\n" "$*"; fi; }
@@ -457,7 +486,13 @@ EOF
                 # push 는 ff 전제. force 계열 절대 금지 — 원격이 앞서면 거부되고
                 # failed 로 보고된다. 로컬 커밋은 그대로 남아 다음 런이 재시도
                 # 한다(자기치유). 이 경로엔 reset 이 없다 — 유실 기전 원천 부재.
-                if [ "$dirty" != "0" ]; then
+                _shits=$(_secret_hits "$repo")
+                if [ -n "$_shits" ]; then
+                  # 커밋 자체를 안 한다. 워킹트리는 그대로 두므로 사람이
+                  # .gitignore 를 고치거나 파일을 치운 뒤 다음 런이 정상 진행한다.
+                  secret_hold+=("$name: $(printf '%s' "$_shits" | tr '\n' ' ')")
+                  repo_err="시크릿 후보 감지 — commit·push 보류(.gitignore 확인 후 재실행)"
+                elif [ "$dirty" != "0" ]; then
                   git -C "$repo" add -A
                   git -C "$repo" commit -m "chore: auto-sync $DATE_ISO" --quiet 2>/dev/null \
                     || repo_err="commit failed (git user.name/email 미설정 확인)"
@@ -484,7 +519,11 @@ EOF
                 if ! git -C "$repo" checkout -q -b "$sync_branch" 2>/dev/null; then
                   repo_err="브랜치 생성 실패 ($sync_branch)"
                 else
-                  if [ "$dirty" != "0" ]; then
+                  _shits=$(_secret_hits "$repo")
+                  if [ -n "$_shits" ]; then
+                    secret_hold+=("$name: $(printf '%s' "$_shits" | tr '\n' ' ')")
+                    repo_err="시크릿 후보 감지 — commit·push 보류(.gitignore 확인 후 재실행)"
+                  elif [ "$dirty" != "0" ]; then
                     git -C "$repo" add -A
                     git -C "$repo" commit -m "chore: auto-sync $DATE_ISO" --quiet 2>/dev/null \
                       || repo_err="commit failed (git user.name/email 미설정 확인)"
@@ -755,6 +794,13 @@ fi
 if [ ${#unchanged[@]} -gt 0 ] && [ ${#unchanged[@]} -lt 20 ]; then
   log ""
   log "○ 변경 없음 (${#unchanged[@]}): ${unchanged[*]}"
+fi
+# ── 시크릿 보류 (v3.46) ──
+if [ ${#secret_hold[@]} -gt 0 ]; then
+  log ""
+  log "🔐 시크릿 후보 — commit·push 보류 (${#secret_hold[@]}):"
+  for x in "${secret_hold[@]}"; do log "   • $x"; done
+  log "   ↳ .gitignore(또는 .git/info/exclude)에 넣거나 파일을 치운 뒤 다시 실행하세요."
 fi
 # ── T7: 병합 완료 브랜치 자동 정리 결과 ──
 if [ ${#pruned[@]} -gt 0 ]; then
