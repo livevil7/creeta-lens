@@ -402,8 +402,16 @@ def parse_winget_upgrade(text):
         if set(s) <= {"-"}:
             continue  # 구분선
         if re.fullmatch(r"\d+ upgrades? available\.?", s):
-            continue  # 요약줄
+            continue  # 요약줄 (영어 로케일)
         i_id = _cell_to_index(line, cols["Id"])
+        # 표의 Id 컬럼에 **닿지도 않는** 줄은 패키지 행이 아니다 — 요약·안내문이다.
+        # 위의 정규식은 영어 출력에만 맞아서, 한글 Windows 의
+        # "25 업그레이드를 사용할 수 있습니다." 는 여기까지 흘러와 매 실행마다
+        # "파싱 건너뜀" 경고를 냈다(실측: sj-omen·sj-x1 전부). 경고는 사용자에게
+        # 고장으로 읽히는데 실제로는 아무것도 누락되지 않았다 — 25건 표시에
+        # 25건을 다 읽었다. 폭으로 판정하면 로케일과 무관하게 조용히 걸러진다.
+        if i_id >= len(line):
+            continue
         i_ver = _cell_to_index(line, cols["Version"])
         i_avail = _cell_to_index(line, cols["Available"])
         i_src = _cell_to_index(line, cols["Source"]) if cols["Source"] is not None else len(line)
@@ -420,6 +428,26 @@ def parse_winget_upgrade(text):
             "latest": latest,
         })
     return items
+
+
+def _source_tool(src):
+    """소스별 실행 파일 이름. 없는 소스는 None."""
+    return {"winget": "winget", "npm": "npm", "pip": "pip", "brew": "brew"}.get(src)
+
+
+def _source_applies_here(src):
+    """이 플랫폼에서 그 소스를 기대할 수 있는가.
+
+    macOS 에 winget 이 없는 것은 결함이 아니라 당연한 상태다. 반대로 macOS 에
+    brew 가 PATH 에 없는 것은 **알려야 할 사실**이다 — 그 머신의 brew 패키지가
+    통째로 검사되지 않은 채 "최신" 으로 보고되기 때문이다.
+    """
+    sysname = platform.system()
+    if src == "winget":
+        return sysname == "Windows"
+    if src == "brew":
+        return sysname in ("Darwin", "Linux")
+    return True
 
 
 # ---------- Source scanners (each returns (items, error_or_None)) ----------
@@ -790,11 +818,17 @@ def scan_plugins():
 def cmd_scan(write_snapshot=False):
     items = []
     source_errors = []
+    sources_skipped = []
     # cli-special: 전용 업데이트 경로가 있는 것만 (claude / lens 플러그인)
     it = scan_claude()
     if it:
         items.append(it)
     items.extend(scan_plugins())
+    # 도구가 PATH 에 없으면 스캐너는 (빈 목록, None) 을 돌려준다 — 즉 **오류도
+    # 아니고 항목도 없다**. 그러면 그 소스는 리포트에서 통째로 사라지고 사용자는
+    # "검사했는데 올릴 게 없다" 로 읽는다. 실측(2026-09-20): 비로그인 셸의 두 macOS
+    # 머신에서 brew 가 PATH 에 없어 brew 패키지가 한 건도 집계되지 않았는데
+    # source_errors 는 0 이었다. 검사하지 않은 것과 검사해서 깨끗한 것은 다르다.
     for src_name, fn in (
         ("winget", scan_winget),
         ("npm", scan_npm_global),
@@ -806,6 +840,20 @@ def cmd_scan(write_snapshot=False):
         items.extend(got)
         if err:
             source_errors.append({"source": src_name, "error": err})
+            continue
+        if got:
+            continue
+        if not _source_applies_here(src_name):
+            continue  # 플랫폼에 없는 게 당연한 소스 — 말할 것 없음
+        tool = _source_tool(src_name)
+        missing = (not _find_code()) if src_name == "vscode" else (
+            bool(tool) and not shutil.which(tool))
+        if missing:
+            sources_skipped.append({
+                "source": src_name,
+                "reason": "%s 를 PATH 에서 찾지 못했다 — 이 소스는 검사되지 않았다"
+                          % (tool or "code"),
+            })
     items = dedup_items(items)
     # 승격 판정은 winget 항목이 있을 때만, --scope user 조회는 비승격일 때만 (P6)
     winget_present = any(i["source"] == "winget" for i in items)
@@ -818,7 +866,8 @@ def cmd_scan(write_snapshot=False):
             i["risk"], i["hold_reason"] = classify_risk(
                 i["source"], pkg, i.get("installed"), i.get("latest"),
                 elevated, user_scope_ids)
-    payload = json.dumps({"items": items, "source_errors": source_errors},
+    payload = json.dumps({"items": items, "source_errors": source_errors,
+                          "sources_skipped": sources_skipped},
                          indent=2, ensure_ascii=False)
     # 사전 스냅샷 — 무확인 실행 후 "무엇이 어떤 버전에서 갔는지" 사후 재구성용 (T5).
     # **명시 요청(`scan --snapshot`)일 때만 쓴다.** 모든 스캔이 같은 경로에 쓰면
