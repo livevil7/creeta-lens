@@ -9,6 +9,7 @@
   "baseBranch": { "Returns_ERP_v20": "staging", "namane-cms": "master" },
   "syncPolicy": { "Returns_ERP_v20": "pr-manual" },
   "protectedBranches": { "namane-cms": ["main"] },
+  "nonStopActions": { "Returns_ERP_v20": ["staging 배포", "staging DB 변경"] },
   "gateEnforcement": true,
   "requireTaskBranch": false,
   "autoDeleteMergedBranch": true,

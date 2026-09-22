@@ -48,7 +48,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 6. **실제 검증** — QA 는 텍스트 검토 금지. SUCCESS_CRITERIA 각 항목을 도구로 직접 증명한다. (Phase 6)
 7. **최대 5회 반복** — 6번째는 없다. 미달 상태로 끝나면 done 대신 최종 보고 후 `실행 종료` 로 사용자 개입을 요청한다. 통과한 서브태스크는 재수행하지 않는다. (Phase 5)
 8. **산출물은 풀 경로** — 최종 보고에서 bare 이름(`report.md`) 금지. 프로젝트 루트 기준 전체 경로. (Phase 7)
-9. **게이트 원장 (v3.35)** — SUCCESS_CRITERIA 를 `.lens/gates/` 에 결의하고, 증거(exit code + EXPECT 매칭)로만 닫는다. **증거 없는 `met` 는 미충족으로 계산된다** — 빈 게이트보다 나쁘다(자기채점이라서). 미충족이 남으면 `hooks/stop.js` 가 턴 종료를 거부한다. 포기는 사유를 적은 `abandoned` 로만. (Phase 0.5 · 6.0 · 7.2.5)
+9. **게이트 원장 (v3.35)** — SUCCESS_CRITERIA 를 `.lens/gates/` 에 결의하고, 증거(exit code + EXPECT 매칭)로만 닫는다. **증거 없는 `met` 는 미충족으로 계산된다** — 빈 게이트보다 나쁘다(자기채점이라서). auto 게이트가 미충족인 채 턴을 끝내려 하면 `hooks/stop.js` 가 거부한다(상한 2회) — manual 만 남았거나 서브에이전트·Workflow 를 기다리는 중이면 막지 않는다(v3.48). 포기는 사유를 적은 `abandoned` 로만. (Phase 0.5 · 6.0 · 7.2.5)
 
 ---
 
@@ -62,16 +62,16 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 
 | 정지 | 무엇 | 질문 header |
 |---|---|---|
-| **비가역** | ① **항상 멈추는 행동** — 운영·staging 배포, 머지가 곧 배포인 레포(`syncPolicy: pr-manual`)의 머지, DB 스키마·데이터 변경·삭제, 대량 삭제, force push, 소유가 증명 안 된 브랜치에 커밋. **계획에 단계로 적혀 있어도 멈춘다.** ② 그 밖에 되돌리기 어려운데 계획에 없는 행동 | `정지:비가역` |
+| **비가역** | ① **항상 멈추는 행동** — 배포, 머지가 곧 배포인 레포(`syncPolicy: pr-manual`)의 머지, DB 스키마·데이터 변경·삭제, 대량 삭제, force push, 소유가 증명 안 된 브랜치에 커밋. **계획에 단계로 적혀 있어도 멈춘다.** 운영 배포·운영 DB 는 항상 멈춘다. staging 배포·staging DB 변경은 그 레포가 `${CLAUDE_PLUGIN_ROOT}/lens.config.json` 의 `nonStopActions[<레포 디렉토리명>]` 에 그 행동을 적어 둔 때만 멈추지 않는다(staging 으로 가는 머지는 staging 배포다). ② 그 밖에 되돌리기 어려운데 계획에 없는 행동 | `정지:비가역` |
 | **외부영향** | ① **항상 멈추는 행동** — 메일·SNS·메시지 발송, 외부 게시, 유료 API 대량 호출. 계획에 적혀 있어도 멈춘다. ② 그 밖에 돈이 들거나 밖으로 나가는데 계획에 없는 행동 | `정지:외부영향` |
 | **범위변경** | 승인된 범위를 넘어야 목표에 닿는 경우 — 계획에 없는 파일·화면 구조·다른 레포, 목표 자체 변경 | `정지:범위변경` |
 
-- **「항상 멈추는 행동」을 멈추지 않는 경우는 하나뿐**: 사용자가 승인하면서 **그 행동을 묻지 말고 하라고 명시**했을 때("배포까지 해", "발송까지 진행해"). 그 말이 계획서 `approval_note` 나 핸드오프 `[APPROVED]` 에 원문으로 남아 있어야 한다. 그때는 직전에 한 줄 알리고 진행한다.
+- **「항상 멈추는 행동」을 멈추지 않는 경우는 둘뿐**: ① 사용자가 승인하면서 **그 행동을 묻지 말고 하라고 명시**했을 때("배포까지 해", "발송까지 진행해"). 그 말이 계획서 `approval_note` 나 핸드오프 `[APPROVED]` 에 원문으로 남아 있어야 한다. ② 위 표의 staging 예외 — 그 레포의 `nonStopActions` 에 적힌 staging 행동. 둘 다 직전에 한 줄 알리고 진행한다.
 - 핸드오프 `정지 지점` 은 이 규칙으로 **멈출 단계의 목록**이다 — `/cp` 가 승인 보고의 "멈추는 곳" 에 미리 보여준다. 목록에 없던 정지가 실행 중에 생기면(계획에 없던 비가역 행동·범위 변경) 그 순간 멈춘다.
 - 멈출 때 보고: 무엇을 하려는가 · 왜 정지인가 · 지금까지 된 것 · 선택지마다 무슨 일이 일어나나. 답을 기다리는 동안 **그 행동과 무관한 서브태스크는 계속 돌린다.**
 - **그 외 판단은 Leader 가 내린다.** 해석이 갈리는 세부(이름·구현 방식·순서)는 목표 기준으로 고르고 `## 진행상황` 의 편차 기록에 적는다.
 - 정지가 아닌 질문 header 는 셋뿐이다: 실행 **전** 승인 `실행 승인` · 자동 검증을 다 끝낸 뒤 manual 검증 행을 **한 질문에 모아** 확인받는 `검증 확인` · 실행이 **끝났는데** 목표 미달(반복 5회 소진·우회로도 실패)일 때 후속을 묻는 `실행 종료`.
-- **강제**: Claude Code 에서는 `hooks/pre-tool-ask.js` 가 이 세션의 게이트 원장이 열려 있는 동안 위 여섯 header 가 아닌 질문창을 거부한다. header 는 모델이 붙이는 이름표라 훅은 **이름표만** 본다 — 이름표를 거짓으로 붙이면 막지 못한다. 텍스트로 묻고 턴을 끝내는 우회는 `hooks/stop.js` 가 미충족 게이트로 막는다. Codex 에는 훅이 없다 — 이 절이 규칙이다.
+- **강제**: Claude Code 에서는 `hooks/pre-tool-ask.js` 가 이 세션의 게이트 원장이 열려 있는 동안 위 여섯 header 가 아닌 질문창을 거부한다. header 는 모델이 붙이는 이름표라 훅은 **이름표만** 본다 — 이름표를 거짓으로 붙이면 막지 못한다. 텍스트로 묻고 턴을 끝내는 우회는 auto 조건이 미충족이면 `hooks/stop.js` 가 막는다(상한 2회). manual 조건만 남았거나 백그라운드 작업(서브에이전트·Workflow)을 기다리는 중이면 막지 않는다 — 그건 우회가 아니라 대기다. Codex 에는 훅이 없다 — 이 절이 규칙이다.
 - **헤드리스**(`LENS_NONINTERACTIVE=1`)에서 정지에 닿으면 묻지 않는다 — 그 행동을 하지 않은 채 무엇에서 멈췄는지 보고하고 실행을 끝낸다(원장은 7.2.5 대로 닫는다).
 
 | 종전에 멈추던 곳 | 이제 |
@@ -217,10 +217,10 @@ scope: {포함 항목 수} · 정지 지점: {이 계획에서 멈출 단계 —
 1. **필수 섹션** — `validatePlanStructure` 를 실제로 실행한다(산문 자기점검 아님):
 
    ```bash
-   # grade 는 인자로 받지 않는다 — 문서 frontmatter 에서 직접 읽는다. /cp 의 핸드오프
+   # grade 는 인자로 받지 않는다 — CLI 가 문서 frontmatter 에서 직접 읽는다. /cp 의 핸드오프
    # 페이로드에 [GRADE] 블록이 있는데도 이 자리에서 참조된 적이 없어(실측 0회), 인자를
    # 비운 채 호출되면 deep 계획이 기본 등급으로 느슨하게 검사됐다. 문서가 SoT 다.
-   node -e "const m=require('${CLAUDE_PLUGIN_ROOT}/lib/plan-manager.js');const fs=require('fs');const c=fs.readFileSync(process.argv[1],'utf-8');const g=(c.match(/^grade\s*:\s*(\S+)/m)||[])[1];const r=m.validatePlanStructure(c,g);console.log(JSON.stringify({grade:g||'(기본)',...r}));process.exit(r.valid?0:1)" {plan_doc_path}
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" plan structure {plan_doc_path}
    ```
 
 2. **차단 질문 0** — `[BLOCKING_QUESTIONS]` 또는 계획서 `## ❓ 미해결 질문` 의 **차단** 항목이 비어 있는가. 남아 있으면 **그 질문을 먼저 묻는다**(보고 먼저, 질문 1개) — 답을 모르는 채 실행하면 worker 가 임의 가정으로 만든다. `[DECISIONS]` 에 답이 있는 질문은 다시 묻지 않는다.
@@ -259,7 +259,7 @@ scope: {포함 항목 수} · 정지 지점: {이 계획에서 멈출 단계 —
 **판정은 코드가 한다 (v3.34).** 종전 57줄의 산문 판정 로직을 `lib/git-branch.js` 로 옮겼다 — 산문으로만 있던 소유 증명 ①②③ 은 **구현이 아예 없었고**(실측: `require(.*git-branch)` 가 JS 전체에서 0 hits), 조사 렌즈 넷이 "이미 코드에 있다"고 잘못 가정했다. 이 규칙이 지키는 것은 base 가 `staging` 인 레포에 직접 커밋되던 경로다 — 거기서 머지는 곧 배포다.
 
 ```bash
-node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');const d=g.entryDecision(process.argv[1],process.argv[2]||null);console.log(JSON.stringify(d,null,1))" . {plan_branch}
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" branch entry . {plan_branch} --plan {plan_doc_path}
 ```
 
 | `decision` | 뜻 | 행동 |
@@ -279,7 +279,7 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');const d=g.en
 브랜치 이름은 slug 에서 결정적으로 나온다. 그래서 **이전 task 가 남긴 브랜치**도, **우연히 slug 가 같은 새 task** 도 같은 이름을 만든다. 이름은 *어느 브랜치인지* 를 말할 뿐 *누구 것인지* 를 말하지 않는다.
 
 ```bash
-node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');const fs=require('fs');const o=g.verifyOwnership(process.argv[1],process.argv[2],process.argv[3],fs.readFileSync(process.argv[4],'utf-8'));console.log(JSON.stringify(o,null,1))" . {branch} {base} {plan_doc_path}
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" branch ownership . {branch} {base} {plan_doc_path}
 ```
 
 세 신호가 **전부** 참일 때만 `owned: true` 다 — ① 계획 문서의 소유 기록이 이 브랜치를 지목 ② base 와 merge-base 공유 ③ 아직 병합되지 않음. **판정 불가는 통과가 아니다**(병합 상태를 못 읽으면 `notMerged: false`).
@@ -306,15 +306,28 @@ node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');const fs=req
 `✅ Review` 표(= 핸드오프 `[VERIFICATION]`)의 각 행을 게이트 1개로 옮긴다. `종류=auto` 행은
 `check`(실행할 명령)와 `expect`(**성공했을 때만** 출력에 나오는 문자열)를 채우고, `manual` 행은 둘 다 비운다.
 
-```bash
-node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JSON.stringify(g.createLedger(process.cwd(),{scope:'{plan-id}',planDoc:'{plan_doc_path}',goal:'{Goal 한 문장}',gates:[{id:'G1',criterion:'{성공기준 1}',check:'{명령}',expect:'{성공 표지}'},{id:'G2',criterion:'{성공기준 2}',kind:'manual'}]})))"
+**측정할 수 있으면 auto 다** — check 는 실행 가능한 명령이어야 하고 `lens-gate create` 가 확인한다. manual 은 차단 사유가 아니며 보고에 '대표 확인 필요: …' 한 줄로만 나간다. 사용자 화면에 게이트·원장·N/M 같은 내부 용어를 쓰지 않는다. `create` 는 auto 의 check 를 한 번씩 실제로 돌리므로 배포·발송·DB 변경처럼 부작용이 있는 명령은 check 로 쓰지 않는다(그런 행은 manual).
+
+게이트 목록은 인자가 아니라 파일로 넘긴다(셸 인용 사고 방지) — `.lens/{plan-id}.gates.json` 에 **Write 도구로** 쓴다(셸 heredoc 은 쓰지 않는다 — Bash 도구가 heredoc 안의 `\\` 를 `\` 로 줄여 정규식 검사식이 깨지는 것을 2026-09-22 실측):
+
+```json
+[
+  {"id": "G1", "criterion": "{성공기준 1}", "kind": "auto", "check": "{명령}", "expect": "{성공 표지}"},
+  {"id": "G2", "criterion": "{성공기준 2}", "kind": "manual"}
+]
 ```
 
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" create {plan-id} --plan {plan_doc_path} --goal "{Goal 한 문장}" --gates .lens/{plan-id}.gates.json
+```
+
+- `create` 가 실행할 수 없는 check(명령 없음·실행 불가)를 지목하며 거부하면, 그 행을 실제 명령으로 고치거나 측정할 수 없는 행이면 manual 로 바꿔 다시 만든다.
+- 남은 조건은 `lens-gate status {plan-id}` 로 본다. 원장 JSON 을 직접 읽거나 고치지 않는다.
 - **`expect` 는 성공/실패 양쪽에서 찍히는 문자열이면 안 된다** — 그러면 게이트가 통과를 증명하지 못한다.
 - 원장은 `.lens/gates/` 에 있고 gitignore 다. **실행 상태이지 산출물이 아니다.**
 - 직접 호출(0.2)로 들어왔어도 Leader 가 도출한 SUCCESS_CRITERIA 로 똑같이 만든다. 게이트 0개면 만들지 않는다.
-- **언제 만드나 (v3.40)**: `/cp` 의 `[APPROVED]` 핸드오프면 여기서 만든다. **직접 호출이면 1.5 승인을 받은 직후에** 만든다 — 승인 전에 만든 원장은 사용자가 취소해도 남아서, 이 세션의 질문을 최대 24시간 막는다(`hooks/pre-tool-ask.js`). 취소·중단으로 끝나면 `closeLedger` 로 닫는다.
-- 상한: 같은 원장으로 **3회** 연속 진전이 없으면 훅이 경고와 함께 자동 해제한다(무한 대기 없음).
+- **언제 만드나 (v3.40)**: `/cp` 의 `[APPROVED]` 핸드오프면 여기서 만든다. **직접 호출이면 1.5 승인을 받은 직후에** 만든다 — 승인 전에 만든 원장은 사용자가 취소해도 남아서, 이 세션의 질문을 최대 24시간 막는다(`hooks/pre-tool-ask.js`). 취소·중단으로 끝나면 `lens-gate close {plan-id}` 로 닫는다.
+- 상한: 같은 미충족 목록으로 **2회** 막은 뒤에는 훅이 자동 해제한다(해제 알림은 모델에게만, 상태당 1회 — 무한 대기 없음).
   끄려면 `lens.config.json` 의 `gateEnforcement: false` 또는 `LENS_GATE_ENFORCEMENT=0`.
 
 ---
@@ -401,19 +414,19 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 그 다음 질문 한 번(header `실행 승인`). 선택지는 결과 문장:
 1. **지금 실행** — {위 ➡️ 줄}
 2. **고칠 곳 있음** — 분해·접근 방식을 바꾼다
-3. **취소** — 아무것도 바꾸지 않고 멈춘다(원장을 이미 만들었으면 `closeLedger`)
+3. **취소** — 아무것도 바꾸지 않고 멈춘다(원장을 이미 만들었으면 `lens-gate close`)
 
 ---
 
 ### Phase 2: TodoWrite 준비 (Goal 우선 구조)
 
-**도구는 그 엔진의 네이티브 todo** — Claude `TodoWrite` · Codex `update_plan`. Claude 5 세션에 TodoWrite 가 안 보이면 `~/.claude/settings.json` env `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` 이 빠진 것이다. 도구가 없으면 계획서 `## 📌 진행 체크리스트` 를 원장으로 쓴다 — "도구가 없다" 로 되묻지 않는다. 항목 앞에 `[목표]` / `[실행]` 을 붙인다(Codex `update_plan` 에는 목표·실행 층이 없어서 성공 기준이 QA 전에 닫혔다).
+**도구는 그 엔진의 네이티브 todo** — Claude `TodoWrite` · Codex `update_plan`. 도구 목록에 TodoWrite 가 없으면 deferred 다 — `ToolSearch` 로 `select:TodoWrite` 를 불러온다. 그래도 없으면 `~/.claude/settings.json` env `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` 을 본다. 도구가 없으면 계획서 `## 📌 진행 체크리스트` 를 원장으로 쓴다 — "도구가 없다" 로 되묻지 않는다. 항목 앞에 `[목표]` / `[실행]` 을 붙인다(Codex `update_plan` 에는 목표·실행 층이 없어서 성공 기준이 QA 전에 닫혔다).
 
 상태 전이(pending → in_progress → completed)는 도구 설명이 강제하므로 여기서 재서술하지 않는다. **`/cc` 고유값은 셋이다:**
 
 1. **SUCCESS_CRITERIA 가 최상위 항목**, 서브태스크가 그 아래.
 2. **SUCCESS_CRITERIA 는 서브태스크와 같은 라이프사이클로 묶이지 않는다** — 모든 서브태스크가 끝나도 `pending` 을 유지하고, **Phase 6 QA 가 직접 검증해야만** `completed` 가 된다.
-3. **핸드오프면 plan 문서의 `## 📋 작업 인벤토리` 중 `포함` 항목을 실행 레벨 Todo 로 전량 등록한다 (v3.38)** — 압축·병합·요약 금지. 인벤토리는 `/cp` 에서 "빠뜨린 것"을 기계가 잡는 유일한 지점인데, 실행 Todo 가 그 원장보다 짧으면 원장이 실행 단계에서 다시 새는 것이다. 개수는 `deriveTodoItems` 가 계산해 두었다(`/cp` Phase 4).
+3. **핸드오프면 plan 문서의 `## 📋 작업 인벤토리` `포함` 항목을 전부 실행 레벨 Todo 로 덮는다 (v3.48)** — 10~15개 묶음으로 올리되 묶음 이름에 행 번호 범위를 적어 빠지는 행이 없게 한다(`/cp` Phase 4 와 같은 규칙). 89건을 통째 올리면 목록이 읽히지 않고 금방 낡는다(2026-09-21 실측). 인벤토리는 `/cp` 에서 "빠뜨린 것"을 기계가 잡는 유일한 지점이라, 묶어도 행 번호로 전건을 덮어야 한다.
 
 > 2번이 없으면 하위가 다 끝나는 순간 최상위도 함께 닫혀서 QA 를 건너뛸 유인이 생기고, "모든 Todo 가 초록인데 실제로는 미검증" 상태가 된다. 틀렸을 때 스스로 못 알아채는 종류라 산문으로 남긴다.
 
@@ -637,7 +650,7 @@ Supervisor 모델 = **변경의 규모·위험도로 판정** (v3.25 개정 — 
 **호출 — 여전히 한 줄이다.** Codex 레인을 띄우고 판정을 읽어 합치는 것까지 스크립트가 갖는다. **프로젝트 루트에서**:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode review --tag p45
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/cross-verify.sh" --mode review --tag p45 --plan {plan_doc_path}
 ```
 
 > ⚠️ **Bash 도구의 `timeout` 을 반드시 명시하거나 `run_in_background: true` 로 띄운다.** 하네스 기본 상한은 **120초**이고 리뷰는 그보다 오래 걸린다 — 그냥 부르면 스크립트가 자기 상한에 닿기도 전에 하네스가 먼저 죽여서, 종료 코드도 부분 출력도 남지 않는다. 동기로 부를 거면 `timeout: 450000`. Supervisor 와 진짜 병렬이 되려면 background 가 기본이다.
@@ -656,6 +669,7 @@ VERDICT FAIL lanes_ok=1 lanes_down=0
 | `timeout` | 상한 초과 | 그 레인은 **투표하지 않는다**. 플래그만 기록하고 진행 |
 | `unavailable` | 미설치·미인증·실패 | 동일 — **블로킹 금지** |
 | `unparsable` | 돌긴 했는데 판정을 못 읽었다 | 동일. 침묵을 pass 로 세지 않는다 |
+| `unverified` | 검토할 변경이 없었다(빈 diff) 또는 시간 초과 | 투표하지 않는다. **pass 가 아니다** — `--plan` 을 붙여 base 이후 커밋까지 보게 했는지 먼저 확인 (v3.48) |
 
 **판정**: `VERDICT FAIL` 이면 (= 살아있는 레인 중 하나라도 `fail`, 또는 `high_findings` 가 비지 않음) → Phase 5 재할당. `VERDICT PASS` + `supervisor.overall_pass == true` 여야 Phase 6. `VERDICT UNVERIFIED`(Codex 레인 다운·판정 불가)는 pass 가 아니다 — Supervisor 단독 진행임을 최종 보고에 명시한다.
 
@@ -816,21 +830,30 @@ QA 의 `success_criteria_results` 를 0.5 의 원장에 그대로 옮긴다. **�
 차단한다** — QA 를 건너뛰고 Phase 7 로 가는 경로가 구조적으로 닫힌다.
 
 ```bash
-# auto 항목 — 실제 실행의 종료코드와 출력을 그대로 넣는다
-node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JSON.stringify(g.recordEvidence(process.cwd(),'{scope}','{게이트 id}',{exit:{종료코드},output:process.argv[1]})))" "{명령 출력}"
+# auto 항목 — Lens 가 원장의 check 를 직접 돌려 종료코드·출력을 기록한다 (게이트 id 를 빼면 auto 전부)
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" run {scope} {게이트 id}
 ```
 
 - **판정은 코드가 한다.** 출력에 `expect` 문자열이 없거나 exit 이 0 이 아니면 `met` 로 기록되지 않는다.
   「통과한 것 같음」이 원장에 들어갈 경로는 없다.
-- **manual 항목**은 `검증 확인` 질문으로 사용자 확인을 받은 뒤 `{note:'{관측}',confirmedBy:'{확인한 사람}'}` 로 기록한다.
-  `confirmedBy` 가 비면 미충족으로 계산된다 — Phase 6 의 "manual 을 자동 pass 처리 금지" 가 여기서 강제된다.
+- **auto 증거는 반드시 `lens-gate run` 으로 남긴다** — 종료코드·출력을 손으로 적어 넣는 경로는 없다(3.48.0 원장은 run 이 남긴 증거만 `met` 로 센다). QA 가 같은 명령을 이미 돌렸어도 run 을 한 번 돌린다.
+- **manual 항목**은 `검증 확인` 질문으로 확인받는다. **사용자가 글로 답한 것도 확인이다**("1"·"확인했어" 등) — 답 원문을 그대로 기록한다:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" evidence {scope} {게이트 id} --note "{관측 또는 답 원문}" --confirmed-by 대표
+```
+
+  `--confirmed-by` 가 비면 미충족으로 계산된다 — Phase 6 의 "manual 을 자동 pass 처리 금지" 가 여기서 강제된다.
+  답이 없어도 턴을 막지 않는다 — 최종 보고에 `대표 확인 필요: {무엇을 어디서 보면 되나}` 한 줄로 남긴다.
 - **정말 검증이 불가능한 기준만** 사유를 적어 이탈한다. 조용히 빼지 마라:
 
 ```bash
-node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JSON.stringify(g.abandonGate(process.cwd(),'{scope}','{id}','{왜 불가능한지 + 인계사항}')))"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" abandon {scope} {id} --reason "{왜 불가능한지 + 인계사항}"
 ```
 
 사유가 비면 거부되고 게이트는 미충족으로 남는다.
+
+- 포기했거나 닫은 뒤 다시 검증하게 되면 `lens-gate reopen {scope} {id}` 로 되살리고 `run` 으로 증거를 붙인다 — 포기 기록을 남긴 채 새 증거를 덧대지 않는다.
 
 #### 6.1 verified == true AND 모든 SUCCESS_CRITERIA pass
 
@@ -904,10 +927,10 @@ Worker #2  |  점수: {score}/100  |  ✓ 통과
 원장을 닫는다. 닫지 않으면 이 레포의 **다음 세션까지** 훅이 계속 차단한다(24시간 뒤 자동 stale 해제).
 
 ```bash
-node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/gate-ledger');console.log(JSON.stringify(g.closeLedger(process.cwd(),'{scope}')))"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" close {scope}
 ```
 
-반환된 `{met, unmet, abandoned}` 를 **최종 보고에 그대로 싣는다.** 이탈(abandoned)이 1건이라도 있으면
+반환된 `{met, unmet, abandoned}` 를 **최종 보고에 사람 말로 싣는다**(확인됨 · 아직 안 됨 · 포기 — 게이트·원장·met 같은 말은 쓰지 않는다). 이탈(abandoned)이 1건이라도 있으면
 done 이 아니라 **부분 완료**다 — 무엇을 왜 포기했는지 사유를 함께 보고한다.
 
 #### 7.3 문서 통합 제안
@@ -938,6 +961,11 @@ done 이 아니라 **부분 완료**다 — 무엇을 왜 포기했는지 사유
 - **게이트**: {통과 / 우회됨({미달 항목})}
 ```
 
+**계획서 본문도 같이 고친다 (3.48.0)** — 문서만 보고 완료를 판정할 수 있어야 한다(갱신이 없어 "전체 38 완료 표시 0" 을 확인하려고 에이전트 7~14개를 띄운 적이 있다):
+- 7.2.5 `lens-gate close` 결과의 `met` 에 든 조건 → `✅ 검증` 표 그 행의 `통과` 칸 맨 앞에 `✅ `. 끝낸 단계의 `- [ ]`(🛠 어떻게·`📌 진행 체크리스트`) → `- [x]`.
+- Goal 이 전부 달성됐으면 frontmatter `status:` → `done`(`executing`·`approved` 어느 쪽이었든).
+- `last_tip:` 은 7.5 커밋 뒤에 적는다.
+
 Goal 달성이 N == M 이면 `/cd` 로 이어서 마감한다(7.3). `/cp done` 은 v3.34 에 없어진 명령이다 — 안내하지 않는다.
 
 > **편차 기록이 왜 필수인가 (v3.25)**: `/cp`(계획) → `/cc`(실행) → **???** → 다음 계획. 지금까지 되먹임 경로가 "재개 포인트 한 줄"뿐이라, **실행 중 계획이 틀렸다는 걸 알아내도 어디에도 남지 않았다.** 그러면 다음 계획이 같은 실수를 반복한다. 편차를 기록해야 고리가 닫힌다.
@@ -954,7 +982,7 @@ Goal 달성이 N == M 이면 `/cd` 로 이어서 마감한다(7.3). `/cp done` �
 
 1. **`.gitignore` 존중 (시크릿 임의 제외 절대 금지)** — `git add -A` 는 `.gitignore` 에 없는 것만 스테이징한다. **Lens 가 추가로 ".env 같으니 빼자"는 시크릿 필터를 걸지 않는다.** 무엇을 숨길지의 SoT 는 사용자의 `.gitignore` 다. 사용자는 민감파일(쿠키·세션·크레덴셜·키)을 **의도적으로 버전관리**하므로(예: `livevil-setting` 에 commit·push) 추적된 파일은 그대로 커밋한다. (사용자 강한 룰 — `feedback_sensitive_files_to_livevil_setting`: 민감파일은 숨기지 말 것. 임의 제외는 이 룰 위반.)
 2. **task 브랜치에서만 커밋** — `lib/git-branch.js` 의 `canCommitTo(repoPath, planBranch)` 로 판정한다. `planBranch` 는 **Phase 0.4 에서 확정한 브랜치**다(핸드오프면 plan 문서의 `branch`, 직접 호출이면 0.4 가 정한 이름). **커밋 허용 조건 = 현재 브랜치가 그 브랜치와 같을 때만.** 그 외(감지된 base 포함)는 커밋하지 않고 사유와 함께 보고한다 — 특히 0.4 강등 경로(`requireTaskBranch: false` + 브랜치 확보 실패)로 여기 도달했으면 **거부가 정의된 동작**이다: 커밋 없이 변경 요약+제안으로 끝낸다. 0.4 가 브랜치 **이름조차 확정하지 못한 채** 진행한 경우에만 `canCommitTo(repoPath, null)` 로 판정한다 — 이 경로는 "허용 접두사 4종 + base 아님"일 때만 허용한다(branch-lifecycle §2.1 규칙 3). 어느 경로로도 base 직접 커밋은 열리지 않는다. 브랜치 **이름 문자 비교를 판정 근거로 쓰지 않는다** — base 는 레포마다 다르다(워크스페이스 27개 레포 실측: `master` 만 11 / `main` 만 13 / 둘 다 1 / `main`+`staging` 1 / 원격에 둘 다 없음 1. 이름 비교는 staging 을 놓쳐, 커밋이 곧 배포인 레포에 직접 커밋되는 사고 경로였다). base 판정이 불가한 레포에서도 커밋하지 않는다(모르는 상태에서 커밋 금지).
-3. **커밋** — 변경을 스테이징 후 한 줄 메시지로 커밋. (커밋 메시지 trailer 규칙은 사용자/프로젝트 컨벤션 따름)
+3. **커밋** — **이 세션의 현황판에 running·launched 워커가 있으면 커밋을 보류하고 보고한다. 워커가 끝난 뒤 커밋.**(`git add -A` 가 워커의 작업 중 파일을 담는다 — 회귀 재현용으로 되돌려 둔 파일이 커밋된 실측 2026-09-18.) 변경을 스테이징 후 한 줄 메시지로 커밋. (커밋 메시지 trailer 규칙은 사용자/프로젝트 컨벤션 따름) 커밋 뒤 `git rev-parse HEAD` 를 계획서 frontmatter `last_tip:` 에 적어 한 번 더 커밋한다 — 브랜치가 지워진 뒤에도 `/cd` 가 이 sha 가 base 에 들어갔는지로 병합을 판정한다.
 4. **동기화** — ahead 면 push. 운영 머신(Mac Mini 등)까지 동기화가 필요한 레포면 `/cs` 패턴(pull→commit→push) 안내/실행.
 5. **diverged 면 보고만** — 원격과 갈라졌으면 자동 push 금지, "수동 해결 필요" 로 보고.
 
@@ -973,7 +1001,7 @@ Lens Multi — 최종 결과
 ✓ {완료한 서브태스크}  (…)
 
 Goal 달성: {N}/{M}
-게이트: met {N} / unmet {N} / abandoned {N}   ← 7.2.5 의 closeLedger 반환값 그대로
+확인: 끝 {N} · 아직 {N}({무엇}) · 포기 {N}({사유}) · 대표 확인 필요: {무엇, 없으면 없음}   ← 7.2.5 `lens-gate close` 결과를 사람 말로
 QA 증거: {실행한 명령·관측과 그 결과}
 산출물: {프로젝트 루트 기준 풀 경로}
 ```

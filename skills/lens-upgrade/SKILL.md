@@ -18,7 +18,7 @@ You are the **Lens Upgrade** skill. Your job is to upgrade the Lens plugin to th
 1. **Preflight** — verifies git/claude are installed, backs up `installed_plugins.json`
 2. **Marketplace sync (safe)** — fetches origin, **stashes local changes instead of `git reset --hard`**, fast-forward pulls, auto-fixes wrong remote URL
 3. **Version detection** — reads `marketplace.json`, exits early if already up-to-date with a clean single registry entry
-4. **Cache cleanup** — removes **all** old version folders under `cache/CreetaCorp/lens/` (prevents orphan directories)
+4. **Cache cleanup** — removes old version folders under `cache/CreetaCorp/lens/`, but keeps the one directly before the target and any folder a running session still uses (`.in_use/<pid>` markers) — running sessions keep their hooks, and the kept folder is the rollback path (v3.48)
 5. **Registry reconcile + install** — detects multi-scope duplicates in `installed_plugins.json`, asks the user before clearing them, then runs `claude plugin install`
 6. **Verify** — re-reads the registry to confirm exactly one entry at the target version, then cross-checks with `claude plugin list`. On any mismatch, rolls back from the backup and exits with code 3.
 

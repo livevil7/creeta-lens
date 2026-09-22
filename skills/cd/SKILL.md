@@ -98,7 +98,7 @@ Triggers: done, complete, finish task, close out, wrap up, 완료, 완료 처리
 >
 > ⚠️ **DONE 모드는 git 조작이 허용되는 예외다.** `/cp` 의 절대 규칙("계획 & 문서화만 — 문서 외 파일 수정 금지")은 **PLAN 모드**에 적용된다. DONE 모드는 작업을 *닫는* 정리 단계이므로 push·PR 생성·**병합된** 브랜치 삭제를 수행한다. 대신 **Phase 1.4 의 안전 규칙을 그대로 상속**한다 — 자동 삭제 절대 금지, 사용자 승인 필수, 추측 삭제 금지. 브랜치 **생성**은 여전히 `/cc` 의 일이고 `/cp` PLAN 모드는 이름만 정한다.
 
-Phase 1.3 에서 정리 대상으로 선택된 각 task 에 대해, 문서 frontmatter 에 `branch` 가 있으면 `lib/git-branch.js` 의 `mergedState(repoPath, branch, base)` 로 판정한다.
+Phase 1.3 에서 정리 대상으로 선택된 각 task 에 대해, 문서 frontmatter 에 `branch` 가 있으면 `lens-cli branch merged`(내부는 `lib/git-branch.js` 의 `mergedState`)로 판정한다.
 
 **판정 직전에 원격 ref 를 최신화한다 (선행 조건 — 생략 불가)** — `mergedState` 가 읽는 것은 **로컬에 저장된 원격 추적 ref** 다. 그 ref 가 마지막으로 갱신된 뒤 원격 task 브랜치에 새 커밋이 들어오면, 낡은 tip 을 보고 "머지됨" 으로 분류하고 **브랜치 정리(Phase 2.5)의 삭제가 더 새로운 원격 작업을 지운다.** 이 워크스페이스는 Windows 개발 머신과 Mac Mini 양쪽에서 같은 레포를 쓰므로 가정이 아니라 실제로 일어나는 시나리오다. 따라서:
 
@@ -107,10 +107,12 @@ Phase 1.3 에서 정리 대상으로 선택된 각 task 에 대해, 문서 front
 - 같은 원칙("판정 직전 refresh + SHA lease")이 배치 정리 도구 `scripts/prune_branches.py` 에도 적용된다. 두 경로의 판정 원칙은 항상 같아야 한다 (SoT: `docs/rules/branch-lifecycle.md`).
 
 ```bash
-# 4번째 인자 {fetch:true} 가 필수다 — 이게 없으면 판정 직전 refresh 가 돌지 않는다.
+# 판정 직전 fetch 는 CLI 가 항상 한다({fetch:true}) — 실패하면 state unknown + reason
+# "git fetch --prune origin 실패" 로 나오고, 그 판정은 삭제 근거가 아니다.
 # 낡은 tracking ref 로 "머지됨" 을 판정하면 브랜치 정리(Phase 2.5)에서 lease 가
 # 거부되어 그 task 의 완료 처리가 멈춘다 — 완료 인터뷰가 헛돈다.
-node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3],{fetch:true})))" . feat/<slug> <base>
+# --plan 을 넘기면 ref 가 다 지워진 브랜치도 병합 커밋 메시지·frontmatter last_tip 으로 판정한다.
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" branch merged . feat/<slug> <base> --plan docs/tasks/<id>.md
 ```
 
 반환값의 `state` 가 아래 6상태이고 `reason` 이 판정 근거다. **PR 유무는 `mergedState` 가 모른다** — 따로 조회한다. `gh` 부재·인증 실패면 **조용히 넘어가지 말고** "PR 상태 조회 불가" 를 표시하고 history 이동은 보류한다(머지 미확인과 같은 취급).
@@ -132,22 +134,22 @@ gh pr list --repo <OWNER/REPO> --head <branch> --state all --json number,state,b
 - 자격 통과 **0개**(MERGED 는 있는데 전부 base 불일치인 경우 포함)면 `prMerged` 를 주지 않는다 — 판정은 `unknown` 으로 남아 **사람 확인**으로 간다. 보고에 `PR #N 은 MERGED 지만 base 가 <baseRefName> (계획 base <base> 아님) — 증거 불인정` 을 명시해, 사람이 그 stacked 변경의 행방을 추적할 수 있게 한다.
 - 자격 통과 **2개 이상**이면 같은 브랜치가 두 사이클에 재사용된 흔적이다(1 task = 1 브랜치 = 1 PR 위반). 어느 머지가 이 task 의 것인지 도구가 특정할 수 없다 — 자동 증거로 쓰지 않고 `unknown` 유지, 후보 전부(번호·mergedAt)를 보고하고 사람 확인.
 
-**`unknown` 이 나왔고 base 자격을 통과한 MERGED PR 이 정확히 1개면 재판정한다** — GitHub 이 머지 후 head 를 자동 삭제하고 로컬 브랜치까지 정리된 상태에서는 원격·로컬 ref 가 둘 다 없어 `mergedState` 가 내용을 증명할 방법이 없다(→ `unknown`). 그건 **정상 완료 흐름**인데, 그대로 두면 **그 task 는 영원히 history 로 못 간다.** base 자격까지 통과한 머지를 확인했으면 그 사실을 판정에 되먹인다:
+**`unknown` 이 나왔고 base 자격을 통과한 MERGED PR 이 정확히 1개면 재판정한다** — GitHub 이 머지 후 head 를 자동 삭제하고 로컬 브랜치까지 정리된 상태에서는 원격·로컬 ref 가 둘 다 없고, squash 머지면 병합 커밋 메시지·`last_tip` 근거도 없어 `mergedState` 가 내용을 증명할 방법이 없다(→ `unknown`). 그건 **정상 완료 흐름**인데, 그대로 두면 **그 task 는 영원히 history 로 못 간다.** base 자격까지 통과한 머지를 확인했으면 그 사실을 판정에 되먹인다:
 
 ```bash
-node -e "const g=require('${CLAUDE_PLUGIN_ROOT}/lib/git-branch.js');console.log(JSON.stringify(g.mergedState(process.argv[1],process.argv[2],process.argv[3],{fetch:true,prMerged:true})))" . feat/<slug> <base>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" branch merged . feat/<slug> <base> --plan docs/tasks/<id>.md --pr-merged
 ```
 
-`prMerged: true` 는 **로컬·원격 ref 가 둘 다 없을 때만** 참조된다(내용 증거가 있으면 그쪽이 우선). 지울 ref 가 없으므로 이 경로의 오판이 삭제로 이어지지 않는다. ⚠️ PR 상태를 **확인하지 않은 채** `prMerged: true` 를 주지 마라 — 그리고 **base 자격 검사 없이도 주지 마라.** 이름 일치 + MERGED 는 증명이 아니라 가정이다.
+`--pr-merged`(= `mergedState` 의 `prMerged: true`)는 **로컬·원격 ref 가 둘 다 없을 때만** 참조된다(내용 증거가 있으면 그쪽이 우선). 지울 ref 가 없으므로 이 경로의 오판이 삭제로 이어지지 않는다. ⚠️ PR 상태를 **확인하지 않은 채** `prMerged: true` 를 주지 마라 — 그리고 **base 자격 검사 없이도 주지 마라.** 이름 일치 + MERGED 는 증명이 아니라 가정이다.
 
 | 상태 | 의미 | 처리 | 판정에 쓴 SHA 기록 |
 |---|---|---|---|
 | `unpushed` | 원격에 브랜치가 없고, **내용이 base 에 없음이 증명됐다** | **push + PR 생성 제안** (AskUserQuestion). history 이동 보류 | — (원격 ref 없음) |
-| `merged-deleted` | 원격 브랜치가 없지만 **로컬 ref 기준으로 내용이 base 에 들어갔음이 증명됐다** — 머지 직후 head 를 삭제한 정상 흐름(§3 이 규정한 것) | `merged`/`patch-merged` 와 동일하게 Phase 2 이후 진행. 브랜치 정리(Phase 2.5)는 **원격 삭제를 건너뛴다**(지울 ref 가 없다) — **로컬 브랜치만** 삭제 | `branchSha` 는 `null`(원격 ref 부재). 대신 `localSha` 를 로컬 삭제의 lease 로 쓴다 |
+| `merged-deleted` | 원격 브랜치가 없지만 **로컬 ref 기준으로 내용이 base 에 들어갔음이 증명됐다** — 머지 직후 head 를 삭제한 정상 흐름(§3 이 규정한 것). 원격·로컬 ref 가 **둘 다 없어도** ① base 에 이 브랜치 이름을 담은 병합 커밋이 있거나(`merge --no-ff` 레포) ② 계획서 frontmatter `last_tip:`(/cc 7.5 가 기록)이 base 의 조상이면 이 상태다 — `reason` 에 어느 근거인지 적힌다(이때 `localSha` 는 `null`, 로컬 삭제는 "이미 정리됨") | `merged`/`patch-merged` 와 동일하게 Phase 2 이후 진행. 브랜치 정리(Phase 2.5)는 **원격 삭제를 건너뛴다**(지울 ref 가 없다) — **로컬 브랜치만** 삭제 | `branchSha` 는 `null`(원격 ref 부재). 대신 `localSha` 를 로컬 삭제의 lease 로 쓴다 |
 | `unmerged` (PR 없음) | 원격에 있고 미머지, PR 도 아직 없다 | **PR 생성 제안**. history 이동 보류 | `origin/<branch>` tip |
 | `unmerged` (PR 열림) | 리뷰 대기 | **history 로 내리지 않는다** → **"In Review"** 로 보고. task 파일은 `docs/tasks/` 에 그대로 둔다 | `origin/<branch>` tip |
 | `merged` / `patch-merged` | 병합이 증명됐다 | Phase 2(완료 인터뷰) → **Phase 2.5(브랜치 정리)** → Phase 3(history 기록) → Phase 4(task 정리) 순으로 진행 — **브랜치 정리가 아카이브보다 먼저다** | **필수** — `origin/<branch>` tip + 비교에 쓴 `origin/<base>` tip. Phase 2.5 가 이 값을 lease 로 쓴다 |
-| `unknown` | **도구가 증명하지 못했다** — 계보가 다르거나, 원격 ref 가 없는데 내용 반영 여부도 확인 불가(merge-tree 충돌·구버전 git·로컬 ref 도 없음) | **자동 처리 금지.** 사람 확인 요청 — history 이동·브랜치 삭제 **둘 다 보류**. ⚠️ **push + PR 생성을 제안하지 않는다** — 이미 머지된 작업일 수 있다(그 제안은 `unpushed` 전용) | 기록만(사람 확인용). 삭제 근거로는 쓰지 않는다 |
+| `unknown` | **도구가 증명하지 못했다** — 계보가 다르거나, 원격 ref 가 없는데 내용 반영 여부도 확인 불가(merge-tree 충돌·구버전 git·로컬 ref 도 없고 병합 커밋·`last_tip` 근거도 없음) | **자동 처리 금지.** 사람 확인 요청 — history 이동·브랜치 삭제 **둘 다 보류**. ⚠️ **push + PR 생성을 제안하지 않는다** — 이미 머지된 작업일 수 있다(그 제안은 `unpushed` 전용) | 기록만(사람 확인용). 삭제 근거로는 쓰지 않는다 |
 
 **판정에 쓴 SHA 를 기록한다** — fetch 직후 판정에 실제로 사용한 tip SHA 를 판정 결과와 함께 남긴다. 이 값이 Phase 2.5 의 **lease** 다: 삭제 명령에 이 SHA 를 **실어 보내고**, 원격 tip 이 다르면 git 이 삭제를 거부한다("확인한 뒤 삭제" 가 아니다 — Phase 2.5). **SHA 없이 나온 판정으로는 브랜치를 삭제하지 않는다.**
 
