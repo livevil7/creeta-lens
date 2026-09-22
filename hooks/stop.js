@@ -183,16 +183,18 @@ function gateVerdict(input) {
     let decision = null;
 
     if (store.filePath('blocks')) {
-      // Per-session counter; a store that cannot be written leaves decision null → pass.
-      store.update('blocks', (previous) => {
+      // Per-session counter. A counter that could not be SAVED must not block:
+      // every stop would read as the first and the 2-block cap would never bite.
+      const saved = store.update('blocks', (previous) => {
         decision = ledger.decideBlock(evaluation, previous, { cli });
         return decision.state;
       }, null);
+      if (saved === null) decision = null;
     } else {
       const statePath = ledger.blockStatePath(projectRoot);
       const decide = () => {
         decision = ledger.decideBlock(evaluation, safeReadJson(statePath, null), { cli });
-        safeWriteJson(statePath, decision.state);
+        if (!safeWriteJson(statePath, decision.state)) decision = null;
       };
       try {
         withFileLock(`${statePath}.lock`, decide, { timeoutMs: 1500 });

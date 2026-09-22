@@ -204,6 +204,15 @@ test('A3·A4 — 메타데이터만 바뀐 원장으로 5회: 차단 2 → 조�
   assert.strictEqual(outs.filter(o => 'systemMessage' in o).length, 0);
 });
 
+test('fail-open — 차단 카운터를 저장하지 못하면 막지 않는다(상한이 작동하지 않는 차단 금지)', () => {
+  const fx = fixture();
+  openLedger(fx, AUTO);
+  // blocks.json 자리에 폴더를 두어 쓰기가 반드시 실패하게 한다.
+  fs.mkdirSync(path.join(fx.sessionDir, 'blocks.json'), { recursive: true });
+  const outs = [0, 1, 2].map(() => run(fx, payload(fx)));
+  assert.deepStrictEqual(outs.map(isBlock), [false, false, false], JSON.stringify(outs));
+});
+
 test('A3 — stop_hook_active 참 + 같은 해시면 카운터만 +1 (blocks.json)', () => {
   const fx = fixture();
   openLedger(fx, AUTO);
