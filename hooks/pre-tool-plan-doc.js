@@ -25,6 +25,18 @@
  *      writes) — the delegate is the one holding the pen, and whether its own
  *      entries are attributable in the transcript is a harness detail.
  *
+ * v3.48 — WHO is acting (E1·E2·E3). On 2026-09-21 a fable subagent was refused as
+ * "claude-opus-5" (the parent transcript's model), spent 4 minutes reading this
+ * hook, and copied the delegation record into another repo to get through.
+ *   - A call with `agent_id` is a subagent's. Its model is read from its own
+ *     transcript `<transcript dir>/<session>/subagents/agent-<agent_id>.jsonl`
+ *     (layout measured on this machine); when that says a model, it decides.
+ *     The parent's model is read only when there is no `agent_id`.
+ *   - "Delegated" is read from THIS session's dashboard in the session store —
+ *     another session's or another repo's record, or an errored delegation, is
+ *     not visible or does not count. `launched` counts (a background planner).
+ *     No session id → the legacy repo dashboard.
+ *
  * WHEN IT STAYS OUT OF THE WAY
  * ----------------------------
  *   - the plan is already approved/executing — progress edits belong to the executor;
@@ -32,7 +44,7 @@
  *   - anything unreadable (no transcript, broken JSON, missing file) — fail open;
  *   - LENS_PLANNER_GATE=0.
  *
- * Input (stdin): { tool_name, tool_input: { file_path, content? }, transcript_path, cwd }
+ * Input (stdin): { tool_name, tool_input: { file_path, content? }, transcript_path, session_id, agent_id?, cwd }
  * Output: {} | { hookSpecificOutput: { permissionDecision: 'deny', permissionDecisionReason } }
  */
 
@@ -44,6 +56,7 @@ const {
   installFailSoftHandlers, readJsonInput, writeJson, resolveProjectRoot, safeReadJson,
 } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('pre-tool-plan-doc');
+const store = require(path.join(PLUGIN_ROOT, 'lib', 'session-store'));
 
 // SoT: hooks/pre-tool-task.js TOP_TIER · docs/rules/harness-rules.md §4.1.
 // Matched against the harness's model id (`claude-fable-5-1`), not equality.
@@ -72,12 +85,22 @@ function actingModel(file) {
   for (let i = lines.length - 1; i >= 0; i -= 1) {
     let e;
     try { e = JSON.parse(lines[i]); } catch { continue; }
-    if (e && e.type === 'assistant' && e.message && typeof e.message.model === 'string') return e.message.model;
+    // `<synthetic>` is the harness's own line (API error, session limit), not a model.
+    if (e && e.type === 'assistant' && e.message && typeof e.message.model === 'string'
+      && e.message.model !== '<synthetic>') return e.message.model;
   }
   return null;
 }
 
-/** Did this session spawn a top-tier agent? (the pen may be in its hand) */
+/** The subagent's own transcript, or null when the id is unusable as a file name. */
+function subagentTranscript(transcriptPath, agentId) {
+  const id = store.cleanId(agentId);
+  if (!transcriptPath || !id) return null;
+  const name = id.startsWith('agent-') ? id : `agent-${id}`;
+  return path.join(path.dirname(transcriptPath), path.basename(transcriptPath, '.jsonl'), 'subagents', `${name}.jsonl`);
+}
+
+/** Legacy (no session id): did this session spawn a top-tier agent? (the pen may be in its hand) */
 function topTierDelegated(projectRoot) {
   const board = safeReadJson(path.join(projectRoot, '.lens', 'agent-dashboard.json'), null);
   const agents = board && Array.isArray(board.agents) ? board.agents : [];
@@ -110,30 +133,49 @@ function main() {
   if (PAST_APPROVAL.test(field(text, 'status'))) return writeJson({});
   if (/조사보고/.test(field(text, 'kind'))) return writeJson({});
 
+  try { store.bind(input); } catch { /* no store → the legacy repo dashboard below */ }
+  const agentId = store.isSubagentCall(input) ? input.agent_id.trim() : null;
+
+  // A subagent is judged by its own transcript; the parent's model is not its model.
   let model;
   try {
-    model = actingModel(input.transcript_path);
+    model = actingModel(agentId ? subagentTranscript(input.transcript_path, agentId) : input.transcript_path);
   } catch {
-    return writeJson({}); // an unreadable transcript must never trap a session
+    if (!agentId) return writeJson({}); // an unreadable transcript must never trap a session
+    model = null;                       // a subagent falls back to the delegation record
   }
-  if (!model) return writeJson({});            // unknown model → fail open
-  if (model.includes(TOP_TIER)) return writeJson({});
+  if (model && model.includes(TOP_TIER)) return writeJson({});
+  if (!agentId && !model) return writeJson({}); // unknown model → fail open
 
-  const root = resolveProjectRoot({ filePath, cwd: input.cwd });
-  try {
-    if (topTierDelegated(root)) return writeJson({});
-  } catch { /* a broken board is not evidence either way — fall through to deny */ }
+  // A subagent whose transcript names its model has been judged by it already.
+  if (!(agentId && model)) {
+    try {
+      const delegated = store.current().sessionId
+        ? store.topTierDelegated(TOP_TIER)
+        : topTierDelegated(resolveProjectRoot({ filePath, cwd: input.cwd }));
+      if (delegated) return writeJson({});
+    } catch { /* a broken board is not evidence either way — fall through to deny */ }
+  }
+
+  let who = `이 세션은 ${model} 이고 ${TOP_TIER} 위임 기록도 없다.`;
+  if (agentId) {
+    who = (model
+      ? `이 서브에이전트(${agentId})는 ${model} 이다.`
+      : `이 서브에이전트(${agentId})의 모델을 기록에서 읽지 못했고 이 세션의 ${TOP_TIER} 위임 기록도 없다.`)
+      + ' 서브에이전트는 결과를 리더에게 넘기고, 위임은 리더가 한다.';
+  }
 
   writeJson({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
       permissionDecisionReason:
-        `[Lens] 계획서는 최상위 티어(${TOP_TIER})가 쓴다 — 이 세션은 ${model} 이고 ${TOP_TIER} 위임 기록도 없다. `
+        `[Lens] 계획서는 최상위 티어(${TOP_TIER})가 쓴다 — ${who} `
         + `계획서는 되돌리기 어려운 결정을 문서에 박는 일이라, 여기서 틀리면 워커 전원이 틀린 것을 정확하게 만든다(harness-rules §4.1). `
         + `Agent(model: "${TOP_TIER}") 에 Phase 1~2.5 를 위임하되 **컨텍스트를 통째로** 실어 보내라 — 원본 요청 전문 · 목표/왜 · 조사 결과 · 인벤토리 전량 · 관련 docs/rules·docs/history 경로. `
         + `컨텍스트 없는 위임은 상위 모델이 아니라 무지한 모델을 쓰는 것이다. 그 에이전트가 이 파일을 쓰면 통과한다. `
-        + `계획서가 아닌 문서(조사보고)는 frontmatter 에 kind: 조사보고 를 적고, 이 검사를 꺼야 하면 LENS_PLANNER_GATE=0.`,
+        + `계획서가 아닌 문서(조사보고)는 frontmatter 에 kind: 조사보고 를 적는다. `
+        + 'Agent 를 부를 수 없는 컨텍스트면 `LENS_PLANNER_GATE=0` 으로 끄고 계획서 `planner_model` 에 사유를 적어라.',
     },
   });
 }

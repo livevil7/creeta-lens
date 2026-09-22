@@ -55,10 +55,17 @@ function repo(body, { agents = null } = {}) {
   return { root, plan };
 }
 
+// The session store lives in a temp folder; the real session id of the shell
+// running these tests must not leak into payloads that carry none.
+const STORE = fs.mkdtempSync(path.join(os.tmpdir(), 'lens-plan-store-'));
+
 function run(payload, env = {}) {
   const out = execFileSync(process.execPath, [HOOK], {
     input: JSON.stringify(payload),
-    env: { ...process.env, CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT, CLAUDE_HOOK_INPUT: '', LENS_PLANNER_GATE: '', ...env },
+    env: {
+      ...process.env, CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT, CLAUDE_HOOK_INPUT: '', LENS_PLANNER_GATE: '',
+      LENS_SESSION_STORE: STORE, CLAUDE_CODE_SESSION_ID: '', ...env,
+    },
   }).toString().trim();
   return JSON.parse(out || '{}');
 }
@@ -133,6 +140,117 @@ test('LENS_PLANNER_GATE=0 이면 끈다', () => {
   const { plan } = repo(DRAFT);
   const r = run({ tool_name: 'Write', tool_input: { file_path: plan, content: DRAFT }, transcript_path: transcript('claude-opus-5') }, { LENS_PLANNER_GATE: '0' });
   assert.deepStrictEqual(r, {});
+});
+
+// ── v3.48 — subagents and the session store (E1 · E2 · E3 · E6) ──
+// Layout measured on this machine 2026-09-22: the main transcript is
+// `<dir>/<session>.jsonl`, a subagent's is `<dir>/<session>/subagents/agent-<agent_id>.jsonl`,
+// and a subagent's hook call carries `agent_id` with the MAIN transcript_path.
+
+console.log('\n  -- 서브에이전트 · 세션 저장소 --');
+
+const assistantLine = model => ({ type: 'assistant', message: { id: 'm', model, role: 'assistant', content: [{ type: 'text', text: '쓰겠습니다' }] } });
+
+/** Main transcript `<dir>/<sid>.jsonl` on `model`, plus `{ agentId: [models…] }` subagent transcripts. */
+function session(sid, model, subagents = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lens-plan-sess-'));
+  const main = path.join(dir, `${sid}.jsonl`);
+  fs.writeFileSync(main, [
+    { type: 'user', message: { role: 'user', content: [{ type: 'text', text: '계획 세워줘' }] } },
+    assistantLine(model),
+  ].map(e => JSON.stringify(e)).join('\n') + '\n');
+  for (const [agentId, models] of Object.entries(subagents)) {
+    const file = path.join(dir, sid, 'subagents', `agent-${agentId}.jsonl`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const lines = [{ type: 'user', isSidechain: true, agentId, sessionId: sid, message: { role: 'user', content: '계획서 작성' } }]
+      .concat([].concat(models).map(assistantLine));
+    fs.writeFileSync(file, lines.map(e => JSON.stringify(e)).join('\n') + '\n');
+  }
+  return main;
+}
+
+/** This session's dashboard in the session store (what pre-tool-task writes). */
+function board(sid, agents) {
+  fs.mkdirSync(path.join(STORE, sid), { recursive: true });
+  fs.writeFileSync(path.join(STORE, sid, 'dashboard.json'), JSON.stringify({ session: sid, agents }));
+}
+
+const writeAs = (plan, { sid, t, agentId, cwd }) => run({
+  tool_name: 'Write',
+  tool_input: { file_path: plan, content: DRAFT },
+  transcript_path: t,
+  session_id: sid,
+  agent_id: agentId,
+  cwd,
+});
+
+test('E1: fable 서브에이전트가 쓰면 부모가 opus 여도 통과한다 (서브에이전트 기록의 모델)', () => {
+  const { plan } = repo(DRAFT);
+  const t = session('s-e1', 'claude-opus-5', { a2df502b97f9845c5: 'claude-fable-5-1' });
+  assert.deepStrictEqual(writeAs(plan, { sid: 's-e1', t, agentId: 'a2df502b97f9845c5' }), {});
+});
+
+test('E1: 서브에이전트 기록이 읽히면 그 모델로 판정한다 — opus 서브에이전트는 부모 fable·위임 기록과 무관하게 거부', () => {
+  const { plan } = repo(DRAFT);
+  const t = session('s-e1b', 'claude-fable-5-1', { a0opus: 'claude-opus-5' });
+  board('s-e1b', [{ id: 'x', model: 'fable', status: 'running' }]);
+  const r = writeAs(plan, { sid: 's-e1b', t, agentId: 'a0opus' });
+  assert.ok(denied(r), JSON.stringify(r));
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /claude-opus-5/);
+});
+
+test('E1: 서브에이전트 기록 끝의 <synthetic>(API 오류 줄)은 모델이 아니다', () => {
+  const { plan } = repo(DRAFT);
+  const t = session('s-syn', 'claude-opus-5', { a0syn: ['claude-fable-5-1', '<synthetic>'] });
+  assert.deepStrictEqual(writeAs(plan, { sid: 's-syn', t, agentId: 'a0syn' }), {});
+});
+
+test('E1 폴백: 서브에이전트 기록이 없어도 이 세션의 fable 위임(진행 중)이 있으면 통과', () => {
+  const { plan } = repo(DRAFT);
+  const t = session('s-fb', 'claude-opus-5');
+  board('s-fb', [{ id: 'p', model: 'fable', status: 'launched' }]);
+  assert.deepStrictEqual(writeAs(plan, { sid: 's-fb', t, agentId: 'a0missing' }), {});
+});
+
+test('E1 폴백: 서브에이전트 기록도 위임 기록도 없으면 거부 (부모 모델로 대신 판정하지 않는다)', () => {
+  const { plan } = repo(DRAFT);
+  const t = session('s-none', 'claude-fable-5-1');
+  const r = writeAs(plan, { sid: 's-none', t, agentId: 'a0missing' });
+  assert.ok(denied(r), JSON.stringify(r));
+});
+
+test('E2: 메인이 opus 여도 이 세션에서 띄운 fable 이 아직 launched 면 통과', () => {
+  const { plan } = repo(DRAFT);
+  const t = session('s-e2', 'claude-opus-5');
+  board('s-e2', [{ id: 'p', model: 'claude-fable-5-1', status: 'launched' }]);
+  assert.deepStrictEqual(writeAs(plan, { sid: 's-e2', t }), {});
+});
+
+test('E3: 다른 세션 저장소의 fable 위임은 자격이 아니다', () => {
+  const { plan } = repo(DRAFT);
+  board('s-other', [{ id: 'p', model: 'fable', status: 'done' }]);
+  const r = writeAs(plan, { sid: 's-mine', t: session('s-mine', 'claude-opus-5') });
+  assert.ok(denied(r), JSON.stringify(r));
+});
+
+test('E3: error 로 끝난 fable 위임은 자격이 아니다', () => {
+  const { plan } = repo(DRAFT);
+  board('s-err', [{ id: 'p', model: 'fable', status: 'error' }]);
+  const r = writeAs(plan, { sid: 's-err', t: session('s-err', 'claude-opus-5') });
+  assert.ok(denied(r), JSON.stringify(r));
+});
+
+test('E3: 세션 id 가 있으면 레포 .lens 현황판(복사된 위임 기록)은 읽지 않는다', () => {
+  const { root, plan } = repo(DRAFT, { agents: [{ id: 'mirrored', model: 'fable', status: 'done' }] });
+  const r = writeAs(plan, { sid: 's-repo', t: session('s-repo', 'claude-opus-5'), cwd: root });
+  assert.ok(denied(r), JSON.stringify(r));
+});
+
+test('E6: 거부 문구가 Agent 를 못 부르는 컨텍스트의 탈출구(LENS_PLANNER_GATE=0 + planner_model 사유)를 알려 준다', () => {
+  const { plan } = repo(DRAFT);
+  const r = write(plan, 'claude-opus-5', { content: DRAFT });
+  assert.ok(denied(r));
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /Agent 를 부를 수 없는 컨텍스트면 `LENS_PLANNER_GATE=0` 으로 끄고 계획서 `planner_model` 에 사유를 적어라/);
 });
 
 console.log(`\n  ${passed} passed, ${failed} failed\n`);

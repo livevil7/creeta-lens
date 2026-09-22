@@ -42,7 +42,7 @@ const crypto = require('crypto');
 
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
 const {
-  installFailSoftHandlers, readJsonInput, writeJson, resolveProjectRoot, safeReadJson, safeWriteJson,
+  installFailSoftHandlers, readJsonInput, writeJson, resolveProjectRoot, safeReadJson, safeWriteJson, ensureLensDir,
 } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('post-tool-plan-doc');
 
@@ -86,8 +86,9 @@ function frontmatterField(content, key) {
   return m ? m[1].trim() : '';
 }
 
+/** `grade: deep` / `grade: "deep"` → 'deep' (v3.48: the quoted form read as '"deep"'). */
 function grade(content) {
-  return (content.match(/^grade\s*:\s*(\S+)/m) || [])[1];
+  return (content.match(/^grade\s*:\s*["']?([^"'\s]+)/m) || [])[1];
 }
 
 /** Lines outside code fences that name a path only this machine has. */
@@ -101,19 +102,25 @@ function machinePathCount(content) {
   return count;
 }
 
-/** Inject nothing when this exact message was the last one for this plan. */
-function isRepeat(projectRoot, relPath, message) {
+/**
+ * Inject nothing when this exact message was the last one for this plan in this
+ * session. v3.48: keyed by session too — another session editing the same plan
+ * never saw the message and must not be silenced by it.
+ */
+function isRepeat(projectRoot, relPath, message, sessionId) {
   const statePath = path.join(projectRoot, '.lens', 'plan-doc-hook.json');
   const hash = crypto.createHash('sha256').update(message).digest('hex').slice(0, 16);
+  const key = sessionId ? `${sessionId}:${relPath}` : relPath;
   const state = safeReadJson(statePath, {}) || {};
-  if (state[relPath] === hash) return true;
-  state[relPath] = hash;
+  if (state[key] === hash) return true;
+  state[key] = hash;
+  ensureLensDir(projectRoot);
   safeWriteJson(statePath, state);
   return false;
 }
 
-function emit(projectRoot, relPath, message) {
-  if (!message || isRepeat(projectRoot, relPath, message)) return writeJson({});
+function emit(projectRoot, relPath, message, sessionId) {
+  if (!message || isRepeat(projectRoot, relPath, message, sessionId)) return writeJson({});
   return writeJson({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: message } });
 }
 
@@ -134,6 +141,7 @@ function main() {
   const projectRoot = resolveProjectRoot({ filePath, cwd: input?.cwd });
   const planId = path.basename(filePath, '.md');
   const relPath = path.relative(projectRoot, filePath).split(path.sep).join('/') || filePath;
+  const sessionId = typeof input?.session_id === 'string' ? input.session_id : '';
   const approved = PAST_APPROVAL.test(frontmatterField(content, 'status'));
   const kind = readKind(content) || '신규';
 
@@ -163,7 +171,7 @@ function main() {
   if (approved) {
     return emit(projectRoot, relPath, parts.length
       ? `[Lens] 계획서 ${path.basename(filePath)} (실행 중) — ${parts.join(' · ')}.`
-      : '');
+      : '', sessionId);
   }
 
   let shown = null;
@@ -200,13 +208,13 @@ function main() {
     const count = kind === '조사보고'
       ? '조사보고 — 실행 원장 대상 아님.'
       : `커버리지: 인벤토리 ${coverage.total}건 → 포함 ${coverage.included} / 제외 ${coverage.excluded}.`;
-    return emit(projectRoot, relPath, `[Lens] 계획서 게이트 통과 — ${count}` + showHint + modelHint + priorWork);
+    return emit(projectRoot, relPath, `[Lens] 계획서 게이트 통과 — ${count}` + showHint + modelHint + priorWork, sessionId);
   }
 
   return emit(projectRoot, relPath,
     `[Lens] 계획서 ${path.basename(filePath)} 가 게이트를 통과하지 못한다. ${parts.join(' · ')}. ` +
     '승인을 요청하기 전에 고쳐라 — 이 검사는 /cp 승인 전과 /cc 실행 진입에서 다시 돈다. ' +
-    '(차단하지 않는다.)' + showHint + modelHint + priorWork);
+    '(차단하지 않는다.)' + showHint + modelHint + priorWork, sessionId);
 }
 
 main();

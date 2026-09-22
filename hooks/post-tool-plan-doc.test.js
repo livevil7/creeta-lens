@@ -74,9 +74,9 @@ function setup(body) {
   return { ws, repo, file };
 }
 
-function run({ ws, file }) {
+function run({ ws, file }, sessionId) {
   const out = execFileSync(process.execPath, [HOOK], {
-    input: JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: file }, cwd: ws }),
+    input: JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: file }, cwd: ws, session_id: sessionId }),
     env: { ...process.env, CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT, CLAUDE_PROJECT_DIR: ws, CLAUDE_HOOK_INPUT: '' },
   }).toString().trim();
   const j = JSON.parse(out || '{}');
@@ -121,6 +121,21 @@ test('a 조사보고 is not asked for an execution ledger', () => {
   const msg = run(ctx);
   assert.match(msg, /조사보고/);
   assert.ok(!/인벤토리\(📋\)가 없거나/.test(msg), msg);
+});
+
+// v3.48 J4
+test('the repeat guard is per session — another session still gets the message', () => {
+  const ctx = setup(PLAN());
+  assert.ok(run(ctx, 'S1'));
+  assert.ok(run(ctx, 'S2'), 'S2 was silenced by S1\'s message');
+  assert.strictEqual(run(ctx, 'S1'), '');
+});
+
+test('a quoted grade ("deep") still requires the deep sections', () => {
+  const ctx = setup(PLAN('grade: "deep"'));
+  const msg = run(ctx);
+  assert.match(msg, /필수 섹션 누락/);
+  assert.match(msg, /Risks/);
 });
 
 test('a non-plan file is ignored', () => {

@@ -8,6 +8,13 @@
  *    Rule: since the last tool result or user message, the assistant must have
  *    written at least MIN_CHARS non-space characters.
  *
+ *    v3.48 — WHEN it can judge. The transcript is written asynchronously (official
+ *    hook docs), so at PreToolUse the report and the call itself may not be in the
+ *    file yet. Measured: 1 of 31 dialogs passed since 09-16, and 26 of 34 refusals
+ *    had the report in front of them. So the hook first looks for the call being
+ *    judged (`tool_use_id`) in the transcript; not there → no verdict (allow).
+ *    There → the report window ends at that call, not at the file's last line.
+ *
  * 2. NO STOPS DURING AN APPROVED RUN (v3.40). Owner, 2026-09-04: "1,2,3 다 해. 싹다 해
  *    멀 자꾸 하나하나 할라그래 싹 다 하라고." / 2026-08-14: "이제 그만 물어보고 구현하지?"
  *    Once /cc has opened its gate ledger (Phase 0.5) for THIS session and not closed
@@ -26,7 +33,7 @@
  * Fail-open on anything unreadable — a broken transcript or ledger must never trap
  * a session. Kill switch: LENS_ASK_GUARD=0
  *
- * Input (stdin): { tool_name, tool_input: { questions: [{ header, … }] }, transcript_path, session_id, cwd }
+ * Input (stdin): { tool_name, tool_input: { questions: [{ header, … }] }, tool_use_id, transcript_path, session_id, cwd }
  * Output: {} | { hookSpecificOutput: { hookEventName, permissionDecision: 'deny', permissionDecisionReason } }
  */
 
@@ -36,6 +43,7 @@ const fs = require('fs');
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
 const { installFailSoftHandlers, readJsonInput, writeJson, resolveProjectRoot } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('pre-tool-ask');
+const store = require(path.join(PLUGIN_ROOT, 'lib', 'session-store'));
 
 const MIN_CHARS = 40;
 const TAIL_BYTES = 768 * 1024;
@@ -77,11 +85,29 @@ function recentAssistantText(entries) {
   return text;
 }
 
-/** null when the report is there (or unreadable); otherwise the refusal text. */
+/** Index of the assistant entry carrying the tool_use block `id`, or -1. */
+function toolUseIndex(entries, id) {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const e = entries[i];
+    if (e.type !== 'assistant') continue;
+    const content = e.message && e.message.content;
+    if (Array.isArray(content) && content.some(b => b && b.type === 'tool_use' && b.id === id)) return i;
+  }
+  return -1;
+}
+
+/** null when the report is there (or unreadable, or not written yet); otherwise the refusal text. */
 function reportProblem(input) {
   const file = input.transcript_path;
   if (!file || !fs.existsSync(file)) return null;
-  const written = recentAssistantText(readTail(file));
+  let entries = readTail(file);
+  const callId = typeof input.tool_use_id === 'string' && input.tool_use_id ? input.tool_use_id : null;
+  if (callId) {
+    const at = toolUseIndex(entries, callId);
+    if (at < 0) return null; // this call is not in the transcript yet — nothing to judge
+    entries = entries.slice(0, at + 1);
+  }
+  const written = recentAssistantText(entries);
   if (written.replace(/\s+/g, '').length >= MIN_CHARS) return null;
   return '질문창보다 보고가 먼저다 — 이 질문 앞에 사용자에게 보인 글이 없다. '
     + '먼저 한 메시지로 쓴다: 무엇을 발견·결정했나 · 계획서 링크(있으면) · 선택지마다 무엇이 일어나나 · 추천과 이유. '
@@ -125,17 +151,21 @@ function runProblem(input) {
   const run = activeRun(input);
   if (!run) return null;
   const root = run.root.split(path.sep).join('/');
-  const closeCmd = `node -e "require('${PLUGIN_ROOT.split(path.sep).join('/')}/lib/gate-ledger').closeLedger('${root}','${run.scope}')"`;
+  const pluginRoot = PLUGIN_ROOT.split(path.sep).join('/');
+  const closeCmd = `node "${pluginRoot}/scripts/lens-gate.js" close ${run.scope} --root "${root}"`;
+  const evidenceCmd = `node "${pluginRoot}/scripts/lens-gate.js" evidence ${run.scope} <id> --note '<답 원문>' --confirmed-by 대표 --root "${root}"`;
   return `이 세션에 승인된 실행이 열려 있다(게이트 원장 ${run.scope}) — 승인 한 번이면 끝까지 묻지 않고 간다. `
     + `이 질문("${String(offending[0].header || '').slice(0, 20)}")의 header 는 허용된 여섯 개가 아니다. `
     + '① 되돌리기 어려운 행동(배포·머지=배포·DB 변경·대량 삭제·force push)이면 `정지:비가역`, 발송·외부 게시·유료 대량 호출이면 `정지:외부영향`, '
     + '승인 범위를 넘어야 하면 `정지:범위변경`, 자동 검증을 끝낸 뒤 manual 행 확인이면 `검증 확인`, 실행이 끝났으면 `실행 종료`, 실행 전 승인이면 `실행 승인` 으로 다시 부른다. '
     + '② 그 어느 것도 아니면 묻지 말고 목표 기준으로 판단해 진행하고 편차 기록에 적는다. '
-    + `③ 실행을 취소했거나 이미 끝났는데 원장이 남은 것이면 먼저 닫는다: ${closeCmd} (급하면 LENS_ASK_GUARD=0).`;
+    + `③ 실행을 취소했거나 이미 끝났는데 원장이 남은 것이면 먼저 닫는다: ${closeCmd} (급하면 LENS_ASK_GUARD=0). `
+    + `④ 사용자가 글로 답하면 그 답이 확인이다 — ${evidenceCmd} 으로 기록한다.`;
 }
 
 function main() {
   const input = readJsonInput();
+  try { store.bind(input); } catch { /* fail-open */ }
   if ((input && input.tool_name) !== 'AskUserQuestion') return writeJson({});
   if (/^(0|false|off|no)$/i.test(String(process.env.LENS_ASK_GUARD || ''))) return writeJson({});
 

@@ -5,6 +5,8 @@
  * Pins: a question with no report in front of it is denied; a question that
  * follows a real report passes; an earlier report does not cover a question that
  * comes after more tool calls; any unreadable transcript fails open.
+ * v3.48: the transcript is written asynchronously — when the call being judged
+ * (`tool_use_id`) is not in it yet, there is no verdict (allow).
  *
  * Run: node hooks/pre-tool-ask.test.js
  */
@@ -46,10 +48,15 @@ function transcript(entries) {
   return file;
 }
 
+const STORE = fs.mkdtempSync(path.join(os.tmpdir(), 'lens-ask-store-'));
+
 function run(payload, env = {}) {
   const out = execFileSync(process.execPath, [HOOK], {
     input: JSON.stringify(payload),
-    env: { ...process.env, CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT, CLAUDE_HOOK_INPUT: '', LENS_ASK_GUARD: '', ...env },
+    env: {
+      ...process.env, CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT, CLAUDE_HOOK_INPUT: '', LENS_ASK_GUARD: '',
+      LENS_SESSION_STORE: STORE, CLAUDE_CODE_SESSION_ID: '', ...env,
+    },
   }).toString().trim();
   return JSON.parse(out || '{}');
 }
@@ -99,6 +106,55 @@ test('LENS_ASK_GUARD=0 turns it off', () => {
   assert.deepStrictEqual(run({ tool_name: 'AskUserQuestion', transcript_path: t }, { LENS_ASK_GUARD: '0' }), {});
 });
 
+// ── v3.48 — the transcript is written asynchronously (B1) ─────────
+// Synthetic, but shaped like a real transcript (2a412ea0 lines 495~497): the
+// thinking, text and tool_use of ONE message are separate lines sharing a
+// message.id, and an `attachment` line can sit between the tool result and the
+// reply. The hook input carries `tool_use_id` of the call being judged.
+
+console.log('\n  -- 기록 지연 --');
+
+const ASK_ID = 'toolu_01TESTaskUserQuestion';
+const part = (msgId, block) => ({ type: 'assistant', message: { id: msgId, model: 'claude-opus-5', role: 'assistant', content: [block] } });
+const attachment = () => ({ type: 'attachment', attachment: { type: 'hook_additional_context', content: ['…'] } });
+const LONG_REPORT = `${REPORT} `.repeat(40).slice(0, 1835);
+const before = () => [
+  user('해줘'),
+  part('msg_1', { type: 'tool_use', id: 'toolu_bash', name: 'Bash', input: {} }),
+  toolResult(),
+  attachment(),
+];
+const askLine = () => part('msg_2', { type: 'tool_use', id: ASK_ID, name: 'AskUserQuestion', input: {} });
+const askNow = t => run({ tool_name: 'AskUserQuestion', transcript_path: t, tool_use_id: ASK_ID });
+
+test('a 1,835-char report written on its own line before the question passes', () => {
+  const t = transcript([...before(), part('msg_2', { type: 'thinking', thinking: '…' }), part('msg_2', { type: 'text', text: LONG_REPORT }), askLine()]);
+  assert.deepStrictEqual(askNow(t), {});
+});
+
+test('the current call is not in the transcript yet → no verdict: allow, no reason', () => {
+  const t = transcript(before()); // neither the report nor the question has been written
+  assert.deepStrictEqual(askNow(t), {});
+});
+
+test('the current call is in the transcript with no report before it → denied', () => {
+  const t = transcript([...before(), part('msg_2', { type: 'thinking', thinking: '…' }), askLine()]);
+  const r = askNow(t);
+  assert.ok(denied(r), JSON.stringify(r));
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /보고가 먼저/);
+});
+
+test('a line written after the current call (a parallel tool result) does not cut the report off', () => {
+  const t = transcript([
+    ...before(),
+    part('msg_2', { type: 'text', text: LONG_REPORT }),
+    part('msg_2', { type: 'tool_use', id: 'toolu_read', name: 'Read', input: {} }),
+    askLine(),
+    { type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_read', content: 'ok' }] } },
+  ]);
+  assert.deepStrictEqual(askNow(t), {});
+});
+
 // ── v3.40 — no stops during an approved run ─────────────────
 
 console.log('\n  -- 무정지 실행 --');
@@ -132,15 +188,18 @@ test('during this session\'s run, an ordinary question is denied and names the s
   assert.match(reason, /검증 확인/);
 });
 
-test('the refusal gives a way out for a cancelled run: the exact closeLedger call and the kill switch', () => {
+test('the refusal gives a way out for a cancelled run: the exact lens-gate close call and the kill switch', () => {
   // its own session — the index still lists S1 runs left open by the other tests
   const { root } = runRepo('S4');
   const reason = ask('작업 완료 — 정리', { cwd: root, session: 'S4' }).hookSpecificOutput.permissionDecisionReason;
-  assert.match(reason, /closeLedger\('[^']+','2026-09-14-x'\)/);
+  assert.match(reason, /lens-gate\.js" close 2026-09-14-x --root "[^"]+"/);
   assert.match(reason, /LENS_ASK_GUARD=0/);
+  // B3 — a typed answer is a confirmation too; the refusal says how to record it.
+  assert.match(reason, /lens-gate\.js" evidence 2026-09-14-x /);
+  assert.match(reason, /--confirmed-by 대표/);
   // …and the command it prints actually closes the run.
-  const cmd = reason.match(/node -e "([^"]+)"/)[1];
-  execFileSync(process.execPath, ['-e', cmd]);
+  const [, cli, scope, closeRoot] = reason.match(/node "([^"]+lens-gate\.js)" close (\S+) --root "([^"]+)"/);
+  execFileSync(process.execPath, [cli, 'close', scope, '--root', closeRoot]);
   assert.deepStrictEqual(ask('작업 완료 — 정리', { cwd: root, session: 'S4' }), {});
 });
 
