@@ -118,16 +118,18 @@ function runCheck(command, cwd, timeoutS) {
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', collect);
     child.stderr.on('data', collect);
-    const timer = setTimeout(() => { timedOut = true; killTree(child); }, timeoutS * 1000);
-    child.on('error', err => done(null, err.message));
-    // After a timeout kill, do not wait for the pipes: an MSYS helper (e.g. `sleep`)
-    // is outside the Windows process tree and can hold them open until it ends.
-    child.on('exit', () => {
-      if (!timedOut) return;
+    // On timeout, settle right here — do not wait for an 'exit' or a pipe close.
+    // An MSYS helper (e.g. `sleep`) is outside the Windows process tree, and a
+    // child the check backgrounded can outlive its bash parent (whose 'exit' has
+    // then already fired) while holding the pipes open.
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killTree(child);
       child.stdout.destroy();
       child.stderr.destroy();
       done(null);
-    });
+    }, timeoutS * 1000);
+    child.on('error', err => done(null, err.message));
     child.on('close', code => done(timedOut ? null : code));
   });
 }
