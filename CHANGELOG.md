@@ -1,3 +1,49 @@
+## [3.48.0] - 2026-09-22
+
+**Lens 가 기다리는 턴을 붙잡고, 질문창을 막고, 동시에 도는 세션끼리 상태를 섞고 있었다.** 대표 지적: *"Lens로 cc 또는 cp를 하면 … 완료 조건 17건이 아직 확인되지 않아 이어서 작업합니다 … 이런게 계속 떠"* · *"설문창을 제대로 못띄워서 그냥 계속 텍스트로 질문을 하네?"* · 9/21 *"아니 왜 자꾸 나오는데? 나한테 보이게 하지를 말아"*. 옆 세션 17개와 자동 실행 3,557건의 대화 기록, Codex 독립 감사, Claude Code 공식 훅 문서를 대조해 74건을 찾았고 그중 Lens 레포 몫을 이 릴리스에서 고쳤다. 계획서: `docs/tasks/2026-09-22-lens-runtime-fixes.md`.
+
+### Fixed (v3.48.0)
+
+- **Stop 게이트가 대기 중인 턴을 막던 것** — 오늘 스냅홀로 작업의 차단 6회가 전부 워커 대기 중이었다. 공식 Stop 입력 `background_tasks` 에 subagent·workflow·teammate·cloud session 이 있으면 판정 없이 통과한다(shell·monitor 는 제외 — 상시 개발 서버가 게이트를 영영 끄지 않게). 필드가 없는 구버전은 무장된 진행보고 시계·이 세션의 launched 에이전트로 폴백.
+- **manual(사람 확인) 조건 때문에 막던 것** — 턴 안에서 채울 수 없는 조건이다. `awaitingUser` 로 분리, 차단 사유 아님.
+- **차단·해제 문구가 사용자 화면에 뜨던 것** — `systemMessage` 삭제. 2회 차단 뒤 해제는 조용히(Stop 의 `additionalContext` 는 턴을 한 번 더 잇는다).
+- **차단 상한이 계속 초기화되던 것** — 카운터 해시가 원장 원문(시각 포함)이고 cwd 레포별 파일이라, 원장이 바뀌거나 cwd 를 옮기면 0부터 다시 셌다(09-18 5시간 무변화에 "막기→해제" 8회+). 이제 미충족 게이트 id 목록 해시 · 세션 저장소.
+- **Stop 이 차단 판정 전에 세션을 완료로 기록하던 것** — 판정 먼저, 통과일 때만 `endSession`·접점 시각.
+- **질문창 거짓 거부** — 공식 계약상 대화 기록은 비동기로 써진다. 같은 메시지의 보고 글이 훅 시점에 없어 9/16 이후 31회 중 30회를 거부했다(거부 34회 중 26회는 보고가 있었다). 현재 `tool_use_id` 가 기록에 없으면 판단 보류 = 통과.
+- **계획서 작성자 검사가 fable 서브에이전트를 거부하던 것** — 서브에이전트 훅도 메인 `transcript_path` 를 받는다. `agent_id` 가 있으면 `subagents/agent-<id>.jsonl` 의 모델로 판정. 위임 기록은 이 세션 현황판에서만 본다(다른 세션·레포·error 위임 제외 — 09-21 위임 기록 위조의 재발 방지).
+- **진행보고 시계를 세션·워커가 공유하던 것** — "19914초 경과"(실제 985초), 워커 기록 22개에 29회. 세션 저장소 + `agent_id` 호출 무시 + 사용자 메시지에도 갱신(`lastContactAt`).
+- **다른 세션 시작이 현황판을 초기화하던 것 / 다른 세션 spawn 을 TOP 상한에 세던 것** — 세션 저장소.
+- **Workflow 백그라운드 실행을 "done (102ms). All 1 agents complete" 로 기록하던 것** — 24/24. 공용 판별 `lib/spawn-envelope.js`. 이름도 meta.name. 진행보고 훅의 Workflow 분기가 도달 불가였던 것도 함께.
+- **launched 가 영구히 쌓이던 것** — `SubagentStop` 배선(`hooks/subagent-stop.js`), `PostToolUseFailure` → error, `tool_use_id` 로 연결. 안내문은 한 줄, 개수가 바뀔 때만.
+- **커밋 직후 Codex 리뷰가 빈 diff 에 PASS 하던 것** — 34파일 +4,681줄 커밋 직후 37바이트 "pass"(09-18), 수동 재실행이 보안 결함을 찾았다. 이제 base 와의 merge-base 이후 전체 diff, 빈 diff 는 `unverified`, 타임아웃은 stderr 로그 + `unverified`.
+- **훅 timeout 단위** — 3000·5000·90000 을 밀리초로 적었는데 단위는 초(50분·83분·25시간). 3·5·90 으로.
+- **user-prompt-handler 가 한 번도 작동하지 않던 것** — 입력 필드는 `prompt`. 고치면 "AskUserQuestion 을 부르지 마라" 를 주입하게 되므로 OVERRIDE 는 삭제하고 진행보고 시계 갱신 용도로.
+- **`.lens/` 가 git 변경으로 잡히던 것** — 만들 때 그 레포 `.git/info/exclude` 에 `.lens/` 자동 등록(로컬 전용).
+- **브랜치 진입 판정이 늘 "물어봄"** — 실행할 계획서 파일·`.lens/` 는 dirty 에서 제외, 사유 중복 제거.
+- **/cd 가 브랜치 삭제 뒤 병합 판정을 못 하던 것** — PR 없이 `merge --no-ff` 하는 레포. 병합 커밋 메시지·계획서 `last_tip` 으로 `merged-deleted`.
+- **gate-ledger.js 의 NUL 바이트** — grep 이 "Binary file matches" 로 내용을 숨겼다.
+
+### Added (v3.48.0)
+
+- `lib/session-store.js` — 훅 런타임 상태를 `~/.claude/lens/sessions/<session_id>/`(`CLAUDE_CONFIG_DIR` 존중, 7일 정리).
+- `scripts/lens-gate.js` — 원장 조작의 유일한 경로(status·create·run·evidence·abandon·reopen·close). `create` 는 auto 검사를 한 번 실행해 실행 불가(126·127)를 거부, `run` 이 검사를 직접 돌린다. 원장 schema 2 는 `run` 출처 증거만 met.
+- `scripts/lens-cli.js` — 스킬의 `node -e` 한 줄(git-branch·plan-manager) 대체 래퍼. 판정 로직 없음.
+- `hooks/subagent-stop.js` · `lib/spawn-envelope.js`.
+- `lens.config.json` `nonStopActions` — 레포별 "멈추지 않아도 되는 행동". Returns_ERP_v20: staging 배포·staging DB 변경(대표 09-01·09-10·09-18 발언).
+- Workflow 스크립트 모델 검사 — `agent(` 호출에 `model` 이 없으면 거부, 60개 초과는 경고(09-02 질문 하나에 opus 136개).
+
+### Changed (v3.48.0)
+
+- `/cp` — md 를 그대로 Artifact 로 발행(모델이 매번 HTML 변환기를 손으로 짜던 것 제거 — Lens 는 3.42 에 HTML 을 없앴지만 문구 모순이 남아 있었다). 첫 링크는 조사 전에, 조사 상한 15분, TOP 위임은 백그라운드로 '작성만', 보고 첫 줄은 링크, 할 일은 뼈대 먼저·10~15개 묶음.
+- `/cc` — auto 증거는 `lens-gate run` 만, manual 은 비차단·보고 한 줄, 사용자 화면에 내부 용어 금지, 워커가 도는 동안 커밋 보류, 끝나면 계획서 체크·`status`·`last_tip` 갱신.
+- 컴팩션 뒤 "사용자 언어로 답한다" 재주입(영어 답변 49건 실측).
+- `scripts/upgrade.py` — 직전 설치 버전 폴더 1개 보존(실행 중 세션의 훅 경로 보호 · 롤백 수단).
+
+### Known (v3.48.0)
+
+- "보고 먼저" 규칙은 대화 기록이 늦게 써지는 탓에 이제 대부분 훅이 아니라 `/cp` 계약 카드가 지킨다.
+- Workflow 완료는 관측하는 훅이 없어 launched 로 남는다(안내문은 개수가 바뀔 때만).
+
 ## [3.47.0] - 2026-09-20
 
 **`/cs` 가 레포만 맞추고 있었다 — 이제 머신 자체를 맞춘다.** 대표 질문: *"내가 /cs 를 하면 지금 이런 리포 뿐만 아니고 모든 게 다 동기화되게 하는 거지?"* 그래야 맞다.
