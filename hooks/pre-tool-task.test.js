@@ -94,5 +94,92 @@ test('끄는 방법이 있다 (LENS_MODEL_GATE)', () => {
   assert.match(HOOK, /LENS_MODEL_GATE/);
 });
 
+// ── v3.48: the real hook, official PreToolUse payloads (subprocess) ──
+// E4: 313 Workflow agents in one session all ran on the session model — the
+// script's agent() calls never passed the model gate.
+
+const os = require('os');
+const { execFileSync } = require('child_process');
+
+const STORE = fs.mkdtempSync(path.join(os.tmpdir(), 'lens-pretask-store-'));
+const ENV = { ...process.env, LENS_SESSION_STORE: STORE, CLAUDE_HOOK_INPUT: '', CLAUDE_PROJECT_DIR: STORE };
+delete ENV.CLAUDE_CODE_SESSION_ID;
+delete ENV.LENS_MODEL_GATE;
+
+const runHook = (payload, env = ENV) => JSON.parse(execFileSync(process.execPath, [path.join(__dirname, 'pre-tool-task.js')], {
+  input: JSON.stringify(payload), env, cwd: STORE, stdio: ['pipe', 'pipe', 'pipe'],
+}).toString().trim() || '{}');
+const wf = (sid, toolInput, id = 'toolu_wf') => ({
+  session_id: sid, cwd: STORE, hook_event_name: 'PreToolUse', tool_name: 'Workflow', tool_input: toolInput, tool_use_id: id,
+});
+const spawn = (sid, model, id) => ({
+  session_id: sid, cwd: STORE, hook_event_name: 'PreToolUse', tool_name: 'Agent',
+  tool_input: { description: `일 ${id}`, prompt: 'x', model, subagent_type: 'general-purpose' }, tool_use_id: id,
+});
+const decision = out => out.hookSpecificOutput && out.hookSpecificOutput.permissionDecision;
+const reason = out => String((out.hookSpecificOutput && out.hookSpecificOutput.permissionDecisionReason) || '');
+const ctx = out => String((out.hookSpecificOutput && out.hookSpecificOutput.additionalContext) || '');
+const META = "export const meta = { name: 'probe', description: 'x' }\n";
+
+console.log('\n== pre-tool-task: 실제 훅 호출 (v3.48) ==');
+
+test('Workflow 스크립트의 agent( 에 model 이 없으면 거부하고 위치를 댄다', () => {
+  const script = `${META}phase('A')\nconst r = await agent('model 이라는 단어가 프롬프트에만 있다', { label: 'a' })\n`;
+  const out = runHook(wf('pt-1', { script }));
+  assert.strictEqual(decision(out), 'deny');
+  assert.match(reason(out), /3행/);
+});
+
+test('모든 agent( 에 model 이 있으면 통과, 현황판에 tool_use_id 와 이름이 남는다', () => {
+  const script = `${META}await agent('a', { model: 'sonnet' })\nawait agent("b", {label: 'x', model: 'haiku'})\n`;
+  const out = runHook(wf('pt-2', { script }, 'toolu_wf2'));
+  assert.notStrictEqual(decision(out), 'deny');
+  const board = JSON.parse(fs.readFileSync(path.join(STORE, 'pt-2', 'dashboard.json'), 'utf-8'));
+  const e = board.agents.find(a => a.toolUseId === 'toolu_wf2');
+  assert.ok(e, 'entry with tool_use_id');
+  assert.strictEqual(e.name, 'probe');
+  assert.strictEqual(e.tool, 'Workflow');
+});
+
+test('agent( 61개 → 경고(차단 아님)', () => {
+  const script = META + Array.from({ length: 61 }, (_, i) => `await agent('p${i}', { model: 'haiku' })`).join('\n');
+  const out = runHook(wf('pt-3', { script }));
+  assert.notStrictEqual(decision(out), 'deny');
+  assert.match(ctx(out), /61개/);
+});
+
+test('반복문 안 agent( → 셀 수 없다는 경고(차단 아님)', () => {
+  const script = `${META}await parallel(TASKS.map(t => () => agent(t.prompt, { model: t.model })))\n`;
+  const out = runHook(wf('pt-4', { script }));
+  assert.notStrictEqual(decision(out), 'deny');
+  assert.match(ctx(out), /셀 수 없다/);
+});
+
+test('옵션을 변수로 넘기면 판단 불가 → 거부 아님', () => {
+  const out = runHook(wf('pt-5', { script: `${META}await agent(p, opts)\n` }));
+  assert.notStrictEqual(decision(out), 'deny');
+});
+
+test('script 없이 이름·scriptPath 로 부르는 저장 워크플로는 건너뛴다', () => {
+  assert.notStrictEqual(decision(runHook(wf('pt-6', { name: 'saved-flow' }))), 'deny');
+  assert.notStrictEqual(decision(runHook(wf('pt-6', { scriptPath: 'C:/x/flow.js' }, 'toolu_wf6b'))), 'deny');
+});
+
+test('LENS_MODEL_GATE=0 이면 Workflow 도 거부하지 않는다', () => {
+  const out = runHook(wf('pt-7', { script: `${META}await agent('a')\n` }), { ...ENV, LENS_MODEL_GATE: '0' });
+  assert.notStrictEqual(decision(out), 'deny');
+});
+
+test('model 없는 Agent spawn 은 여전히 거부한다', () => {
+  assert.strictEqual(decision(runHook(spawn('pt-8', undefined, 'toolu_a0'))), 'deny');
+});
+
+test('TOP 상한은 이 세션 현황판만 센다 — 다른 세션의 fable 은 세지 않는다', () => {
+  runHook(spawn('pt-top-a', 'fable', 't1'));
+  runHook(spawn('pt-top-a', 'fable', 't2'));
+  assert.ok(!/TOP 티어/.test(ctx(runHook(spawn('pt-top-b', 'fable', 't3')))), '다른 세션의 1번째 fable 에 상한 경고');
+  assert.match(ctx(runHook(spawn('pt-top-a', 'fable', 't4'))), /3번째/);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

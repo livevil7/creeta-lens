@@ -3,20 +3,28 @@
  * Tracks when a sub-agent (Task tool) completes execution.
  *
  * Triggered: After each Task tool invocation completes
- * Writes: .lens/agent-dashboard.json
+ * Writes: the session dashboard (lib/agent-tracker.js)
  *
  * ⚠️ A background (async) launch is NOT a completion. PostToolUse fires as soon as
  * the spawn call returns — measured ~130ms after launch for agents that then ran
  * 311s and 567s (실측 2026-07-25). Marking those 'done' emitted a false
- * "All N agents complete" while every agent was still working. See isAsyncLaunch().
+ * "All N agents complete" while every agent was still working. See lib/spawn-envelope.js.
  *
- * ⚠️ …and it fires only once, at launch. No hook observes the completion of a
- * background agent, so this hook cannot ever resolve one. Async launches are
+ * ⚠️ …and it fires only once, at launch. This hook never observes the completion
+ * of a background agent, so it cannot resolve one. Async launches are
  * therefore parked in the 'launched' status (= unknown), which is excluded from
  * the done count AND from the Stop hook's orphan→error sweep. Neither a false
  * 'done' nor a false 'error'. SoT: docs/rules/harness-rules.md §4.5.
  *
- * Input (stdin): { tool_name, tool_input, tool_response, tool_output, tool_error }
+ * v3.48: the launch is classified by lib/spawn-envelope.js (shared with
+ * post-tool-progress.js) — a background Workflow was recorded as "done (102ms).
+ * All 1 agents complete" on 24 of 24 launches (D1) — and linked by tool_use_id,
+ * the description only as a fallback (D4). A launch is resolved later by
+ * hooks/subagent-stop.js (SubagentStop, by agentId) or by this hook's --failed
+ * mode (PostToolUseFailure, by tool_use_id → error).
+ *
+ * Input (stdin): { session_id, tool_name, tool_input, tool_response, tool_use_id }
+ *                (--failed: PostToolUseFailure — { …, error, is_interrupt })
  * Output (stdout): { hookSpecificOutput }
  */
 
@@ -27,98 +35,60 @@ const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '.
 const { installFailSoftHandlers, readJsonInput, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('post-tool-task');
 
+const store = require(path.join(PLUGIN_ROOT, 'lib', 'session-store'));
+const { classify, responseText } = require(path.join(PLUGIN_ROOT, 'lib', 'spawn-envelope'));
+
 // Load agent tracker
 const {
-  completeAgentByDescription,
-  markAgentLaunchedByDescription,
+  completeAgentByToolUseId,
+  markAgentLaunched,
+  claimLaunchedNotice,
   loadDashboard,
   LAUNCHED_STATUS,
 } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
 
-/**
- * Flatten a tool response into searchable text.
- * The payload is a string, or a content-block array [{type:'text',text}], or an object.
- */
-function responseText(input) {
-  const raw = input?.tool_response ?? input?.tool_output ?? input?.tool_result ?? input?.response;
-  if (!raw) return '';
-  if (typeof raw === 'string') return raw;
-  // A content-block array carries its payload in .text — flatten it instead of
-  // escaping it. JSON.stringify turns every newline into the two characters `\`
-  // and `n`, putting a WORD character immediately before `agentId:` and breaking
-  // the \b in isAsyncLaunchEnvelope(). 실측: 배열형에서 문장은 맞는데 식별자가
-  // 안 잡혀 봉투가 깨지고, 백그라운드 런치가 그대로 done 으로 기록된다.
-  if (Array.isArray(raw)) {
-    const flat = raw.map((b) => (typeof b === 'string' ? b : b?.text || '')).join('\n');
-    if (flat.trim()) return flat;
-  }
-  try {
-    return JSON.stringify(raw);
-  } catch {
-    return '';
-  }
+const FAILED_MODE = process.argv.includes('--failed');
+
+/** One line, only when the unresolved count moved since it was last said (C4). */
+function launchedNote() {
+  const { launched, changed } = claimLaunchedNotice();
+  return launched > 0 && changed
+    ? ` 백그라운드 미확정 ${launched}건 — 완료 알림 전에는 완료로 보지 마라.`
+    : '';
 }
 
-/**
- * Was this spawn an async (background) launch rather than a finished agent?
- *
- * Evidence (실측 2026-07-25, session transcript): every background spawn carried
- * `tool_input.run_in_background === true`, and the tool result text began with
- * "Async agent launched successfully." plus "agentId: …" / "output_file: …" and
- * the sentence "The agent is working in the background." Two independent signals,
- * so the check does not depend on either one alone.
- */
-function isAsyncLaunch(input) {
-  if (input?.tool_input?.run_in_background === true) return true;
-  // 전경 선언은 조기 거부한다. 텍스트 매칭보다 먼저 와야 한다 — 전경 Task 가
-  // 보고문에 "working in the background" 를 인용하면(비동기 동작을 주제로 일하는
-  // 에이전트에서 실제로 일어난다) 이미 끝난 Task 가 'launched' 로 찍히고,
-  // 그 레코드는 영영 done 이 되지 않아 대시보드가 미해결로 남는다.
-  // post-tool-progress.js 의 무장 조건과 같은 순서다 (harness-rules §4.4·§4.5).
-  if (input?.tool_input?.run_in_background === false) return false;
-  // 필드가 아예 없는 경우(Agent 도구는 기본이 백그라운드라 필드를 안 실는다)에만
-  // 텍스트를 본다. 단 **문구 하나로는 부족하다** — 임의의 결과 텍스트가 그 문구를
-  // 인용할 수 있고(이 훅 문서를 다루는 에이전트가 실제로 그런다), 그러면 이미 끝난
-  // 전경 Task 가 'launched' 로 찍혀 세션 내내 미해결로 남는다.
-  // 그래서 **구조화된 봉투**를 요구한다: 실제 async 반환은 "Async agent launched
-  // successfully." 와 함께 `agentId:` / `output_file:` 를 항상 싣는다(실측). 산문
-  // 인용은 그 조합을 갖추지 못한다.
-  return isAsyncLaunchEnvelope(responseText(input));
-}
-
-/**
- * Structured async-launch envelope — the launch sentence AND a launch identifier.
- * Shared shape with post-tool-progress.js; if the harness changes this envelope
- * both hooks lose their signal at once (harness-rules §4.4·§4.5).
- */
-function isAsyncLaunchEnvelope(text) {
-  if (!text) return false;
-  // 두 철자를 모두 받는다 — 같은 런치가 산문 봉투로도, 구조화 결과로도 온다.
-  // 실측 2026-07-26: 한 세션의 async Agent 런치 41건 전부가 toolUseResult
-  // `{status:'async_launched', isAsync:true, agentId, outputFile, …}` 였다. 산문
-  // 철자만 요구하면 그 payload 에는 문장이 없어 봉투가 성립하지 않고, 백그라운드
-  // 런치가 'launched' 가 아니라 'done' 으로 기록된다 — 이 훅이 막으려던 그 결함.
-  const sentence = /Async agent launched|working in the background|"status"\s*:\s*"async_launched"/i.test(text);
-  const identifier = /\bagentId:\s*\S/i.test(text)
-    || /\boutput_file:\s*\S/i.test(text)
-    || /"(?:agentId|outputFile|output_file)"\s*:\s*"\S/i.test(text);
-  return sentence && identifier;
+/** PostToolUseFailure: the spawn failed after starting — record it as error. */
+function recordFailure(input, description) {
+  const errorMsg = String(input?.error || 'tool failed');
+  const agent = completeAgentByToolUseId(input?.tool_use_id || null, 'error', errorMsg, description);
+  const name = agent?.name || description || 'task';
+  writeJson({
+    hookSpecificOutput: {
+      hookEventName: 'PostToolUseFailure',
+      additionalContext: `[Lens] sub-agent "${String(name).split('\n')[0].slice(0, 40)}" FAILED: ${errorMsg.slice(0, 200)}`,
+    },
+  });
+  process.exit(0);
 }
 
 function main() {
   try {
     // Read tool output from stdin
     const input = readJsonInput();
+    store.bind(input);
 
     // Determine completion status
     const hasError = !!(input?.tool_error) || !!(input?.error);
     const status = hasError ? 'error' : 'done';
     const errorMsg = input?.tool_error || input?.error || null;
 
-    // Claude Code does not pass a hook correlation ID, so match by the Task
-    // description first and fall back to the most recent running agent.
+    // tool_use_id links this call to its PreToolUse entry; the description is
+    // only the fallback for an entry registered without one.
     const toolInput = input?.tool_input || {};
-    const description = toolInput.description || toolInput.prompt || toolInput.task || '';
+    const toolUseId = input?.tool_use_id || null;
+    const description = toolInput.description || toolInput.prompt || toolInput.task || toolInput.name || '';
+    if (FAILED_MODE) recordFailure(input, description);
+    const spawn = classify(input);
 
     // Async launch: the agent has only STARTED. Park it in the dedicated
     // 'launched' status — not 'done' (false completion), and not left 'running'
@@ -127,17 +97,22 @@ function main() {
     // failure within seconds. 'launched' says "unknown" and is exempt from that
     // sweep. (durationMs here is the spawn call's own duration, which is why the
     // old path reported "done (132ms)" for agents that ran for minutes.)
-    if (!hasError && isAsyncLaunch(input)) {
-      const agent = markAgentLaunchedByDescription(description);
+    // 'unknown' (a Workflow whose result shows neither a launch nor a finished run)
+    // is parked as launched too: recording it done is the D1 false completion.
+    const background = spawn.kind === 'agent-async' || spawn.kind === 'workflow-async' || spawn.kind === 'unknown';
+    if (!hasError && background) {
+      const agent = markAgentLaunched({
+        toolUseId, description, agentId: spawn.agentId, runId: spawn.runId, name: spawn.name,
+      });
       const s = loadDashboard().summary;
       const launched = s.launched ?? 0; // pre-1.1.0 dashboards have no counter
       const name = agent?.name
-        || (description ? String(description).split('\n')[0].slice(0, 40) : 'task');
+        || (spawn.name || (description ? String(description).split('\n')[0].slice(0, 40) : 'task'));
       writeJson({
         hookSpecificOutput: {
           hookEventName: 'PostToolUse',
           matcher: 'Task',
-          additionalContext: `[Lens] sub-agent "${name}" 백그라운드 실행 시작 — 상태 '${LAUNCHED_STATUS}'(완료 미관측, done 아님). 이 훅은 완료를 관측할 수 없다: 완료 알림 또는 TaskOutput(block=false)/SendMessage 로 실측하기 전에는 완료로 간주·보고 금지. 대시보드: ${s.running} running / ${launched} ${LAUNCHED_STATUS}(미확정) / ${s.done} done / ${s.error} error. '${LAUNCHED_STATUS}' 는 성공도 실패도 아니며 턴/세션 종료 시 error 로 바뀌지 않는다 — 실패 증거로도 쓰지 마라. 지금부터 2분 주기 진행보고 의무 (docs/rules/harness-rules.md §4.4).`,
+          additionalContext: `[Lens] "${name}" 백그라운드 실행 시작('${LAUNCHED_STATUS}' — 완료 아님).${launchedNote()}`,
           agentId: agent?.id || 'unknown',
           agentName: name,
           status: LAUNCHED_STATUS,
@@ -152,7 +127,7 @@ function main() {
       process.exit(0);
     }
 
-    const agent = completeAgentByDescription(description, status, errorMsg);
+    const agent = completeAgentByToolUseId(toolUseId, status, errorMsg, description);
 
     // Build summary for context
     const dashboard = loadDashboard();
@@ -187,19 +162,17 @@ function main() {
     // into the aggregate sentence. "All N agents complete" is only printable when
     // nothing is running AND nothing is unresolved.
     const launched = summary.launched ?? 0; // pre-1.1.0 dashboards have no counter
-    const launchedNote = launched > 0
-      ? ` ⚠️ ${launched} background agent(s) unresolved ('${LAUNCHED_STATUS}' = completion never observed, NOT failed) — verify with TaskOutput(block=false)/completion notice before declaring done.`
-      : '';
+    const launchedLine = launchedNote(); // also records a drop to 0
 
     let additionalContext;
     if (finalStatus === 'error') {
       additionalContext = `[Lens] sub-agent "${agent?.name || description || 'task'}" FAILED${errorMsg ? `: ${String(errorMsg).slice(0, 200)}` : ''}. Dashboard: ${summary.running} running / ${launched} ${LAUNCHED_STATUS} / ${summary.done} done / ${summary.error} error.` + skillAudit;
     } else if (summary.error > 0) {
-      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ⚠️ ${summary.error} earlier agent(s) errored — check before declaring done. ${summary.running} still running.${launchedNote}` + skillAudit;
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ⚠️ ${summary.error} earlier agent(s) errored — check before declaring done. ${summary.running} still running.${launchedLine}` + skillAudit;
     } else if (summary.running > 0) {
-      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done. ${summary.running} still running, ${summary.done} done.${launchedNote}` + skillAudit;
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done. ${summary.running} still running, ${summary.done} done.${launchedLine}` + skillAudit;
     } else if (launched > 0) {
-      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ${summary.done} observed complete, 0 running — NOT "all complete".${launchedNote}` + skillAudit;
+      additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). ${summary.done} observed complete, 0 running — NOT "all complete".${launchedLine}` + skillAudit;
     } else {
       additionalContext = `[Lens] sub-agent "${agent?.name || 'task'}" done (${agent?.durationMs ?? '?'}ms). All ${summary.done} agents complete.` + skillAudit;
     }
@@ -229,7 +202,7 @@ function main() {
     // Never fail loudly
     writeJson({
       hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
+        hookEventName: FAILED_MODE ? 'PostToolUseFailure' : 'PostToolUse',
         matcher: 'Task',
         error: err.message,
       },

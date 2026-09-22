@@ -8,8 +8,9 @@ const fs = require('fs');
 
 // Resolve plugin root (hooks/ is one level deep)
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
-const { installFailSoftHandlers, readJsonInput, resolveProjectRoot, safeEnsureDir, safeReadJson, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
+const { ensureLensDir, installFailSoftHandlers, readJsonInput, resolveProjectRoot, safeEnsureDir, safeReadJson, writeJson } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('session-start');
+const store = require(path.join(PLUGIN_ROOT, 'lib', 'session-store'));
 
 // Load modules
 const { scanInstalledSkills } = require(path.join(PLUGIN_ROOT, 'lib', 'skill-scanner'));
@@ -28,13 +29,18 @@ function main() {
     // stdin is a one-shot stream: readJsonInput() consumes it, so the second
     // caller gets {} and its source check silently passes. Read once, pass down.
     const hookInput = readJsonInput() || {};
+    store.bind(hookInput);
     const source = hookInput.source;
     const newConversation = NEW_CONVERSATION_SOURCES.has(source);
     const projectRoot = resolveProjectRoot({ cwd: typeof hookInput.cwd === 'string' ? hookInput.cwd : undefined });
 
+    // v3.48: per-session state lives in the session store; sweep folders left by
+    // sessions untouched for a week (only on a fresh launch — cheap, and rare).
+    if (source === 'startup') store.prune(store.RETENTION_DAYS);
+
     // 0a. Drop the previous session's progress-report clock. Done before anything
     //     else so that a failure further down still leaves an honest clock.
-    clearPreviousSessionProgressClock(newConversation, projectRoot);
+    clearPreviousSessionProgressClock(newConversation);
 
     // 0. Initialize agent dashboard + plans + results directories for this session.
     //    Gated by the same allowlist as 0a. This hook runs on EVERY SessionStart
@@ -51,6 +57,8 @@ function main() {
     //    loadDashboard() never returns null — a missing or corrupt file yields a
     //    default in memory — so the continuation branch has to save it explicitly
     //    or the hook can finish leaving no dashboard on disk at all.
+    //    v3.48: the board is this session's own file, so a new conversation can
+    //    only ever reset its own (C3 — another session's start used to wipe it).
     let dashboard;
     if (newConversation) {
       dashboard = initSession();
@@ -64,6 +72,7 @@ function main() {
       const resultsDir = config.resultsDir
         ? path.resolve(config.resultsDir)
         : path.join(projectRoot, '.lens', 'results');
+      if (!config.resultsDir) ensureLensDir(projectRoot); // J3a: keep .lens out of git
       safeEnsureDir(resultsDir);
     }
 
@@ -91,7 +100,7 @@ function main() {
     const auditNudge = formatAuditNudge({ root: projectRoot, config });
 
     // 4. Build additional context
-    const additionalContext = buildAdditionalContext({
+    const additionalContext = languageLine(source) + buildAdditionalContext({
       memorySummary,
       planSummary,
       auditNudge,
@@ -172,15 +181,27 @@ function main() {
  */
 const NEW_CONVERSATION_SOURCES = new Set(['startup', 'resume', 'clear']);
 
-function clearPreviousSessionProgressClock(newConversation, projectRoot) {
+function clearPreviousSessionProgressClock(newConversation) {
   try {
     if (!newConversation) return;
-    // Same resolution as hooks/stop.js and hooks/post-tool-progress.js — diverging
-    // here would point the hooks at different files.
-    fs.unlinkSync(path.join(projectRoot, '.lens', 'progress-report-state.json'));
+    // v3.48: this session's own clock only. Without a session id the legacy
+    // repo-level file is shared with other sessions, so it is left alone.
+    const own = store.filePath('progress');
+    if (own) fs.unlinkSync(own);
   } catch {
     // No state file (the normal case) or an unreadable one — nothing to reset.
   }
+}
+
+/**
+ * F6: after a compaction (or a fork) the conversation continues from a summary,
+ * and answers drifted to English — 49 in one session, recurring even after the
+ * user objected. Startup output stays as it was.
+ */
+function languageLine(source) {
+  return source === 'compact' || source === 'fork'
+    ? '> 사용자 언어로 답한다(이 사용자는 한국어·존댓말).\n\n'
+    : '';
 }
 
 // ── Context Builder ───────────────────────────────────────
