@@ -42,7 +42,8 @@
 # Exit codes:
 #   0  Codex ran and wrote $OUT — or the diff was empty ($OUT says unverified)
 #   1  bad usage (including a --base that resolves to no ref)
-#   2  Codex not found or not authenticated   → caller decides degrade vs stop
+#   2  Codex not found or not authenticated, or no timeout/gtimeout to bound it
+#      ($OUT then says unverified)            → caller decides degrade vs stop
 #   3  timed out — $OUT keeps partial output, or {"verdict":"unverified",
 #      "reason":"timeout <sec>s"} when there was none (never an empty file)
 #
@@ -75,7 +76,7 @@ while [ $# -gt 0 ]; do
     --timeout)     TIMEOUT="${2:-}"; shift 2 ;;
     --effort)      EFFORT="${2:-}"; shift 2 ;;
     --base)        BASE="${2:-}"; shift 2 ;;
-    -h|--help)     sed -n '2,47p' "$0"; exit 0 ;;
+    -h|--help)     sed -n '2,48p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -101,6 +102,16 @@ echo "out=$OUT"
 # A timeout used to leave a 0-byte result and no trace of why (p05, 420s).
 LOG="$OUT.stderr.log"
 : > "$LOG"
+
+# The bound on the codex call. macOS ships neither `timeout` nor coreutils'
+# `gtimeout` (macmini runs this too), and an unbounded call is the 83% hang this
+# script exists to prevent — so no bound means no call.
+TIMEOUT_CMD="$(command -v timeout || command -v gtimeout)"
+if [ -z "$TIMEOUT_CMD" ]; then
+  printf '%s' '{"verdict":"unverified","reason":"no timeout command"}' > "$OUT"
+  echo "no timeout/gtimeout on PATH (macOS: brew install coreutils) — codex not called" >&2
+  exit 2
+fi
 
 # ── 1. Detect ────────────────────────────────────────────
 # Three-step fallback, same order as docs/rules/codex-integration.md §2.
@@ -218,14 +229,14 @@ if [ "$MODE" = "review" ]; then
   # the </dev/null redirects elsewhere exist to prevent.
   # -s read-only: the diff is untrusted input and can carry a prompt injection,
   # while the owner's config.toml defaults to sandbox_mode = danger-full-access.
-  timeout "$TIMEOUT" "$CODEX_BIN" exec --skip-git-repo-check -s read-only \
+  "$TIMEOUT_CMD" "$TIMEOUT" "$CODEX_BIN" exec --skip-git-repo-check -s read-only \
     "${MODEL_ARG[@]}" -c model_reasoning_effort="$EFFORT" -c service_tier=fast \
     --output-schema "$SCHEMA" --ephemeral -o "$OUT" - < "$PROMPT" \
     >/dev/null 2>>"$LOG"
   rc=$?
   rm -f "$SCHEMA" "$DIFF" "$PROMPT"
 else
-  timeout "$TIMEOUT" "$CODEX_BIN" exec --skip-git-repo-check -s read-only \
+  "$TIMEOUT_CMD" "$TIMEOUT" "$CODEX_BIN" exec --skip-git-repo-check -s read-only \
     "${MODEL_ARG[@]}" -c model_reasoning_effort="$EFFORT" -c service_tier=fast \
     -o "$OUT" - < "$PROMPT_FILE" >/dev/null 2>>"$LOG"
   rc=$?

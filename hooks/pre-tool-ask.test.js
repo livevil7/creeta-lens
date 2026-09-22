@@ -7,6 +7,8 @@
  * comes after more tool calls; any unreadable transcript fails open.
  * v3.48: the transcript is written asynchronously — when the call being judged
  * (`tool_use_id`) is not in it yet, there is no verdict (allow).
+ * All transcripts here are synthetic, the "1,835-char report" one included: it only
+ * copies the line layout of a real one (2a412ea0 lines 495~497), never its content.
  *
  * Run: node hooks/pre-tool-ask.test.js
  */

@@ -55,9 +55,25 @@ function repoRoot(flags) {
   }
 }
 
+let bashCache = null;
+
+/**
+ * Git Bash on Windows. A bare `bash` there can resolve to WSL's
+ * `System32\bash.exe` (or the WindowsApps stub), which runs checks in another
+ * filesystem — so PATH is searched with those excluded.
+ */
 function bashPath() {
-  const gitBash = 'C:/Program Files/Git/bin/bash.exe';
-  return process.platform === 'win32' && fs.existsSync(gitBash) ? gitBash : 'bash';
+  if (bashCache) return bashCache;
+  if (process.platform !== 'win32') return (bashCache = 'bash');
+  const candidates = [process.env.CLAUDE_CODE_GIT_BASH_PATH, 'C:/Program Files/Git/bin/bash.exe'];
+  for (const c of candidates) if (c && fs.existsSync(c)) return (bashCache = c);
+  try {
+    const found = execFileSync('where', ['bash'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true })
+      .split(/\r?\n/).map(s => s.trim())
+      .find(s => s && !/\\System32\\|WindowsApps/i.test(s));
+    if (found) return (bashCache = found);
+  } catch {}
+  return (bashCache = 'bash');
 }
 
 /** Kill the check and everything it started — a timed-out test suite must not keep running. */

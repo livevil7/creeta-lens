@@ -92,12 +92,24 @@ function actingModel(file) {
   return null;
 }
 
-/** The subagent's own transcript, or null when the id is unusable as a file name. */
+/**
+ * The subagent's own transcript, or null (unusable id / not found). A subagent a
+ * Workflow spawned lives one level deeper: `subagents/workflows/<run>/agent-<id>.jsonl`
+ * (measured 2026-09-22 in 10 sessions on this machine).
+ */
 function subagentTranscript(transcriptPath, agentId) {
   const id = store.cleanId(agentId);
   if (!transcriptPath || !id) return null;
-  const name = id.startsWith('agent-') ? id : `agent-${id}`;
-  return path.join(path.dirname(transcriptPath), path.basename(transcriptPath, '.jsonl'), 'subagents', `${name}.jsonl`);
+  const name = `${id.startsWith('agent-') ? id : `agent-${id}`}.jsonl`;
+  const dir = path.join(path.dirname(transcriptPath), path.basename(transcriptPath, '.jsonl'), 'subagents');
+  if (fs.existsSync(path.join(dir, name))) return path.join(dir, name);
+  try {
+    for (const run of fs.readdirSync(path.join(dir, 'workflows'))) {
+      const file = path.join(dir, 'workflows', run, name);
+      if (fs.existsSync(file)) return file;
+    }
+  } catch { /* no workflows folder */ }
+  return null;
 }
 
 /** Legacy (no session id): did this session spawn a top-tier agent? (the pen may be in its hand) */

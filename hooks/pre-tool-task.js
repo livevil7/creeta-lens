@@ -207,7 +207,9 @@ function workflowNotice(scan) {
   if (!scan) return null;
   const notes = [];
   if (scan.total > WORKFLOW_AGENT_CAP) notes.push(`agent() ${scan.total}개 — 상한 ${WORKFLOW_AGENT_CAP} 초과`);
-  else if (scan.looped > 0) notes.push(`반복문 안 agent() ${scan.looped}곳 — 총 수를 셀 수 없다`);
+  // pipeline()/.map fan-out is the normal shape, so a loop alone is not worth a
+  // warning — only once the static count already reaches the cap.
+  else if (scan.looped > 0 && scan.total >= WORKFLOW_AGENT_CAP) notes.push(`반복문 안 agent() ${scan.looped}곳 — 총 수를 셀 수 없다`);
   if (scan.unsure.length) notes.push(`model 을 확인할 수 없는 호출 ${scan.unsure.map(n => `${n}행`).join(', ')}`);
   if (!notes.length) return null;
   return `[Lens] Workflow 확인: ${notes.join(' · ')}. 총 agent 수가 ${WORKFLOW_AGENT_CAP} 을 넘지 않는지(후보×렌즈 팬아웃이 세션 한도를 태운다), 모든 호출에 model 이 있는지 확인하라.`;

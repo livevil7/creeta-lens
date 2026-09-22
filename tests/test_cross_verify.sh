@@ -28,9 +28,11 @@ echo "== 1. 호출 불변식 (docs/rules/codex-integration.md §1.5) =="
 # all Lens codex calls died this way and read as "the model is slow".
 # Every timeout-wrapped agent invocation must close stdin, either from
 # /dev/null or from a prompt file (a file delivers EOF, so it is equally safe).
-bare="$(grep -n 'timeout "\$TIMEOUT"' "$CODEX" | wc -l)"
+# v3.48.0: the bound is `"$TIMEOUT_CMD"` (timeout or macOS gtimeout). The count
+# must stay > 0 — a pattern that matches nothing passes this check vacuously.
+bare="$(grep -n '"\$TIMEOUT_CMD" "\$TIMEOUT"' "$CODEX" | wc -l)"
 closed="$(grep -c '</dev/null\|< "\$PROMPT' "$CODEX")"
-check "codex-review.sh: agent 호출 $bare 개 전부 stdin 을 닫는다" "[ $closed -ge $bare ]"
+check "codex-review.sh: agent 호출 $bare 개 전부 stdin 을 닫는다" "[ $bare -gt 0 ] && [ $closed -ge $bare ]"
 
 # Comments in these scripts quote the very patterns the rules forbid, in order to
 # explain why they are forbidden. Strip them before asserting, or the explanation

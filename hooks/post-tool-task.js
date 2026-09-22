@@ -108,16 +108,20 @@ function main() {
       const launched = s.launched ?? 0; // pre-1.1.0 dashboards have no counter
       const name = agent?.name
         || (spawn.name || (description ? String(description).split('\n')[0].slice(0, 40) : 'task'));
+      // Its SubagentStop may have landed first — then the tracker already recorded done.
+      const earlyDone = agent?.status === 'done';
       writeJson({
         hookSpecificOutput: {
           hookEventName: 'PostToolUse',
           matcher: 'Task',
-          additionalContext: `[Lens] "${name}" 백그라운드 실행 시작('${LAUNCHED_STATUS}' — 완료 아님).${launchedNote()}`,
+          additionalContext: earlyDone
+            ? `[Lens] "${name}" 백그라운드 실행이 이미 끝났다(종료 이벤트가 먼저 도착).${launchedNote()}`
+            : `[Lens] "${name}" 백그라운드 실행 시작('${LAUNCHED_STATUS}' — 완료 아님).${launchedNote()}`,
           agentId: agent?.id || 'unknown',
           agentName: name,
-          status: LAUNCHED_STATUS,
+          status: earlyDone ? 'done' : LAUNCHED_STATUS,
           launch: 'async',
-          resolved: false,
+          resolved: earlyDone,
           durationMs: null,
           dashboardSummary: {
             total: s.total, running: s.running, launched, done: s.done, error: s.error,

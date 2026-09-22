@@ -117,6 +117,38 @@ test('a resolved agent stopping again (resumed by SendMessage) does not resolve 
   assert.strictEqual(entry(sid, 'tu_r2').status, 'launched');
 });
 
+test('a fallback-resolved id is remembered — the same agent_id stopping twice leaves other launches alone', () => {
+  const sid = 'ag-fallback-twice';
+  pre(sid, 'tu_t1', 'Agent', agentInput('첫째', { run_in_background: true }));
+  post(sid, 'tu_t1', 'Agent', agentInput('첫째', { run_in_background: true }), 'launched');
+  pre(sid, 'tu_t2', 'Agent', agentInput('둘째', { run_in_background: true }));
+  post(sid, 'tu_t2', 'Agent', agentInput('둘째', { run_in_background: true }), 'launched');
+  const stop = { ...base(sid), hook_event_name: 'SubagentStop', agent_id: 'zz77', agent_type: 'Explore' };
+  run(STOP, stop);
+  assert.strictEqual(entry(sid, 'tu_t1').status, 'done');
+  assert.strictEqual(entry(sid, 'tu_t1').agentId, 'zz77');
+  run(STOP, stop);
+  assert.strictEqual(entry(sid, 'tu_t2').status, 'launched');
+});
+
+test('SubagentStop before PostToolUse (early stop) → the later async envelope records done', () => {
+  const sid = 'ag-early';
+  pre(sid, 'tu_e1', 'Agent', agentInput('빨리 끝남'));
+  run(STOP, { ...base(sid), hook_event_name: 'SubagentStop', agent_id: 'e555', agent_type: 'Explore' });
+  assert.strictEqual(entry(sid, 'tu_e1').status, 'running', 'fixture: the entry is still running when the stop lands');
+  post(sid, 'tu_e1', 'Agent', agentInput('빨리 끝남'), AGENT_STRUCT('e555'));
+  assert.strictEqual(entry(sid, 'tu_e1').status, 'done');
+  assert.ok(!(board(sid).earlyStops || []).some(s => s.agentId === 'e555'), 'the early stop is consumed');
+});
+
+test('agent_id with the "agent-" prefix (SubagentStart spelling) resolves the same launch', () => {
+  const sid = 'ag-prefix';
+  pre(sid, 'tu_px', 'Agent', agentInput('접두사'));
+  post(sid, 'tu_px', 'Agent', agentInput('접두사'), AGENT_STRUCT('p999'));
+  run(STOP, { ...base(sid), hook_event_name: 'SubagentStop', agent_id: 'agent-p999', agent_type: 'Explore' });
+  assert.strictEqual(entry(sid, 'tu_px').status, 'done');
+});
+
 test('SubagentStop from an internal agent or a Workflow inner agent resolves nothing', () => {
   const sid = 'ag-guard';
   pre(sid, 'tu_g1', 'Agent', agentInput('백그라운드', { run_in_background: true }));

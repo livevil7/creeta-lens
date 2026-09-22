@@ -19,7 +19,8 @@
  *     teammate / cloud session) → pass silently. The turn ended but the run did
  *     not: stamp the contact clock, do NOT mark the session completed. `shell`,
  *     `monitor` and `MCP task` do not count — a dev server or a Monitor lives for
- *     the whole session and would switch the gate off for good.
+ *     the whole session and would switch the gate off for good. Nor does an entry
+ *     whose status says it is finished or idle (an idle teammate lingers too).
  *     Field absent (older Claude Code; an empty array means "none", not "unknown")
  *     → an armed progress clock (signal < 180 s ago) or a launched/running agent
  *     on this session's dashboard counts as waiting.
@@ -52,6 +53,13 @@ const { endSession, loadDashboard } = require(path.join(PLUGIN_ROOT, 'lib', 'age
 
 /** `background_tasks[].type` labels that mean "the run is waiting on work that will come back". */
 const WAIT_TYPES = new Set(['subagent', 'workflow', 'teammate', 'cloud session']);
+/**
+ * A task in one of these states is not work in flight — an idle teammate can sit
+ * in the list for the whole session and would switch the gate off for good. A
+ * missing or unknown status still counts as waiting (the list is "in-flight" by
+ * contract; only a known finished/idle state overrides that).
+ */
+const NOT_WAITING_STATUS = /^(completed|complete|done|failed|error|killed|stopped|cancelled|canceled|idle)$/i;
 /** Same as hooks/post-tool-progress.js ARM_TTL_MS. */
 const ARM_TTL_MS = 180000;
 
@@ -96,7 +104,9 @@ function toMs(value) {
 
 function waitingOnBackground(input) {
   if (Array.isArray(input.background_tasks)) {
-    return input.background_tasks.some(t => t && WAIT_TYPES.has(String(t.type || '').toLowerCase()));
+    return input.background_tasks.some(t => t
+      && WAIT_TYPES.has(String(t.type || '').toLowerCase())
+      && !(typeof t.status === 'string' && NOT_WAITING_STATUS.test(t.status.trim())));
   }
   // Field absent: judge from what Lens itself observed.
   const progress = store.filePath('progress')
@@ -155,7 +165,11 @@ function gateVerdict(input) {
       const key = path.resolve(root).toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      loaded.ledgers.push(...ledger.loadLedgers(root).ledgers);
+      const other = ledger.loadLedgers(root);
+      loaded.ledgers.push(...other.ledgers);
+      // An unparseable file carries no session id, so it cannot be tied to this
+      // session — only the current repo's broken ledgers are a reason to block.
+      for (const bad of other.invalid) safeLog(`unreadable ledger ignored: ${root} ${bad.file} (${bad.error})`);
     }
     // A ledger another session opened is not this turn's obligation.
     const sessionId = input && input.session_id;

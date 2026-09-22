@@ -100,6 +100,18 @@ check "exit 0" "[ $rc -eq 0 ]"
 check "stdout 에 out=<경로>" "[ \"\${line#out=}\" != \"\$line\" ] && [ -s \"\$path_out\" ]"
 rm -f "$path_out" "$path_out.stderr.log"
 
+echo "== 6. timeout 명령이 없으면(기본 macOS) codex 를 부르지 않는다 =="
+# macOS ships neither `timeout` nor `gtimeout` (coreutils). Without a bound the
+# codex call could hang forever, so the lane goes down instead of running bare.
+mkdir -p "$TMP/nobin"
+BASH_BIN="$(command -v bash)"
+before="$(calls)"
+(cd "$W" && PATH="$TMP/nobin" "$BASH_BIN" "$CODEX" --mode review --out "$TMP/r6.json" >/dev/null 2>&1); rc=$?
+check "exit 2 (cross-verify 가 unavailable 로 읽는 코드)" "[ $rc -eq 2 ]"
+check "codex 미호출" "[ \"\$(calls)\" -eq $before ]"
+check "verdict unverified · reason no timeout command" \
+  "grep -q '\"verdict\":\"unverified\"' '$TMP/r6.json' && grep -q '\"reason\":\"no timeout command\"' '$TMP/r6.json'"
+
 echo
 echo "== 결과: $pass 통과 / $fail 실패 =="
 [ $fail -eq 0 ]

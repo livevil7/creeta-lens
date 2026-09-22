@@ -143,12 +143,35 @@ test('A1 — shell·monitor·MCP task 만 있으면 대기가 아니다: 미충�
   assert.ok(isBlock(out), JSON.stringify(out));
 });
 
+test('A1 — 끝난·유휴 상태(status idle 등)의 teammate 는 대기가 아니다: 정상 판정', () => {
+  for (const status of ['idle', 'completed', 'Killed', 'cancelled']) {
+    const fx = fixture();
+    openLedger(fx, AUTO);
+    const out = run(fx, payload(fx, { background_tasks: [{ id: 't', type: 'teammate', status }] }));
+    assert.ok(isBlock(out), `${status}: ${JSON.stringify(out)}`);
+  }
+});
+
+test('A1 — status 가 running 이거나 없거나 모르는 값이면 종전대로 대기', () => {
+  for (const status of ['running', undefined, 'pending_something']) {
+    const fx = fixture();
+    openLedger(fx, AUTO);
+    const task = { id: 'a', type: 'subagent' };
+    if (status !== undefined) task.status = status;
+    assert.deepStrictEqual(run(fx, payload(fx, { background_tasks: [task] })), {}, String(status));
+  }
+});
+
 test('A4 — 차단 출력은 decision+reason 만: systemMessage 없음, "이어서 작업합니다" 없음, lens-gate 전체 경로', () => {
   const fx = fixture();
   openLedger(fx, AUTO);
   const out = run(fx, payload(fx));
   assert.deepStrictEqual(Object.keys(out).sort(), ['decision', 'reason']);
   assert.ok(!out.reason.includes('이어서 작업합니다'), out.reason);
+  // Stop 의 block reason 은 사장님 transcript 에 경고로 보인다(공식 문서) — 첫 줄은 사람 말만.
+  const first = out.reason.split('\n')[0];
+  for (const word of ['게이트', '원장', 'lens-gate', '/2']) assert.ok(!first.includes(word), `첫 줄에 내부 용어 "${word}": ${first}`);
+  assert.strictEqual(first, '아직 확인되지 않은 완료 조건이 1건 있어 마무리하기 전에 확인합니다.');
   const cli = path.join(PLUGIN_ROOT, 'scripts', 'lens-gate.js').split(path.sep).join('/');
   for (const sub of ['status', 'run', 'abandon']) assert.ok(out.reason.includes(`node "${cli}" ${sub} demo`), `${sub}: ${out.reason}`);
   assert.ok(out.reason.includes(fx.root.split(path.sep).join('/')), '다른 레포 원장도 찾도록 --root 를 준다');
@@ -275,6 +298,23 @@ test('fail-open — 깨진 blocks.json·progress.json 이어도 죽지 않고 JS
   const out = run(fx, body);
   assert.strictEqual(out.systemMessage, undefined);
   assert.ok(isBlock(out) || Object.keys(out).length === 0, JSON.stringify(out));
+});
+
+test('깨진 원장 json — 현재 레포 것만 차단 사유, 색인으로 읽은 다른 레포 것은 막지 않는다', () => {
+  const fx = fixture();
+  const other = path.join(path.dirname(fx.root), 'other-repo');
+  fs.mkdirSync(path.join(other, '.git'), { recursive: true });
+  fs.mkdirSync(ledger.gatesDir(other), { recursive: true });
+  fs.writeFileSync(path.join(ledger.gatesDir(other), 'broken.json'), '{ not json');
+  // 이 테스트만의 색인 — 다른 테스트에 깨진 레포를 흘리지 않는다.
+  const index = path.join(path.dirname(fx.root), 'index.json');
+  const saved = process.env.LENS_LEDGER_INDEX;
+  process.env.LENS_LEDGER_INDEX = index;
+  try { ledger.registerRoot(other, 'broken'); } finally { process.env.LENS_LEDGER_INDEX = saved; }
+  assert.deepStrictEqual(run(fx, payload(fx), { LENS_LEDGER_INDEX: index }), {}, '다른 레포의 손상 원장이 이 세션을 막았다');
+  fs.mkdirSync(ledger.gatesDir(fx.root), { recursive: true });
+  fs.writeFileSync(path.join(ledger.gatesDir(fx.root), 'mine.json'), '{ not json');
+  assert.ok(isBlock(run(fx, payload(fx), { LENS_LEDGER_INDEX: index })), '현재 레포의 손상 원장은 차단 사유다');
 });
 
 test('다른 세션이 연 원장은 이 세션을 막지 않는다', () => {

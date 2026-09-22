@@ -148,11 +148,12 @@ test('agent( 61개 → 경고(차단 아님)', () => {
   assert.match(ctx(out), /61개/);
 });
 
-test('반복문 안 agent( → 셀 수 없다는 경고(차단 아님)', () => {
-  const script = `${META}await parallel(TASKS.map(t => () => agent(t.prompt, { model: t.model })))\n`;
+// pipeline()/.map 안의 agent() 는 기본 패턴이다 — 정적 개수가 60 미만이면 경고하지 않는다.
+test('반복문 안 agent( 라도 정적 개수가 60 미만이면 경고 없이 통과', () => {
+  const script = `${META}await pipeline(ITEMS, it => agent(it.p, { model: 'sonnet' }))\nawait parallel(TASKS.map(t => () => agent(t.prompt, { model: t.model })))\n`;
   const out = runHook(wf('pt-4', { script }));
   assert.notStrictEqual(decision(out), 'deny');
-  assert.match(ctx(out), /셀 수 없다/);
+  assert.strictEqual(ctx(out), '');
 });
 
 test('옵션을 변수로 넘기면 판단 불가 → 거부 아님', () => {

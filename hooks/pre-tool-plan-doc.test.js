@@ -199,6 +199,16 @@ test('E1: 서브에이전트 기록이 읽히면 그 모델로 판정한다 — 
   assert.match(r.hookSpecificOutput.permissionDecisionReason, /claude-opus-5/);
 });
 
+test('E1: Workflow 안에서 띄운 fable 서브에이전트(subagents/workflows/<run>/)도 찾아 통과한다', () => {
+  const { plan } = repo(DRAFT);
+  const t = session('s-wf', 'claude-opus-5');
+  // Layout measured 2026-09-22 (18f26c40): <session>/subagents/workflows/wf_<run>/agent-<id>.jsonl
+  const file = path.join(path.dirname(t), 's-wf', 'subagents', 'workflows', 'wf_022eb584-b8e', 'agent-a0wf.jsonl');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(assistantLine('claude-fable-5-1'))}\n`);
+  assert.deepStrictEqual(writeAs(plan, { sid: 's-wf', t, agentId: 'a0wf' }), {});
+});
+
 test('E1: 서브에이전트 기록 끝의 <synthetic>(API 오류 줄)은 모델이 아니다', () => {
   const { plan } = repo(DRAFT);
   const t = session('s-syn', 'claude-opus-5', { a0syn: ['claude-fable-5-1', '<synthetic>'] });
