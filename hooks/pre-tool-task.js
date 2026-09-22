@@ -152,6 +152,22 @@ function loopSpans(masked) {
   return spans;
 }
 
+/**
+ * `{"model": "sonnet"}` — a quoted key. maskCode blanks string contents, so the
+ * masked text no longer says `model`. Accept it only when the quotes are a real
+ * string token of their own (they survive masking); the same characters inside a
+ * longer string, e.g. a prompt quoting JSON, are blanked and do not count.
+ */
+function hasQuotedModelKey(src, masked, from, to) {
+  const re = /(["'`])model\1\s*:/g;
+  re.lastIndex = from;
+  for (let m = re.exec(src); m && m.index < to; m = re.exec(src)) {
+    const q = m[1];
+    if (masked[m.index] === q && masked[m.index + 6] === q) return true;
+  }
+  return false;
+}
+
 /** Split call arguments at top-level commas. */
 function topLevelArgs(args) {
   const parts = [];
@@ -187,7 +203,7 @@ function scanWorkflowScript(script) {
     if (loops.some(([a, b]) => open > a && open < b)) result.looped += 1;
     if (end < 0) { result.unsure.push(lineOf(open)); continue; }
     const args = masked.slice(open + 1, end - 1);
-    if (/\bmodel\b/.test(args)) continue;
+    if (/\bmodel\b/.test(args) || hasQuotedModelKey(String(script), masked, open + 1, end - 1)) continue;
     const parts = topLevelArgs(args);
     const opts = parts.length >= 2 ? parts[parts.length - 1] : (parts[0] && parts[0].startsWith('{') ? parts[0] : null);
     if (/\.\.\./.test(args) || (opts !== null && !opts.startsWith('{'))) result.unsure.push(lineOf(open));

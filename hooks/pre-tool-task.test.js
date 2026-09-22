@@ -141,6 +141,13 @@ test('모든 agent( 에 model 이 있으면 통과, 현황판에 tool_use_id 와
   assert.strictEqual(e.tool, 'Workflow');
 });
 
+test('따옴표 키 {"model": …} 도 model 로 인정, 프롬프트 문자열 안의 "model": 은 인정하지 않는다', () => {
+  const quoted = `${META}await agent('p', {"model":"sonnet"})\nawait agent('q', { 'model': 'haiku' })\n`;
+  assert.notStrictEqual(decision(runHook(wf('pt-q1', { script: quoted }))), 'deny');
+  const inPrompt = `${META}await agent('JSON 예시 {"model": "x"} 를 설명하라', { label: 'a' })\n`;
+  assert.strictEqual(decision(runHook(wf('pt-q2', { script: inPrompt }))), 'deny');
+});
+
 test('agent( 61개 → 경고(차단 아님)', () => {
   const script = META + Array.from({ length: 61 }, (_, i) => `await agent('p${i}', { model: 'haiku' })`).join('\n');
   const out = runHook(wf('pt-3', { script }));
