@@ -5,7 +5,9 @@ planner_model: fable (세션 위임)
 kind: 개선
 grade: 기본
 created: 2026-09-22
-status: approved
+status: done
+last_tip: bb31432
+released: v3.48.0 (2026-09-22, https://github.com/livevil7/creeta-lens/releases/tag/v3.48.0)
 approved_at: 2026-09-22T13:25:00+09:00
 approved_via: 채팅
 approval_note: "지금 실행을 하고 agentmemonry는 제대로 작동을 안하면 되게 해야지."
@@ -154,138 +156,138 @@ Done: 새 Lens 를 이 컴퓨터에 설치한 뒤 ① 백그라운드 에이전�
 
 C·A3·E1·E2 의 공통 뿌리는 "상태가 세션이 아니라 폴더 단위" 다. 이것을 먼저 옮긴다.
 
-- [ ] `lib/session-store.js` 신설 — 훅 입력의 `session_id` 로 사용자 수준 폴더를 정한다: `~/.claude/lens/sessions/<session_id>/`(`CLAUDE_CONFIG_DIR` 가 있으면 그 아래 — Codex 지적). 안에 `progress.json`(진행보고 시계) · `dashboard.json`(에이전트 현황판) · `blocks.json`(차단 카운터) · `delegations.json`(위임 기록) 네 파일. cwd 와 무관하다.
-- [ ] `session_id` 가 입력에 없으면(외부 실행·구버전) 종전 경로(`<레포>/.lens/…`)로 폴백한다 — 죽지 않고 예전처럼 동작.
-- [ ] `agent_id` 가 입력에 있으면 서브에이전트 호출이다 — 진행보고 시계·차단 카운터는 건드리지 않고, 현황판에는 `agent_id` 로만 기록한다.
-- [ ] `lib/agent-tracker.js` `getDashboardPath()` · `hooks/post-tool-progress.js` `getStatePath()` · `hooks/stop.js` `blockStatePath` · `hooks/pre-tool-plan-doc.js` `topTierDelegated()` 가 전부 이 모듈을 쓴다. `resolveProjectRoot({})` 로 루트를 추측하는 호출을 없앤다.
-- [ ] `hooks/session-start.js`: `startup` 에서 7일 지난 세션 폴더를 지운다. `initSession()` 은 자기 세션 폴더만 만든다 — 다른 세션의 현황판을 초기화하는 경로가 사라진다(C3).
-- [ ] `lib/hook-utils.js` `safeWriteJson`: 원자적 교체가 실패하면 남긴 `.tmp` 를 지운다(74행). 구 레포 수준 상태 파일은 코드가 지우지 않는다(정리 단계에서 손으로).
-- [ ] 막힐 지점: 게이트 원장(`.lens/gates/`)은 **옮기지 않는다** — 원장은 계획(scope)에 속하고 레포에 남아야 /cd 가 닫는다. 원장의 사용자 수준 색인은 그대로 두되 세션 필터는 종전대로 `sessionId` 로 한다.
+- [x] `lib/session-store.js` 신설 — 훅 입력의 `session_id` 로 사용자 수준 폴더를 정한다: `~/.claude/lens/sessions/<session_id>/`(`CLAUDE_CONFIG_DIR` 가 있으면 그 아래 — Codex 지적). 안에 `progress.json`(진행보고 시계) · `dashboard.json`(에이전트 현황판) · `blocks.json`(차단 카운터) · `delegations.json`(위임 기록) 네 파일. cwd 와 무관하다.
+- [x] `session_id` 가 입력에 없으면(외부 실행·구버전) 종전 경로(`<레포>/.lens/…`)로 폴백한다 — 죽지 않고 예전처럼 동작.
+- [x] `agent_id` 가 입력에 있으면 서브에이전트 호출이다 — 진행보고 시계·차단 카운터는 건드리지 않고, 현황판에는 `agent_id` 로만 기록한다.
+- [x] `lib/agent-tracker.js` `getDashboardPath()` · `hooks/post-tool-progress.js` `getStatePath()` · `hooks/stop.js` `blockStatePath` · `hooks/pre-tool-plan-doc.js` `topTierDelegated()` 가 전부 이 모듈을 쓴다. `resolveProjectRoot({})` 로 루트를 추측하는 호출을 없앤다.
+- [x] `hooks/session-start.js`: `startup` 에서 7일 지난 세션 폴더를 지운다. `initSession()` 은 자기 세션 폴더만 만든다 — 다른 세션의 현황판을 초기화하는 경로가 사라진다(C3).
+- [x] `lib/hook-utils.js` `safeWriteJson`: 원자적 교체가 실패하면 남긴 `.tmp` 를 지운다(74행). 구 레포 수준 상태 파일은 코드가 지우지 않는다(정리 단계에서 손으로).
+- [x] 막힐 지점: 게이트 원장(`.lens/gates/`)은 **옮기지 않는다** — 원장은 계획(scope)에 속하고 레포에 남아야 /cd 가 닫는다. 원장의 사용자 수준 색인은 그대로 두되 세션 필터는 종전대로 `sessionId` 로 한다.
 
 ### 1차 — 종료 검사
 
-- [ ] `hooks/stop.js` 순서 교정(A7/A8): 입력 읽기 → 게이트 판정 → **차단이면** 사유만 내고 끝(세션 완료 기록·보고 시계 스탬프 없음) → **통과면** 그때 `endSession()` 과 시계 스탬프.
-- [ ] A1: `background_tasks` 중 `type` 이 `subagent`·`workflow`·`teammate`·`cloud session` 인 항목이 하나라도 있으면 판정 자체를 건너뛰고 통과(출력 없음). `shell`·`monitor`·`MCP task` 는 대기로 치지 않는다 — 개발 서버·감시·/loop 처럼 세션 내내 떠 있는 작업이 게이트를 영원히 끄는 것을 막는다(Pre-mortem). 시계는 스탬프하되 세션은 완료로 찍지 않는다 — 턴은 끝났지만 실행은 안 끝났다.
-- [ ] A2: `lib/gate-ledger.js` `evaluate()` 가 `kind: manual` 게이트를 `outstanding` 에서 빼고 `awaitingUser` 목록으로 따로 낸다. `decideBlock()` 은 `outstanding` 만 본다. manual 만 남은 원장은 차단하지 않는다.
-- [ ] A3: 카운터 키 = `session_id` + scope, 해시 = 미충족 게이트 id 를 정렬해 이은 문자열(원장 원문·시각 제외). 저장은 세션 저장소 `blocks.json`. 상한(`MAX_BLOCKS` 2)은 유지.
-- [ ] A4+A5: 차단 출력은 `decision: block` + `reason` 만(사용자 화면용 `systemMessage` 삭제). 사유 문구는 "완료 조건 N건 미확인 — `lens-gate status` 로 보고 `lens-gate run` 으로 검사를 돌리거나 `lens-gate abandon` 으로 사유를 남겨라" 로 바꾼다("이어서 작업합니다" 삭제). 해제 알림은 `hookSpecificOutput.additionalContext` 로 같은 미충족 해시당 1회만.
-- [ ] `stop_hook_active` 가 참이고 미충족 해시가 직전 차단과 같으면 카운터만 올린다(지금과 같음) — 새 로직은 아니지만 테스트로 고정한다.
-- [ ] 막힐 지점 → 우회로는 아래 `우회로` 절.
+- [x] `hooks/stop.js` 순서 교정(A7/A8): 입력 읽기 → 게이트 판정 → **차단이면** 사유만 내고 끝(세션 완료 기록·보고 시계 스탬프 없음) → **통과면** 그때 `endSession()` 과 시계 스탬프.
+- [x] A1: `background_tasks` 중 `type` 이 `subagent`·`workflow`·`teammate`·`cloud session` 인 항목이 하나라도 있으면 판정 자체를 건너뛰고 통과(출력 없음). `shell`·`monitor`·`MCP task` 는 대기로 치지 않는다 — 개발 서버·감시·/loop 처럼 세션 내내 떠 있는 작업이 게이트를 영원히 끄는 것을 막는다(Pre-mortem). 시계는 스탬프하되 세션은 완료로 찍지 않는다 — 턴은 끝났지만 실행은 안 끝났다.
+- [x] A2: `lib/gate-ledger.js` `evaluate()` 가 `kind: manual` 게이트를 `outstanding` 에서 빼고 `awaitingUser` 목록으로 따로 낸다. `decideBlock()` 은 `outstanding` 만 본다. manual 만 남은 원장은 차단하지 않는다.
+- [x] A3: 카운터 키 = `session_id` + scope, 해시 = 미충족 게이트 id 를 정렬해 이은 문자열(원장 원문·시각 제외). 저장은 세션 저장소 `blocks.json`. 상한(`MAX_BLOCKS` 2)은 유지.
+- [x] A4+A5: 차단 출력은 `decision: block` + `reason` 만(사용자 화면용 `systemMessage` 삭제). 사유 문구는 "완료 조건 N건 미확인 — `lens-gate status` 로 보고 `lens-gate run` 으로 검사를 돌리거나 `lens-gate abandon` 으로 사유를 남겨라" 로 바꾼다("이어서 작업합니다" 삭제). 해제 알림은 `hookSpecificOutput.additionalContext` 로 같은 미충족 해시당 1회만.
+- [x] `stop_hook_active` 가 참이고 미충족 해시가 직전 차단과 같으면 카운터만 올린다(지금과 같음) — 새 로직은 아니지만 테스트로 고정한다.
+- [x] 막힐 지점 → 우회로는 아래 `우회로` 절.
 
 ### 1차 — 질문창 검사
 
-- [ ] `hooks/pre-tool-ask.js` B1: 기록 꼬리에서 `tool_use` 블록의 `id === input.tool_use_id` 인 assistant 항목을 찾는다. **없으면 기록이 아직 안 써진 것 — 판단 보류 = 통과.** 있으면 그 항목까지의 창에서 보고 글을 센다(종전 40자 규칙). `MIN_CHARS` 는 그대로.
-- [ ] B3: 허용 header `검증 확인` 은 그대로. 거부 문구에 "사용자가 글로 답하면 그 답이 확인이다 — `lens-gate evidence <scope> <id> --confirmed-by 대표 --note '답 원문'` 으로 기록" 을 싣는다.
-- [ ] 테스트 `hooks/pre-tool-ask.test.js`: 대화 기록 2a412ea0 을 질문 줄까지 자른 픽스처(보고 1,835자 포함)와 보고 줄을 뺀 픽스처, 그리고 **`tool_use_id` 가 아직 없는** 픽스처 3종을 추가한다.
+- [x] `hooks/pre-tool-ask.js` B1: 기록 꼬리에서 `tool_use` 블록의 `id === input.tool_use_id` 인 assistant 항목을 찾는다. **없으면 기록이 아직 안 써진 것 — 판단 보류 = 통과.** 있으면 그 항목까지의 창에서 보고 글을 센다(종전 40자 규칙). `MIN_CHARS` 는 그대로.
+- [x] B3: 허용 header `검증 확인` 은 그대로. 거부 문구에 "사용자가 글로 답하면 그 답이 확인이다 — `lens-gate evidence <scope> <id> --confirmed-by 대표 --note '답 원문'` 으로 기록" 을 싣는다.
+- [x] 테스트 `hooks/pre-tool-ask.test.js`: 대화 기록 2a412ea0 을 질문 줄까지 자른 픽스처(보고 1,835자 포함)와 보고 줄을 뺀 픽스처, 그리고 **`tool_use_id` 가 아직 없는** 픽스처 3종을 추가한다.
 
 ### 1차 — 진행보고·현황판
 
-- [ ] `hooks/post-tool-progress.js` C1: 상태를 세션 저장소에서 읽고 쓴다. `agent_id` 가 있으면 즉시 종료(워커는 메인 시계를 안 건드린다).
-- [ ] C2 "보고 시각" 의미 교정: `lastReportAt` 을 `lastContactAt`(사장님이 마지막으로 화면을 본 시각 = 턴 종료·사용자 메시지) 과 `lastReminderAt`(마지막 독촉) 으로 나눈다. 독촉은 둘 중 늦은 시각 기준 120초. 독촉 문구는 "마지막 접점 이후 N초" 로.
-- [ ] D3: `isBackgroundSignal()` 에서 **Workflow 분기를 먼저** 본다(`SPAWN_TOOLS` 의 Agent 봉투 검사보다 앞). 판별은 아래 공용 봉투 모듈.
+- [x] `hooks/post-tool-progress.js` C1: 상태를 세션 저장소에서 읽고 쓴다. `agent_id` 가 있으면 즉시 종료(워커는 메인 시계를 안 건드린다).
+- [x] C2 "보고 시각" 의미 교정: `lastReportAt` 을 `lastContactAt`(사장님이 마지막으로 화면을 본 시각 = 턴 종료·사용자 메시지) 과 `lastReminderAt`(마지막 독촉) 으로 나눈다. 독촉은 둘 중 늦은 시각 기준 120초. 독촉 문구는 "마지막 접점 이후 N초" 로.
+- [x] D3: `isBackgroundSignal()` 에서 **Workflow 분기를 먼저** 본다(`SPAWN_TOOLS` 의 Agent 봉투 검사보다 앞). 판별은 아래 공용 봉투 모듈.
 
 ### 1차 — 백그라운드 작업 추적
 
-- [ ] `lib/spawn-envelope.js` 신설 — `classify(toolName, toolInput, toolResponse)` 가 `agent-async` · `workflow-async` · `foreground` · `unknown` 과 식별자(agentId · runId)를 돌려준다. `post-tool-task.js` 와 `post-tool-progress.js` 가 같은 함수를 쓴다(D1). `unknown` 은 done 이 아니라 `launched` 로 남긴다.
-- [ ] D2: Workflow 는 `tool_input.name` 을 이름으로.
-- [ ] D4: `hooks/pre-tool-task.js` 가 `tool_use_id` 를 현황판 항목에 기록하고, `hooks/post-tool-task.js` 는 `tool_use_id` 로 먼저 잇고 설명문 매칭은 폴백으로만. `hooks/hooks.json` 에 `SubagentStop`(matcher 없음 → `hooks/subagent-stop.js`: `agent_id` 로 `launched → done`) 과 `PostToolUseFailure`(`Task|Agent|Workflow` → `hooks/post-tool-task.js --failed`: `tool_use_id` 로 `error`) 를 배선한다.
-- [ ] C4: launched 가 완료 이벤트로 풀리므로 누적이 멈춘다. 남은 launched 안내문은 한 줄("미확정 N건") 로 줄이고 개수가 바뀔 때만 낸다.
-- [ ] 막힐 지점: 비동기 봉투의 `agentId` 와 `SubagentStop` 의 `agent_id` 가 같은 값인지 문서에 없다. 구현 전 실측 1회(백그라운드 에이전트 1개 띄우고 두 값 비교). 다르면 SubagentStop 은 "같은 세션에서 가장 오래된 launched" 를 푼다 — 병렬 오귀속은 있어도 영구 launched 보다 낫다.
+- [x] `lib/spawn-envelope.js` 신설 — `classify(toolName, toolInput, toolResponse)` 가 `agent-async` · `workflow-async` · `foreground` · `unknown` 과 식별자(agentId · runId)를 돌려준다. `post-tool-task.js` 와 `post-tool-progress.js` 가 같은 함수를 쓴다(D1). `unknown` 은 done 이 아니라 `launched` 로 남긴다.
+- [x] D2: Workflow 는 `tool_input.name` 을 이름으로.
+- [x] D4: `hooks/pre-tool-task.js` 가 `tool_use_id` 를 현황판 항목에 기록하고, `hooks/post-tool-task.js` 는 `tool_use_id` 로 먼저 잇고 설명문 매칭은 폴백으로만. `hooks/hooks.json` 에 `SubagentStop`(matcher 없음 → `hooks/subagent-stop.js`: `agent_id` 로 `launched → done`) 과 `PostToolUseFailure`(`Task|Agent|Workflow` → `hooks/post-tool-task.js --failed`: `tool_use_id` 로 `error`) 를 배선한다.
+- [x] C4: launched 가 완료 이벤트로 풀리므로 누적이 멈춘다. 남은 launched 안내문은 한 줄("미확정 N건") 로 줄이고 개수가 바뀔 때만 낸다.
+- [x] 막힐 지점: 비동기 봉투의 `agentId` 와 `SubagentStop` 의 `agent_id` 가 같은 값인지 문서에 없다. 구현 전 실측 1회(백그라운드 에이전트 1개 띄우고 두 값 비교). 다르면 SubagentStop 은 "같은 세션에서 가장 오래된 launched" 를 푼다 — 병렬 오귀속은 있어도 영구 launched 보다 낫다.
 
 ### 1차 — 계획서 작성자·모델 검사
 
-- [ ] `hooks/pre-tool-plan-doc.js` E1: 입력에 `agent_id` 가 있으면 서브에이전트다. 먼저 서브에이전트 기록(`<transcript_path 폴더>/<session_id>/subagents/agent-<agent_id>.jsonl`)의 마지막 assistant 모델을 읽는다. 읽히면 그 모델로 판정. 못 읽으면 세션 저장소 `delegations.json` 에 이 세션의 TOP 위임이 `running`·`launched`·`done` 으로 있으면 통과(E2). 부모 기록의 모델은 `agent_id` 가 없을 때만 본다.
-- [ ] E3: 위임 기록은 세션 저장소에만 쓰고 읽는다 — 다른 세션·다른 레포 기록은 구조상 안 보인다. `error` 인 위임은 자격이 아니다.
-- [ ] E4: `hooks/pre-tool-task.js` 가 Workflow 의 `tool_input.script` 를 정적으로 본다 — `agent(` 호출마다 인자 안에 `model` 이 있는지. 하나라도 없으면 거부(사유에 그 호출 위치). `agent(` 개수가 60 을 넘거나 반복문 안에 있어 셀 수 없으면 경고(차단 아님). `tool_input.script` 가 **있을 때만** 검사한다 — 저장된 워크플로를 `name` 으로 부르면 스크립트가 입력에 없으므로 건너뛴다(거부하지 않는다).
-- [ ] E6: 거부 문구 끝에 "Agent 를 부를 수 없는 컨텍스트면 `LENS_PLANNER_GATE=0` 으로 끄고 계획서 `planner_model` 에 사유를 적어라" 한 줄.
-- [ ] 막힐 지점: 서브에이전트 기록 경로 규칙은 공식 문서의 예시(`…/abc123/subagents/agent-def456.jsonl`)에서 유도한 것이다. 실측에서 다르면 위임 기록 폴백만으로 판정한다(그래도 E1 사고는 재발하지 않는다 — 부모 세션이 fable 을 띄운 기록이 같은 저장소에 있다).
+- [x] `hooks/pre-tool-plan-doc.js` E1: 입력에 `agent_id` 가 있으면 서브에이전트다. 먼저 서브에이전트 기록(`<transcript_path 폴더>/<session_id>/subagents/agent-<agent_id>.jsonl`)의 마지막 assistant 모델을 읽는다. 읽히면 그 모델로 판정. 못 읽으면 세션 저장소 `delegations.json` 에 이 세션의 TOP 위임이 `running`·`launched`·`done` 으로 있으면 통과(E2). 부모 기록의 모델은 `agent_id` 가 없을 때만 본다.
+- [x] E3: 위임 기록은 세션 저장소에만 쓰고 읽는다 — 다른 세션·다른 레포 기록은 구조상 안 보인다. `error` 인 위임은 자격이 아니다.
+- [x] E4: `hooks/pre-tool-task.js` 가 Workflow 의 `tool_input.script` 를 정적으로 본다 — `agent(` 호출마다 인자 안에 `model` 이 있는지. 하나라도 없으면 거부(사유에 그 호출 위치). `agent(` 개수가 60 을 넘거나 반복문 안에 있어 셀 수 없으면 경고(차단 아님). `tool_input.script` 가 **있을 때만** 검사한다 — 저장된 워크플로를 `name` 으로 부르면 스크립트가 입력에 없으므로 건너뛴다(거부하지 않는다).
+- [x] E6: 거부 문구 끝에 "Agent 를 부를 수 없는 컨텍스트면 `LENS_PLANNER_GATE=0` 으로 끄고 계획서 `planner_model` 에 사유를 적어라" 한 줄.
+- [x] 막힐 지점: 서브에이전트 기록 경로 규칙은 공식 문서의 예시(`…/abc123/subagents/agent-def456.jsonl`)에서 유도한 것이다. 실측에서 다르면 위임 기록 폴백만으로 판정한다(그래도 E1 사고는 재발하지 않는다 — 부모 세션이 fable 을 띄운 기록이 같은 저장소에 있다).
 
 ### 1차 — 완료 조건 원장과 lens-gate
 
-- [ ] `scripts/lens-gate.js` 신설(G4) — `status [scope]` · `create <scope> --plan <md> --goal <문장> --gates <json 파일>` · `run <scope> [gateId]` · `evidence <scope> <gateId> --note --confirmed-by` · `abandon <scope> <gateId> --reason` · `reopen <scope> [gateId]` · `close <scope>`. 출력은 JSON 한 줄, 인자는 셸 인용이 필요 없는 형태(파일·플래그).
-- [ ] G1: `run` 이 원장의 `check` 를 bash(win32 는 git-bash)로 직접 실행해 exit·출력(뒤 600자)을 `recordEvidence` 에 넘기고 `evidence.source = "lens-gate run"` 을 찍는다. 원장 `schema` 를 2 로 올리고, **`gateState()` 의 "auto 게이트는 `source` 가 runner 일 때만 `met`" 규칙은 `lens-gate create` 가 만든 schema 2 원장에만 적용한다.** schema 1(업그레이드 전에 열린 원장 — 오늘 snapholo 2a412ea0 처럼 API 로 증거를 넣은 것)은 종전 판정 그대로 — 아니면 업그레이드 직후 열려 있던 원장이 전부 미충족으로 뒤집혀 재차단된다(Pre-mortem). 구 훅(3.47.0)의 `loadLedgers` 는 `schema` 값을 검사하지 않고 `gates` 배열만 보므로(현 코드 확인) schema 2 원장도 읽는다.
-- [ ] G2: `create` 가 auto 게이트마다 `check` 를 한 번 실행해 본다(상한 120초). exit 126·127(실행 불가·명령 없음)이면 원장을 만들지 않고 그 게이트를 지목한다. 시간 초과·다른 실패는 "실행 가능하나 미충족" 으로 인정하고 생성한다.
-- [ ] A6: `reopen` 이 `closedAt` 을 비우거나 `abandoned` 게이트를 `unmet` 으로 되돌리며 `reopenedAt` 을 남긴다. 그 뒤 `run` 으로 증거를 붙이면 정상 `met`.
-- [ ] G6: `lib/gate-ledger.js` 275·293·305행의 NUL·\x01 원문 바이트를 `\u0000`·`\u0001` 이스케이프로.
-- [ ] G5: 스킬의 `node -e` 한 줄 8곳을 CLI 로 바꾼다 — 원장 4곳(`skills/cc/SKILL.md` 310·820·830·907행)은 `lens-gate`, git-branch·plan-manager 4곳(cc 223·262·282, cd 113·138, cp 203·254·290)은 얇은 래퍼 `scripts/lens-cli.js`(`branch entry|ownership|merged`, `plan todo|structure|preflight`)로. 래퍼는 인자를 넘기고 JSON 을 찍을 뿐 판정 로직을 갖지 않는다.
+- [x] `scripts/lens-gate.js` 신설(G4) — `status [scope]` · `create <scope> --plan <md> --goal <문장> --gates <json 파일>` · `run <scope> [gateId]` · `evidence <scope> <gateId> --note --confirmed-by` · `abandon <scope> <gateId> --reason` · `reopen <scope> [gateId]` · `close <scope>`. 출력은 JSON 한 줄, 인자는 셸 인용이 필요 없는 형태(파일·플래그).
+- [x] G1: `run` 이 원장의 `check` 를 bash(win32 는 git-bash)로 직접 실행해 exit·출력(뒤 600자)을 `recordEvidence` 에 넘기고 `evidence.source = "lens-gate run"` 을 찍는다. 원장 `schema` 를 2 로 올리고, **`gateState()` 의 "auto 게이트는 `source` 가 runner 일 때만 `met`" 규칙은 `lens-gate create` 가 만든 schema 2 원장에만 적용한다.** schema 1(업그레이드 전에 열린 원장 — 오늘 snapholo 2a412ea0 처럼 API 로 증거를 넣은 것)은 종전 판정 그대로 — 아니면 업그레이드 직후 열려 있던 원장이 전부 미충족으로 뒤집혀 재차단된다(Pre-mortem). 구 훅(3.47.0)의 `loadLedgers` 는 `schema` 값을 검사하지 않고 `gates` 배열만 보므로(현 코드 확인) schema 2 원장도 읽는다.
+- [x] G2: `create` 가 auto 게이트마다 `check` 를 한 번 실행해 본다(상한 120초). exit 126·127(실행 불가·명령 없음)이면 원장을 만들지 않고 그 게이트를 지목한다. 시간 초과·다른 실패는 "실행 가능하나 미충족" 으로 인정하고 생성한다.
+- [x] A6: `reopen` 이 `closedAt` 을 비우거나 `abandoned` 게이트를 `unmet` 으로 되돌리며 `reopenedAt` 을 남긴다. 그 뒤 `run` 으로 증거를 붙이면 정상 `met`.
+- [x] G6: `lib/gate-ledger.js` 275·293·305행의 NUL·\x01 원문 바이트를 `\u0000`·`\u0001` 이스케이프로.
+- [x] G5: 스킬의 `node -e` 한 줄 8곳을 CLI 로 바꾼다 — 원장 4곳(`skills/cc/SKILL.md` 310·820·830·907행)은 `lens-gate`, git-branch·plan-manager 4곳(cc 223·262·282, cd 113·138, cp 203·254·290)은 얇은 래퍼 `scripts/lens-cli.js`(`branch entry|ownership|merged`, `plan todo|structure|preflight`)로. 래퍼는 인자를 넘기고 JSON 을 찍을 뿐 판정 로직을 갖지 않는다.
 
 ### 1차 — 브랜치·교차 검증·완료 판정
 
-- [ ] G10 `lib/git-branch.js` `entryDecision()`: dirty 판정에서 실행하려는 계획서 파일(인자로 받은 `planDoc`)과 `.lens/` 를 뺀다. `reasons` 는 중복 제거.
-- [ ] H1 `scripts/codex-review.sh --mode review --base <branch>`: diff = 작업트리 + 스테이징 + untracked + **`git diff $(git merge-base origin/<base> HEAD)..HEAD`**. `.lens/` 경로 제외. 합친 diff 가 비면 Codex 를 부르지 않고 `{"verdict":"unverified","reason":"empty diff"}` 를 쓴다. `scripts/cross-verify.sh` 는 계획서 frontmatter `base:` 를 읽어 `--base` 로 넘긴다.
-- [ ] H2: `cross-verify.sh` 가 `--out <dir>` 를 받아 레인 출력 폴더로 쓰고, `codex-review.sh` 의 `--out` 은 기본값(임시 파일)을 가진다. 두 스크립트의 usage 주석을 같은 인자 표로.
-- [ ] H3: 두 스크립트 모두 stderr 를 `<out>.stderr.log` 로 남긴다. 타임아웃이면 결과 파일에 `{"verdict":"unverified","reason":"timeout <초>s"}` 를 쓴다(빈 파일 금지). 판정 문자열 계약은 그대로(59행 제외 유지).
-- [ ] I1 `mergedState()`: 원격·로컬 ref 가 둘 다 없을 때 ① `git log origin/<base> --merges --grep "<branch>"` 의 병합 커밋 ② 계획서 frontmatter `last_tip:`(아래 /cc 문구에서 기록) 이 base 조상이면 `merged-deleted` 로 판정하고 `reason` 에 근거를 쓴다. 둘 다 없으면 지금처럼 `unknown`.
+- [x] G10 `lib/git-branch.js` `entryDecision()`: dirty 판정에서 실행하려는 계획서 파일(인자로 받은 `planDoc`)과 `.lens/` 를 뺀다. `reasons` 는 중복 제거.
+- [x] H1 `scripts/codex-review.sh --mode review --base <branch>`: diff = 작업트리 + 스테이징 + untracked + **`git diff $(git merge-base origin/<base> HEAD)..HEAD`**. `.lens/` 경로 제외. 합친 diff 가 비면 Codex 를 부르지 않고 `{"verdict":"unverified","reason":"empty diff"}` 를 쓴다. `scripts/cross-verify.sh` 는 계획서 frontmatter `base:` 를 읽어 `--base` 로 넘긴다.
+- [x] H2: `cross-verify.sh` 가 `--out <dir>` 를 받아 레인 출력 폴더로 쓰고, `codex-review.sh` 의 `--out` 은 기본값(임시 파일)을 가진다. 두 스크립트의 usage 주석을 같은 인자 표로.
+- [x] H3: 두 스크립트 모두 stderr 를 `<out>.stderr.log` 로 남긴다. 타임아웃이면 결과 파일에 `{"verdict":"unverified","reason":"timeout <초>s"}` 를 쓴다(빈 파일 금지). 판정 문자열 계약은 그대로(59행 제외 유지).
+- [x] I1 `mergedState()`: 원격·로컬 ref 가 둘 다 없을 때 ① `git log origin/<base> --merges --grep "<branch>"` 의 병합 커밋 ② 계획서 frontmatter `last_tip:`(아래 /cc 문구에서 기록) 이 base 조상이면 `merged-deleted` 로 판정하고 `reason` 에 근거를 쓴다. 둘 다 없으면 지금처럼 `unknown`.
 
 ### 1차 — 훅 설정·입력 계약·업그레이드
 
-- [ ] J1 `hooks/hooks.json`: timeout 3000→3 · 5000→5 · 90000→90(초). `SubagentStop`·`PostToolUseFailure` 배선 추가(위 D4).
-- [ ] J2 `scripts/user-prompt-handler.js`: 입력을 `input.prompt` 로 읽는다. OVERRIDE `systemMessage` 주입은 **삭제**(질문창 금지 문구가 B1 을 또 막는다. Claude Code 가 슬래시 명령을 자체 처리하므로 손실 없음 — 대화 기록에 OVERRIDE 0건으로 확인). 대신 세션 저장소 `progress.json` 의 `lastContactAt` 을 갱신한다(C2). 출력은 빈 JSON.
-- [ ] J3a `lib/hook-utils.js` 에 `ensureLensDir(root)`: `.lens` 를 만들 때 `git rev-parse --git-path info/exclude` 가 가리키는 파일에 `.lens/` 한 줄을 없으면 붙인다(worktree 의 `.git` 파일도 처리). git 이 아니면 건너뜀. 모든 `.lens` 생성 지점이 이 함수를 쓴다.
-- [ ] J4 `hooks/post-tool-plan-doc.js`: 중복 억제 키에 `session_id` 를 넣고, `grade()` 가 따옴표를 벗긴다.
-- [ ] 36 `scripts/upgrade.py`: 이 Claude Code(2.1.278)가 `.in_use` 마커를 실제로 쓰는지 실행 중 세션의 캐시 폴더를 열어 확인한다. 쓰지 않으면(가능성 높음) 정책을 "직전 설치 버전 폴더 1개는 항상 보존, 그보다 오래된 것만 삭제" 로 바꾼다 — 실행 중 세션의 훅 경로가 살아남는다. 롤백(이전 버전 재설치)도 이 보존 폴더로 즉시 가능하다.
+- [x] J1 `hooks/hooks.json`: timeout 3000→3 · 5000→5 · 90000→90(초). `SubagentStop`·`PostToolUseFailure` 배선 추가(위 D4).
+- [x] J2 `scripts/user-prompt-handler.js`: 입력을 `input.prompt` 로 읽는다. OVERRIDE `systemMessage` 주입은 **삭제**(질문창 금지 문구가 B1 을 또 막는다. Claude Code 가 슬래시 명령을 자체 처리하므로 손실 없음 — 대화 기록에 OVERRIDE 0건으로 확인). 대신 세션 저장소 `progress.json` 의 `lastContactAt` 을 갱신한다(C2). 출력은 빈 JSON.
+- [x] J3a `lib/hook-utils.js` 에 `ensureLensDir(root)`: `.lens` 를 만들 때 `git rev-parse --git-path info/exclude` 가 가리키는 파일에 `.lens/` 한 줄을 없으면 붙인다(worktree 의 `.git` 파일도 처리). git 이 아니면 건너뜀. 모든 `.lens` 생성 지점이 이 함수를 쓴다.
+- [x] J4 `hooks/post-tool-plan-doc.js`: 중복 억제 키에 `session_id` 를 넣고, `grade()` 가 따옴표를 벗긴다.
+- [x] 36 `scripts/upgrade.py`: 이 Claude Code(2.1.278)가 `.in_use` 마커를 실제로 쓰는지 실행 중 세션의 캐시 폴더를 열어 확인한다. 쓰지 않으면(가능성 높음) 정책을 "직전 설치 버전 폴더 1개는 항상 보존, 그보다 오래된 것만 삭제" 로 바꾼다 — 실행 중 세션의 훅 경로가 살아남는다. 롤백(이전 버전 재설치)도 이 보존 폴더로 즉시 가능하다.
 
 ### 1차 — 실제 조건 재현 테스트
 
 기존 테스트가 실제 조건을 안 담았다는 Codex 지적(표 11건)을 그대로 테스트 목록으로 쓴다. 코드보다 먼저 쓴다.
 
-- [ ] `hooks/stop.test.js` 신설: 공식 Stop payload 재생 — `background_tasks` 에 subagent 1건 → 통과·출력 없음 / shell 만 1건 → 정상 판정(미충족이면 차단) / manual 만 미충족 → 통과 / 메타데이터만 바뀐 원장 5회 → 2회 차단 뒤 해제 1회, 이후 침묵 / `stop_hook_active` 참 / 필드 없는 구버전 payload 폴백 / 깨진 세션 저장소 → 통과.
-- [ ] `hooks/pre-tool-ask.test.js` 추가: 기록 지연(현재 `tool_use_id` 부재) / 2a412ea0 질문 줄까지 재생 / 보고 줄 제거.
-- [ ] `hooks/post-tool-progress.test.js` 신설: 두 `session_id` 동시 → 각자 시계 / `agent_id` 호출 무시 / 실제 Workflow 봉투 문자열(산문·구조화 두 철자) → 무장 / 사용자 메시지 뒤 독촉 시각.
-- [ ] `hooks/post-tool-task.test.js` 신설: Workflow 봉투 → launched + 이름 / SubagentStop → done / PostToolUseFailure → error / 같은 설명 병렬 2건이 `tool_use_id` 로 각자 연결.
-- [ ] `hooks/pre-tool-plan-doc.test.js` 추가: `agent_id` + 서브에이전트 기록 fable → 통과 / 다른 세션 저장소의 fable → 거부 / error 위임 → 거부 / `grade: "deep"`.
-- [ ] `hooks/pre-tool-task.test.js`: Workflow 스크립트에 model 없는 `agent(` → 거부 / 61개 → 경고(실제 훅 호출로, 소스 문자열 검사 금지).
-- [ ] `lib/gate-ledger.test.js` 추가: schema 2 에서 `source` 없는 exit:0 → unmet / schema 1 에서 같은 증거 → met(종전 판정) / `run` 실행 후 met / `create` 가 exit 127 을 거부 / reopen.
-- [ ] `tests/test_codex_review.sh` 신설: 임시 레포에서 커밋 뒤 diff 포함 / 빈 diff → unverified / 타임아웃 → stderr 로그 + unverified. `tests/test_cross_verify.sh` 에 `--out` 케이스.
-- [ ] `lib/git-branch-entry.test.js` 추가: 계획서만 dirty → ask 아님 / 삭제된 브랜치 + 병합 커밋 메시지 → merged-deleted.
-- [ ] `scripts/user-prompt-handler.test.js`: 공식 `prompt` payload 로 stdin 주입, OVERRIDE 0건·systemMessage 없음·시계 갱신.
+- [x] `hooks/stop.test.js` 신설: 공식 Stop payload 재생 — `background_tasks` 에 subagent 1건 → 통과·출력 없음 / shell 만 1건 → 정상 판정(미충족이면 차단) / manual 만 미충족 → 통과 / 메타데이터만 바뀐 원장 5회 → 2회 차단 뒤 해제 1회, 이후 침묵 / `stop_hook_active` 참 / 필드 없는 구버전 payload 폴백 / 깨진 세션 저장소 → 통과.
+- [x] `hooks/pre-tool-ask.test.js` 추가: 기록 지연(현재 `tool_use_id` 부재) / 2a412ea0 질문 줄까지 재생 / 보고 줄 제거.
+- [x] `hooks/post-tool-progress.test.js` 신설: 두 `session_id` 동시 → 각자 시계 / `agent_id` 호출 무시 / 실제 Workflow 봉투 문자열(산문·구조화 두 철자) → 무장 / 사용자 메시지 뒤 독촉 시각.
+- [x] `hooks/post-tool-task.test.js` 신설: Workflow 봉투 → launched + 이름 / SubagentStop → done / PostToolUseFailure → error / 같은 설명 병렬 2건이 `tool_use_id` 로 각자 연결.
+- [x] `hooks/pre-tool-plan-doc.test.js` 추가: `agent_id` + 서브에이전트 기록 fable → 통과 / 다른 세션 저장소의 fable → 거부 / error 위임 → 거부 / `grade: "deep"`.
+- [x] `hooks/pre-tool-task.test.js`: Workflow 스크립트에 model 없는 `agent(` → 거부 / 61개 → 경고(실제 훅 호출로, 소스 문자열 검사 금지).
+- [x] `lib/gate-ledger.test.js` 추가: schema 2 에서 `source` 없는 exit:0 → unmet / schema 1 에서 같은 증거 → met(종전 판정) / `run` 실행 후 met / `create` 가 exit 127 을 거부 / reopen.
+- [x] `tests/test_codex_review.sh` 신설: 임시 레포에서 커밋 뒤 diff 포함 / 빈 diff → unverified / 타임아웃 → stderr 로그 + unverified. `tests/test_cross_verify.sh` 에 `--out` 케이스.
+- [x] `lib/git-branch-entry.test.js` 추가: 계획서만 dirty → ask 아님 / 삭제된 브랜치 + 병합 커밋 메시지 → merged-deleted.
+- [x] `scripts/user-prompt-handler.test.js`: 공식 `prompt` payload 로 stdin 주입, OVERRIDE 0건·systemMessage 없음·시계 갱신.
 
 ### 2차 — /cp 문구와 컴팩션 재주입
 
 `skills/cp/SKILL.md` 만 고친다. 규칙 층위는 안 바꾼다.
 
-- [ ] F1 표시 레인 표(270행): artifact 행을 "**md 파일을 그대로 Artifact 로 발행한다** — 이 문장이 Artifact 도구가 요구하는 '스킬의 md 허용 지시' 다. 페이지를 다시 쓰지 않는다" 로. `artifact-design` 로드 지시·"읽히는 페이지"·"페이지에 담는 것" 블록(276~279행) 삭제. Modify 도 같은 md 를 같은 링크로 재발행.
-- [ ] F2 순서: Phase 0 직후 목표·왜·인벤토리 초안을 md 로 저장 → 발행 → **링크를 먼저 보고**(계약 카드에 "첫 링크는 조사 전에" 한 줄) → 조사(에이전트 최대 6, 상한 15분 — 넘기면 있는 것으로 진행하고 보고에 명시) → 어떻게·검증·리스크를 채워 같은 링크 재발행 → Pre-mortem·Codex 레인은 재발행 **뒤** 병렬.
-- [ ] E5: TOP 위임은 조사가 끝난 뒤 **'작성만'** 넘기고, `run_in_background: true` 로 띄워 2분 진행보고를 지킨다. 전경 위임 금지 한 줄.
-- [ ] F3: 완성·수정 보고 첫 줄 = 링크(계약 카드 8번에 고정).
-- [ ] F4: Phase 0 에서 뼈대(목표 N개 + 단계 4개)를 TodoWrite 에 등록, 실행 항목은 인벤토리 행을 10~15개 묶음으로. 22행의 "env 가 빠진 것이다" → "도구 목록에 없으면 deferred 다 — `ToolSearch` 로 `select:TodoWrite` 를 불러온다. 그래도 없으면 env 플래그" 로 교정.
-- [ ] B2: 질문창이 거부되거나 글로 물을 때 "선택지 전부와 각 결과를 본문에 다시 적는다 — '위에 정리했다' 금지" 한 줄(계약 카드 8번 아래).
-- [ ] F6 `hooks/session-start.js`: `source` 가 `compact`·`fork` 일 때 `additionalContext` 에 "사용자 언어로 답한다(이 사용자는 한국어·존댓말)" 한 줄을 넣는다. startup 경로는 그대로.
+- [x] F1 표시 레인 표(270행): artifact 행을 "**md 파일을 그대로 Artifact 로 발행한다** — 이 문장이 Artifact 도구가 요구하는 '스킬의 md 허용 지시' 다. 페이지를 다시 쓰지 않는다" 로. `artifact-design` 로드 지시·"읽히는 페이지"·"페이지에 담는 것" 블록(276~279행) 삭제. Modify 도 같은 md 를 같은 링크로 재발행.
+- [x] F2 순서: Phase 0 직후 목표·왜·인벤토리 초안을 md 로 저장 → 발행 → **링크를 먼저 보고**(계약 카드에 "첫 링크는 조사 전에" 한 줄) → 조사(에이전트 최대 6, 상한 15분 — 넘기면 있는 것으로 진행하고 보고에 명시) → 어떻게·검증·리스크를 채워 같은 링크 재발행 → Pre-mortem·Codex 레인은 재발행 **뒤** 병렬.
+- [x] E5: TOP 위임은 조사가 끝난 뒤 **'작성만'** 넘기고, `run_in_background: true` 로 띄워 2분 진행보고를 지킨다. 전경 위임 금지 한 줄.
+- [x] F3: 완성·수정 보고 첫 줄 = 링크(계약 카드 8번에 고정).
+- [x] F4: Phase 0 에서 뼈대(목표 N개 + 단계 4개)를 TodoWrite 에 등록, 실행 항목은 인벤토리 행을 10~15개 묶음으로. 22행의 "env 가 빠진 것이다" → "도구 목록에 없으면 deferred 다 — `ToolSearch` 로 `select:TodoWrite` 를 불러온다. 그래도 없으면 env 플래그" 로 교정.
+- [x] B2: 질문창이 거부되거나 글로 물을 때 "선택지 전부와 각 결과를 본문에 다시 적는다 — '위에 정리했다' 금지" 한 줄(계약 카드 8번 아래).
+- [x] F6 `hooks/session-start.js`: `source` 가 `compact`·`fork` 일 때 `additionalContext` 에 "사용자 언어로 답한다(이 사용자는 한국어·존댓말)" 한 줄을 넣는다. startup 경로는 그대로.
 
 ### 2차 — /cc·/cd 문구
 
-- [ ] G3 `skills/cc/SKILL.md` Phase 0.5(원장 생성): "측정할 수 있으면 auto 다 — check 는 실행 가능한 명령이어야 하고 `lens-gate create` 가 확인한다. manual 은 차단 사유가 아니며 보고에 '대표 확인 필요: …' 한 줄로만 나간다. 사용자 화면에 게이트·원장·N/M 같은 내부 용어를 쓰지 않는다."
-- [ ] G5·B3: 원장 명령 4곳을 `lens-gate` 로, git-branch 2곳을 `lens-cli branch` 로. 825행 manual 기록을 `lens-gate evidence --confirmed-by` 로. 사용자가 글로 답한 것도 확인으로 인정.
-- [ ] G7: `lens.config.json` 에 `nonStopActions`(레포별 "멈추지 않아도 되는 행동" 목록, 기본 없음) 추가 — Returns_ERP_v20 에 `staging 배포`·`staging DB 변경`. 65행 정지 표를 "운영 배포·운영 DB 는 항상 멈춘다. staging 은 그 레포 `nonStopActions` 에 있을 때만 멈추지 않는다" 로. harness-rules §4.11 의 정지 3종 정의는 그대로.
-- [ ] G8 7.5 자동 커밋: "이 세션의 현황판에 running·launched 워커가 있으면 커밋을 보류하고 보고한다. 워커가 끝난 뒤 커밋." 한 줄.
-- [ ] G9 Phase 7: `lens-gate close` 결과의 met 목록으로 계획서 ✅ 표의 통과 칸과 📌 체크박스를 갱신하고 frontmatter `status` 를 `executing → done` 으로, 마지막 커밋 sha 를 `last_tip:` 에 기록(I1 의 판정 근거).
-- [ ] I1 `skills/cd/SKILL.md` 113·138행: `lens-cli branch merged` 로 바꾸고, `merged-deleted` 의 새 근거 2종(병합 커밋 메시지·`last_tip`)을 6상태 설명에 추가.
+- [x] G3 `skills/cc/SKILL.md` Phase 0.5(원장 생성): "측정할 수 있으면 auto 다 — check 는 실행 가능한 명령이어야 하고 `lens-gate create` 가 확인한다. manual 은 차단 사유가 아니며 보고에 '대표 확인 필요: …' 한 줄로만 나간다. 사용자 화면에 게이트·원장·N/M 같은 내부 용어를 쓰지 않는다."
+- [x] G5·B3: 원장 명령 4곳을 `lens-gate` 로, git-branch 2곳을 `lens-cli branch` 로. 825행 manual 기록을 `lens-gate evidence --confirmed-by` 로. 사용자가 글로 답한 것도 확인으로 인정.
+- [x] G7: `lens.config.json` 에 `nonStopActions`(레포별 "멈추지 않아도 되는 행동" 목록, 기본 없음) 추가 — Returns_ERP_v20 에 `staging 배포`·`staging DB 변경`. 65행 정지 표를 "운영 배포·운영 DB 는 항상 멈춘다. staging 은 그 레포 `nonStopActions` 에 있을 때만 멈추지 않는다" 로. harness-rules §4.11 의 정지 3종 정의는 그대로.
+- [x] G8 7.5 자동 커밋: "이 세션의 현황판에 running·launched 워커가 있으면 커밋을 보류하고 보고한다. 워커가 끝난 뒤 커밋." 한 줄.
+- [x] G9 Phase 7: `lens-gate close` 결과의 met 목록으로 계획서 ✅ 표의 통과 칸과 📌 체크박스를 갱신하고 frontmatter `status` 를 `executing → done` 으로, 마지막 커밋 sha 를 `last_tip:` 에 기록(I1 의 판정 근거).
+- [x] I1 `skills/cd/SKILL.md` 113·138행: `lens-cli branch merged` 로 바꾸고, `merged-deleted` 의 새 근거 2종(병합 커밋 메시지·`last_tip`)을 6상태 설명에 추가.
 
 ### agentmemory 복구
 
 사장님 지시(2026-09-22): 끄지 말고 제대로 작동하게. 서버는 맥미니(`io.livevil.agentmemory`, 포트 3111)에서 13일째 떠 있고, 이 컴퓨터는 훅·MCP 로 거기에 붙는다.
 
-- [ ] 요약 LLM 연결: 맥미니 `~/.agentmemory/.env` 는 템플릿 그대로(전부 주석)라 공급자가 없다. 텍스트 LLM 규칙(Claude 구독 계정 체인, 메모리 `llm-text-chain-blex-then-sj`)에 맞춰 `AGENTMEMORY_PROVIDER`·`AGENTMEMORY_ALLOW_AGENT_SDK` 등 이 버전이 받는 변수로 Claude 구독 토큰을 연결한다(키는 `livevil-setting/env` 에서, 값은 커밋하지 않는다). 가벼운 모델을 쓴다. 이 버전이 구독 토큰을 못 받으면 우회로: 요약 기능만 끄고(`AUTO_COMPRESS` 끔) 검색·기록은 살린다 — 실패 로그 10,816회가 멈추는 것이 1차 목표.
-- [ ] 메모리 상한: 서버가 힙 97%로 "critical" 이다. 노드 힙 상한을 올려(launchd 인자) 재시작하고, 46MB 로그를 회전한다. 재시작 뒤 health 가 `ok`·요약 성공 1건 이상인지 본다.
-- [ ] 버전 맞춤: 서버 0.9.27 ↔ 이 컴퓨터 플러그인 0.9.29. 서버를 플러그인 버전에 맞춘다(되돌릴 수 있게 현재 버전 기록).
-- [ ] 훅 멈춤 방지: 플러그인 훅에 제한 시간이 없어 서버가 느리면 파일 도구가 최대 10분 멈춘다. 플러그인 파일을 직접 고치면 업데이트 때 덮이므로, 먼저 이 버전의 클라이언트 쪽 제한 시간 변수(`AGENTMEMORY_PROBE_TIMEOUT_MS` 등)로 막고, 없으면 제작자 저장소(rohitg00/agentmemory)에 이슈로 남긴다.
-- [ ] 연결 확인: 이 컴퓨터에서 `claude mcp list` 가 agentmemory 연결됨, 훅 1회 호출이 5초 안에 끝남.
+- [x] 요약 LLM 연결: 맥미니 `~/.agentmemory/.env` 는 템플릿 그대로(전부 주석)라 공급자가 없다. 텍스트 LLM 규칙(Claude 구독 계정 체인, 메모리 `llm-text-chain-blex-then-sj`)에 맞춰 `AGENTMEMORY_PROVIDER`·`AGENTMEMORY_ALLOW_AGENT_SDK` 등 이 버전이 받는 변수로 Claude 구독 토큰을 연결한다(키는 `livevil-setting/env` 에서, 값은 커밋하지 않는다). 가벼운 모델을 쓴다. 이 버전이 구독 토큰을 못 받으면 우회로: 요약 기능만 끄고(`AUTO_COMPRESS` 끔) 검색·기록은 살린다 — 실패 로그 10,816회가 멈추는 것이 1차 목표.
+- [x] 메모리 상한: 서버가 힙 97%로 "critical" 이다. 노드 힙 상한을 올려(launchd 인자) 재시작하고, 46MB 로그를 회전한다. 재시작 뒤 health 가 `ok`·요약 성공 1건 이상인지 본다.
+- [x] 버전 맞춤: 서버 0.9.27 ↔ 이 컴퓨터 플러그인 0.9.29. 서버를 플러그인 버전에 맞춘다(되돌릴 수 있게 현재 버전 기록).
+- [x] 훅 멈춤 방지: 플러그인 훅에 제한 시간이 없어 서버가 느리면 파일 도구가 최대 10분 멈춘다. 플러그인 파일을 직접 고치면 업데이트 때 덮이므로, 먼저 이 버전의 클라이언트 쪽 제한 시간 변수(`AGENTMEMORY_PROBE_TIMEOUT_MS` 등)로 막고, 없으면 제작자 저장소(rohitg00/agentmemory)에 이슈로 남긴다.
+- [x] 연결 확인: 이 컴퓨터에서 `claude mcp list` 가 agentmemory 연결됨, 훅 1회 호출이 5초 안에 끝남.
 
 ### 정리·환경·문서
 
-- [ ] 48: `snapholo-data/.lens/agent-dashboard.json` 에서 `mirroredFrom` 이 있는 위조 항목 제거, `.bak-20260921-planner` 삭제. 그 레포에 다른 세션이 작업 중이면 끝난 뒤.
-- [ ] 74: 워크스페이스 루트 `.lens/` 의 `agent-dashboard.json.*.tmp` 38개와 구 상태 파일(현황판·시계·차단 카운터) 삭제 — 새 Lens 는 읽지 않는다.
-- [ ] 49 J3b: 9개 레포에서 `.git/info/exclude` 에 `.lens/` 등록 + 추적 해제는 **런타임 상태 파일만** `git rm --cached`(agent-dashboard · progress-report-state · gate-block-state · report-shown · *.tmp). `.lens/verify`·`bench`·`preview`·`type` 등 나머지는 그 레포 `docs/` 에서 경로를 grep 해 참조 0 인 것만 해제 — 추적 해제 커밋을 다른 컴퓨터가 pull 하면 그쪽 작업트리에서 파일이 지워진다(Pre-mortem). 커밋은 각 레포 base 브랜치, 다른 세션 작업 중이면 끝난 뒤, 커밋 전 `git status` 로 타 변경 0 확인.
-- [ ] 50 K1: 이 컴퓨터 `~/.claude/settings.json` env 에 `PYTHONUTF8=1` · `PYTHONIOENCODING=utf-8` 만. livevil-setting 에 settings.json 정본은 없다(실측 — 그 폴더엔 manifest·plugins 문서뿐). 다른 컴퓨터는 73행과 함께 보류.
-- [ ] 51 K3: 워크스페이스 루트에 `.markdownlint.json` 을 새로 만들어 MD060 등 표·줄 규칙을 끈다(`.vscode/` 는 없다 — 실측. 낮음, 마지막에).
-- [ ] 52 메모리: `feedback_hide_internal_gate_prompts.md` 의 "manual 게이트를 넣지 않는다" → "manual 은 차단 사유가 아니고 화면에 안 뜬다(3.48.0) — 측정 가능한 것은 auto 로" 로 고침. `trap-lens-gate-ledger-evidence-contract.md` 의 API·`node -e` 처방 → `lens-gate run` 기준으로.
-- [ ] 53 문서: `docs/rules/harness-rules.md` 에 §4.12(세션 상태 저장소·Stop 대기 통과·질문창 판단 보류·lens-gate) 신설, §4.4·§4.7·§4.10·§4.11 의 바뀐 문장 교정. `CLAUDE.md` 버전 노트·모듈 표(session-store · spawn-envelope · lens-gate). `CHANGELOG.md` 3.48.0.
+- [x] 48: `snapholo-data/.lens/agent-dashboard.json` 에서 `mirroredFrom` 이 있는 위조 항목 제거, `.bak-20260921-planner` 삭제. 그 레포에 다른 세션이 작업 중이면 끝난 뒤.
+- [x] 74: 워크스페이스 루트 `.lens/` 의 `agent-dashboard.json.*.tmp` 38개와 구 상태 파일(현황판·시계·차단 카운터) 삭제 — 새 Lens 는 읽지 않는다.
+- [x] 49 J3b: 9개 레포에서 `.git/info/exclude` 에 `.lens/` 등록 + 추적 해제는 **런타임 상태 파일만** `git rm --cached`(agent-dashboard · progress-report-state · gate-block-state · report-shown · *.tmp). `.lens/verify`·`bench`·`preview`·`type` 등 나머지는 그 레포 `docs/` 에서 경로를 grep 해 참조 0 인 것만 해제 — 추적 해제 커밋을 다른 컴퓨터가 pull 하면 그쪽 작업트리에서 파일이 지워진다(Pre-mortem). 커밋은 각 레포 base 브랜치, 다른 세션 작업 중이면 끝난 뒤, 커밋 전 `git status` 로 타 변경 0 확인.
+- [x] 50 K1: 이 컴퓨터 `~/.claude/settings.json` env 에 `PYTHONUTF8=1` · `PYTHONIOENCODING=utf-8` 만. livevil-setting 에 settings.json 정본은 없다(실측 — 그 폴더엔 manifest·plugins 문서뿐). 다른 컴퓨터는 73행과 함께 보류.
+- [x] 51 K3: 워크스페이스 루트에 `.markdownlint.json` 을 새로 만들어 MD060 등 표·줄 규칙을 끈다(`.vscode/` 는 없다 — 실측. 낮음, 마지막에).
+- [x] 52 메모리: `feedback_hide_internal_gate_prompts.md` 의 "manual 게이트를 넣지 않는다" → "manual 은 차단 사유가 아니고 화면에 안 뜬다(3.48.0) — 측정 가능한 것은 auto 로" 로 고침. `trap-lens-gate-ledger-evidence-contract.md` 의 API·`node -e` 처방 → `lens-gate run` 기준으로.
+- [x] 53 문서: `docs/rules/harness-rules.md` 에 §4.12(세션 상태 저장소·Stop 대기 통과·질문창 판단 보류·lens-gate) 신설, §4.4·§4.7·§4.10·§4.11 의 바뀐 문장 교정. `CLAUDE.md` 버전 노트·모듈 표(session-store · spawn-envelope · lens-gate). `CHANGELOG.md` 3.48.0.
 
 ### 릴리스
 
-- [ ] 코드 커밋(기능별로 나눠서) → 전체 테스트 → **푸시 전 실제 재현**: 분기 worktree 를 `claude -p --plugin-dir <worktree>` 로 실어 검증 28·29 를 돌린다. 설치본 3.47.0 이 같이 발화하지 않게 `--settings` 임시 파일로 `enabledPlugins` 의 lens 를 false 로 넘긴다. 그게 안 먹으면 검증 동안 `claude plugin disable lens@CreetaCorp` 뒤 재활성(실행 중 세션은 시작 때 읽은 설정을 유지) → `bash scripts/bump-version.sh 3.48.0` → 범프 커밋 → 태그 `v3.48.0`.
-- [ ] **정지(비가역·외부영향): master 푸시 직전 1회 확인.**
-- [ ] 푸시 + GitHub Release → 이 컴퓨터 `/lens-upgrade`(36 구현이 확인됐으면 실행 중 세션이 있어도 진행 — 그 세션들은 재시작 때 새 버전) → 설치본 grep(검증 27) → 설치본으로 검증 28 한 번 더 → 메모리 갱신.
+- [x] 코드 커밋(기능별로 나눠서) → 전체 테스트 → **푸시 전 실제 재현**: 분기 worktree 를 `claude -p --plugin-dir <worktree>` 로 실어 검증 28·29 를 돌린다. 설치본 3.47.0 이 같이 발화하지 않게 `--settings` 임시 파일로 `enabledPlugins` 의 lens 를 false 로 넘긴다. 그게 안 먹으면 검증 동안 `claude plugin disable lens@CreetaCorp` 뒤 재활성(실행 중 세션은 시작 때 읽은 설정을 유지) → `bash scripts/bump-version.sh 3.48.0` → 범프 커밋 → 태그 `v3.48.0`.
+- [x] **정지(비가역·외부영향): master 푸시 직전 1회 확인.**
+- [x] 푸시 + GitHub Release → 이 컴퓨터 `/lens-upgrade`(36 구현이 확인됐으면 실행 중 세션이 있어도 진행 — 그 세션들은 재시작 때 새 버전) → 설치본 grep(검증 27) → 설치본으로 검증 28 한 번 더 → 메모리 갱신.
 
 ### 우회로
 
@@ -400,6 +402,9 @@ deep 권고: 다중 시스템(모든 컴퓨터·모든 세션의 훅) — 등급
 - **작업 브랜치**: `fix/lens-runtime-fixes` — 2026-09-22 이 계획의 실행이 `origin/master` 위에서 생성. 시작 SHA `b71e466`.
 - **마지막 업데이트**: 2026-09-22
 - **현재 경로**: 권장 경로
+- **Goal 달성**: 9/9 ✓ (최종 확인 fable 실측) — 남은 것: 검증 36(다음 /cp 질문창, 대표 화면 확인) · 인벤토리 73(다른 컴퓨터 설치본 확인)
+- **릴리스**: v3.48.0 master 푸시·GitHub Release·이 컴퓨터 설치(설치본에 수정 식별자 전부 확인) — 2026-09-22
+- **재개 포인트**: 완료. 다른 컴퓨터는 각자 `/lens-upgrade` 또는 `/cs`(함대 동기화) 때 받는다
 - **기준선(변경 전)**: node 테스트 파일 12개 전부 통과 · cross-verify 13 · delegate 22 · git-sync 110 · cu 71
 
 ### 편차 기록 (계획 ↔ 실제)
@@ -410,3 +415,9 @@ deep 권고: 다중 시스템(모든 컴퓨터·모든 세션의 훅) — 등급
 - 교차 검토 경과: Codex 1차 FAIL 3건 → 2차 1건(Workflow 따옴표 키 오탐) → 3차 1건(차단 카운터 저장 실패 시 상한 무력화) → 4차 1건(lens-gate 시간 초과가 뒤에 띄운 자식 때문에 안 지켜짐) → 5차 1건(같은 자리: Windows 고아 프로세스가 시간 초과 뒤에도 남음). 1~4차는 전부 고쳤고 재현 테스트를 남겼다. 5차는 부모가 사라진 Windows 프로세스를 Node 로 끝낼 수 없는 운영체제 동작이라 반복 상한(5)에서 멈추고 알려진 한계로 기록 + `/cc` 0.5 에 "check 는 백그라운드 프로세스를 남기지 않는다" 규칙 추가. 세션을 가두지 않고 lens-gate 결과는 제때 나온다.
 - TOP(fable) 사용: 이번 세션 3회 = `/cp` 계획서 작성 1 + `/cc` 검토자 1 + 최종 확인 1. `/cc` 1회 실행 상한(2)은 지켰다. 설치된 3.47 의 경고("3번째 spawn")는 `/cp` 분까지 센 것.
 - 수정 1회차(반복 2/5): Codex 지적 3건(커밋 보류 규칙의 Workflow · SubagentStop 선도착 유실 · 폴백 완료가 id 미기록) + Supervisor 보강(reason 첫 줄 사람 말 · agent_id 접두사 정규화 · 유휴 teammate · 색인 레포의 손상 원장 · WSL bash · 세션 저장소 update 이중 실행 · Workflow 안 서브에이전트 기록 경로 · 병합 증거 정규식 · macOS timeout · §4.12 위치).
+
+### 실행 지표
+- **추가 질문 수**: 2 (agentmemory 결정 — 계획 단계, 푸시 승인 — 정지 1회)
+- **편차 건수**: 7 (위 편차 기록)
+- **게이트**: 원장 미생성(편차 1) — 검증 표 37행으로 판정, 9/9 통과
+- **교차 검토**: 검토자(fable) 통과 88 · Codex 5회(3→1→1→1→1건, 1~4차 전부 수정, 5차는 Windows 한계로 기록)
