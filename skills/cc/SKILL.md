@@ -306,7 +306,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" branch ownership . {branch} {ba
 `✅ Review` 표(= 핸드오프 `[VERIFICATION]`)의 각 행을 게이트 1개로 옮긴다. `종류=auto` 행은
 `check`(실행할 명령)와 `expect`(**성공했을 때만** 출력에 나오는 문자열)를 채우고, `manual` 행은 둘 다 비운다.
 
-**측정할 수 있으면 auto 다** — check 는 실행 가능한 명령이어야 하고 `lens-gate create` 가 확인한다. manual 은 차단 사유가 아니며 보고에 '대표 확인 필요: …' 한 줄로만 나간다. 사용자 화면에 게이트·원장·N/M 같은 내부 용어를 쓰지 않는다. `create` 는 auto 의 check 를 한 번씩 실제로 돌리므로 배포·발송·DB 변경처럼 부작용이 있는 명령은 check 로 쓰지 않는다(그런 행은 manual).
+**측정할 수 있으면 auto 다** — check 는 실행 가능한 명령이어야 하고 `lens-gate create` 가 확인한다. manual 은 차단 사유가 아니며 보고에 '대표 확인 필요: …' 한 줄로만 나간다. 사용자 화면에 게이트·원장·N/M 같은 내부 용어를 쓰지 않는다. `create` 는 auto 의 check 를 한 번씩 실제로 돌리므로 배포·발송·DB 변경처럼 부작용이 있는 명령은 check 로 쓰지 않는다(그런 행은 manual). check 는 백그라운드 프로세스(`&`, 서버 띄우기)를 남기지 않는다 — Windows 에서는 부모가 먼저 끝난 자식을 시간 초과 때 끝낼 수 없다.
 
 게이트 목록은 인자가 아니라 파일로 넘긴다(셸 인용 사고 방지) — `.lens/{plan-id}.gates.json` 에 **Write 도구로** 쓴다(셸 heredoc 은 쓰지 않는다 — Bash 도구가 heredoc 안의 `\\` 를 `\` 로 줄여 정규식 검사식이 깨지는 것을 2026-09-22 실측):
 
