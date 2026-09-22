@@ -1,37 +1,44 @@
 /**
  * Lens - Stop Hook
- * Records final session state when Claude Code's main agent stops, and refuses
- * the stop while gates are unmet (v3.35).
+ * Refuses the stop while this session's gates are unmet, and otherwise records
+ * the turn end (session dashboard + progress-report contact clock).
  *
- * Triggered: When the main agent finishes (Stop event — i.e. at the end of EVERY
- * turn, not only once per session)
- * Writes: .lens/agent-dashboard.json (marks session complete, orphaned agents as error)
- *         .lens/gate-block-state.json (consecutive-block counter, per session)
+ * Triggered: at the end of EVERY main-agent turn (Stop event).
+ * Reads:  .lens/gates/*.json (this repo + repos in the ledger index), filtered to this session
+ * Writes: session store blocks.json (block counter), progress.json (lastContactAt),
+ *         dashboard via agent-tracker endSession() — all per session_id (lib/session-store);
+ *         without a session id the legacy repo files are used.
  *
- * ⚠️ "Orphaned" means `running`/`pending` only. Background agents parked in
- * `launched` are exempt from the error sweep by endSession(): the hooks never
- * observe their completion, and because this hook runs at every turn boundary the
- * sweep would otherwise declare a healthy background agent failed seconds after
- * launch. Unobserved ≠ failed. SoT: docs/rules/harness-rules.md §4.5.
+ * v3.48 — WHY: 3.47 blocked turns that ended while a worker was still running
+ * (2a412ea0: 6/6 blocks), blocked on manual gates only the user can meet, printed
+ * "이어서 작업합니다" / its release notice on the user's screen (09-21: 52 times),
+ * and marked the session completed BEFORE deciding to block.
  *
- * GATE ENFORCEMENT (v3.35)
- * ------------------------
- * This hook has sat on the Stop event since v3.x and never once refused a stop —
- * both its success and its failure path wrote `{}`. Every "do not report done
- * while a criterion is unmet" rule in /cc was therefore prose the model graded
- * itself against. It now reads `.lens/gates/*.json` and returns
- * `{decision:"block", reason}` while anything is outstanding.
+ * Order:
+ *  1. Background work in flight (`background_tasks` has a subagent / workflow /
+ *     teammate / cloud session) → pass silently. The turn ended but the run did
+ *     not: stamp the contact clock, do NOT mark the session completed. `shell`,
+ *     `monitor` and `MCP task` do not count — a dev server or a Monitor lives for
+ *     the whole session and would switch the gate off for good.
+ *     Field absent (older Claude Code; an empty array means "none", not "unknown")
+ *     → an armed progress clock (signal < 180 s ago) or a launched/running agent
+ *     on this session's dashboard counts as waiting.
+ *  2. Gate verdict. Block → `{decision, reason}` only (model-facing) and nothing
+ *     else is recorded. Release after MAX_BLOCKS is SILENT (`{}`): a Stop
+ *     `additionalContext` continues the conversation (official contract), so a
+ *     notice would force a third turn after two blocks already said it all.
+ *  3. Pass → endSession() and the contact stamp.
+ * Any exception → `{}` (pass). Kill switch: LENS_GATE_ENFORCEMENT=0.
  *
- * No ledger → byte-identical to the old behavior. That is the no-regression
- * floor: only a run that deliberately created a ledger can be blocked.
+ * ⚠️ endSession() sweeps `running`/`pending` agents into error but leaves
+ * `launched` alone — unobserved ≠ failed (docs/rules/harness-rules.md §4.5).
  *
- * Input (stdin): { stop_reason, session_id, cwd }
- * Output (stdout): {} | { systemMessage } | { decision: "block", reason }
+ * Input (stdin): official Stop payload { session_id, cwd, stop_hook_active, background_tasks, ... }
+ * Output (stdout): {} | { decision: "block", reason }
  */
 
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
 
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, '..');
 const {
@@ -40,39 +47,38 @@ const {
 } = require(path.join(PLUGIN_ROOT, 'lib', 'hook-utils'));
 installFailSoftHandlers('stop');
 
-// Load agent tracker
-const { endSession, loadDashboard, getDashboardPath } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
+const store = require(path.join(PLUGIN_ROOT, 'lib', 'session-store'));
+const { endSession, loadDashboard } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
+
+/** `background_tasks[].type` labels that mean "the run is waiting on work that will come back". */
+const WAIT_TYPES = new Set(['subagent', 'workflow', 'teammate', 'cloud session']);
+/** Same as hooks/post-tool-progress.js ARM_TTL_MS. */
+const ARM_TTL_MS = 180000;
 
 function main() {
   try {
-    // Read stop reason from stdin
-    const input = readJsonInput();
-    const stopReason = input?.stop_reason || 'unknown';
+    const input = readJsonInput() || {};
+    store.bind(input);
 
-    // Determine session end status
-    const sessionStatus = stopReason === 'error' ? 'error' : 'completed';
+    if (waitingOnBackground(input)) {
+      stampContact(input);
+      writeJson({});
+      process.exit(0);
+    }
 
-    // End the session and mark orphaned agents
-    const dashboard = endSession(sessionStatus);
-    const summary = dashboard.summary;
-
-    // Stamp the 2-minute progress-report clock: the turn just ended, so the user
-    // has received a message. The state itself is kept — deleting it would let a
-    // later poll re-arm with a fresh clock and postpone the reminder.
-    // (See hooks/post-tool-progress.js)
-    resetProgressReportClock(input);
-
-    // Gate enforcement runs AFTER the bookkeeping above: the dashboard and the
-    // report clock must be correct whether or not this turn is allowed to end.
     const verdict = gateVerdict(input);
-    if (verdict) {
+    if (verdict && verdict.decision === 'block') {
       writeJson(verdict);
       process.exit(0);
     }
 
-    // Stop hook does not support hookSpecificOutput in Claude Code schema
-    // Dashboard is already saved by endSession() above
-    writeJson({});
+    try {
+      endSession(input.stop_reason === 'error' ? 'error' : 'completed');
+    } catch (err) {
+      safeLog(`endSession skipped: ${err && err.message}`);
+    }
+    stampContact(input);
+    writeJson(verdict || {});
     process.exit(0);
   } catch (err) {
     writeJson({});
@@ -80,10 +86,56 @@ function main() {
   }
 }
 
+function projectRootOf(input) {
+  return resolveProjectRoot({ cwd: input && typeof input.cwd === 'string' ? input.cwd : undefined });
+}
+
+function toMs(value) {
+  return typeof value === 'number' ? value : Date.parse(value || '');
+}
+
+function waitingOnBackground(input) {
+  if (Array.isArray(input.background_tasks)) {
+    return input.background_tasks.some(t => t && WAIT_TYPES.has(String(t.type || '').toLowerCase()));
+  }
+  // Field absent: judge from what Lens itself observed.
+  const progress = store.filePath('progress')
+    ? store.read('progress', null)
+    : safeReadJson(path.join(projectRootOf(input), '.lens', 'progress-report-state.json'), null);
+  if (progress && typeof progress === 'object' && progress.armedAt) {
+    const last = toMs(progress.lastSignalAt);
+    if (Number.isFinite(last) && Date.now() - last < ARM_TTL_MS) return true;
+  }
+  const board = loadDashboard();
+  return !!(board && Array.isArray(board.agents)
+    // Workflow entries are excluded: no hook observes a Workflow finishing, so one
+    // launched Workflow would read as "waiting" for the rest of the session.
+    && board.agents.some(a => a && a.tool !== 'Workflow' && (a.status === 'launched' || a.status === 'running')));
+}
+
 /**
- * Decide whether this stop is refused.
- *
- * Returns the object to print, or null to fall through to the old `{}`.
+ * The user has just been shown this turn's text: that is the progress-report
+ * contact (docs/rules/harness-rules.md §4.4). The rest of the clock state is
+ * kept — deleting it would let a late poll re-arm with a fresh clock.
+ */
+function stampContact(input) {
+  try {
+    const nowIso = new Date().toISOString();
+    const stamp = s => ({ ...(s && typeof s === 'object' && !Array.isArray(s) ? s : {}), lastContactAt: nowIso });
+    if (store.filePath('progress')) {
+      store.update('progress', stamp, null);
+      return;
+    }
+    // Legacy (no session id): only an existing repo file — never create `.lens/` here.
+    const legacy = path.join(projectRootOf(input), '.lens', 'progress-report-state.json');
+    if (fs.existsSync(legacy)) safeWriteJson(legacy, stamp(safeReadJson(legacy, null)));
+  } catch (err) {
+    safeLog(`contact stamp skipped: ${err && err.message}`);
+  }
+}
+
+/**
+ * Decide whether this stop is refused. Returns the object to print, or null.
  * Never throws: a bug in gate logic costs one sloppy turn, a trapped session
  * costs the machine. Every failure path here returns null (= allow).
  */
@@ -91,12 +143,10 @@ function gateVerdict(input) {
   try {
     if (!gateEnforcementEnabled()) return null;
 
-    const projectRoot = resolveProjectRoot({ cwd: input && typeof input.cwd === 'string' ? input.cwd : undefined });
-
+    const projectRoot = projectRootOf(input);
     const ledger = require(path.join(PLUGIN_ROOT, 'lib', 'gate-ledger'));
     // v3.39: /cc creates its ledger in the repo it works in, while a workspace
-    // session's hook cwd is the workspace — so this hook read an empty
-    // `.lens/gates` and passed silently. Ledgers register their repo in a user-level
+    // session's cwd is the workspace. Ledgers register their repo in a user-level
     // index; this session's own ledgers are loaded from every registered repo.
     const loaded = ledger.loadLedgers(projectRoot);
     const roots = typeof ledger.indexedRoots === 'function' ? ledger.indexedRoots() : [];
@@ -107,51 +157,40 @@ function gateVerdict(input) {
       seen.add(key);
       loaded.ledgers.push(...ledger.loadLedgers(root).ledgers);
     }
-    // A ledger another session opened is not this turn's obligation — it used to
-    // block unrelated sessions for up to 24 hours.
+    // A ledger another session opened is not this turn's obligation.
     const sessionId = input && input.session_id;
     if (sessionId) loaded.ledgers = loaded.ledgers.filter(l => !l.sessionId || l.sessionId === sessionId);
 
-    // Fast path — no ledger anywhere means this hook behaves exactly as it did
-    // before v3.35. Most turns in most repos land here.
+    // Fast path — no ledger anywhere. Most turns in most repos land here.
     if (!loaded.ledgers.length && !loaded.invalid.length) return null;
 
     const evaluation = ledger.evaluate(loaded);
-    const statePath = ledger.blockStatePath(projectRoot);
-    const sessionKey = crypto.createHash('sha256')
-      .update(String((input && input.session_id) || 'anonymous'))
-      .digest('hex').slice(0, 24);
+    const cli = path.join(PLUGIN_ROOT, 'scripts', 'lens-gate.js');
+    let decision = null;
 
-    const decide = () => {
-      const previous = safeReadJson(statePath, null);
-      const decision = ledger.decideBlock(evaluation, previous, { sessionKey });
-      safeWriteJson(statePath, decision.state);
-      return decision;
-    };
-
-    let decision;
-    try {
-      decision = withFileLock(`${statePath}.lock`, decide, { timeoutMs: 1500 });
-    } catch (lockErr) {
-      // A contended counter is not worth trapping a turn over, but it is also
-      // not a reason to skip the gate: decide unlocked and accept a possible
-      // lost increment (the cap only ever undercounts this way).
-      safeLog(`gate lock unavailable (${lockErr.message}); deciding unlocked`);
-      decision = decide();
-    }
-
-    if (decision.block) {
-      // v3.39: a blocked turn delivered nothing to the user — up to three silent
-      // turns. Say why the work continues.
-      const n = evaluation.outstanding.length;
-      return {
-        decision: 'block',
-        reason: decision.reason,
-        systemMessage: `[Lens] 완료 조건 ${n}건이 아직 확인되지 않아 이어서 작업합니다: `
-          + `${evaluation.outstanding.slice(0, 3).join(' · ')}${n > 3 ? ` 외 ${n - 3}건` : ''}`,
+    if (store.filePath('blocks')) {
+      // Per-session counter; a store that cannot be written leaves decision null → pass.
+      store.update('blocks', (previous) => {
+        decision = ledger.decideBlock(evaluation, previous, { cli });
+        return decision.state;
+      }, null);
+    } else {
+      const statePath = ledger.blockStatePath(projectRoot);
+      const decide = () => {
+        decision = ledger.decideBlock(evaluation, safeReadJson(statePath, null), { cli });
+        safeWriteJson(statePath, decision.state);
       };
+      try {
+        withFileLock(`${statePath}.lock`, decide, { timeoutMs: 1500 });
+      } catch (lockErr) {
+        safeLog(`gate lock unavailable (${lockErr.message}); deciding unlocked`);
+        decide();
+      }
     }
-    if (decision.released && decision.systemMessage) return { systemMessage: decision.systemMessage };
+
+    if (!decision) return null;
+    if (decision.block) return { decision: 'block', reason: decision.reason };
+    if (decision.notice) safeLog(`gate released: ${String(decision.notice).slice(0, 200)}`);
     return null;
   } catch (err) {
     safeLog(`gate verdict skipped: ${err && err.message}`);
@@ -168,39 +207,6 @@ function gateEnforcementEnabled() {
   if (env !== undefined && env !== '') return !/^(0|false|off|no)$/i.test(env);
   const config = safeReadJson(path.join(PLUGIN_ROOT, 'lens.config.json'), {}) || {};
   return config.gateEnforcement !== false;
-}
-
-/**
- * Reset the report clock without discarding the state (fail-soft).
- *
- * Deleting the file loses the timestamp of the message that just reached the
- * user. If background work is still running and the next poll lands more than
- * 120s later, that poll creates fresh state with `lastReportAt = now` and the
- * reminder is pushed out another two minutes — the same "late signal resets the
- * clock" evasion that post-tool-progress.js was fixed to close (harness-rules
- * §4.4). So stamp the report time instead: the turn just ended, so the user
- * *has* been told something, and the 2-minute window starts from here.
- *
- * The arming fields are left alone. If work is still in flight the next signal
- * finds a live state and measures against this stamp; if nothing is in flight
- * the TTL lets it go dormant on its own.
- */
-function resetProgressReportClock(input) {
-  // Same resolution as hooks/post-tool-progress.js getStatePath().
-  const projectRoot = resolveProjectRoot({ cwd: input && typeof input.cwd === 'string' ? input.cwd : undefined });
-  try {
-    const statePath = path.join(projectRoot, '.lens', 'progress-report-state.json');
-    if (!fs.existsSync(statePath)) return;
-    const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-    state.lastReportAt = new Date().toISOString();
-    fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
-  } catch {
-    // Unreadable/corrupt state: fall back to removing it rather than leaving a
-    // broken file that the next hook cannot parse.
-    try {
-      fs.unlinkSync(path.join(projectRoot, '.lens', 'progress-report-state.json'));
-    } catch {}
-  }
 }
 
 /**
