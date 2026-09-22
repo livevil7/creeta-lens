@@ -437,9 +437,22 @@ def phase3_cache_cleanup(ctx: Context) -> None:
 
     log_step(f"Found {len(entries)} cached version(s): {', '.join(p.name for p in entries)}")
 
-    # Remove all cache folders — installer will repopulate only the target.
+    # Remove old cache folders — installer will repopulate only the target.
     # This prevents the "orphan 1.9.0 keeps coming back" problem.
+    #
+    # Two folders survive (v3.48.0):
+    #   · the version the registry pointed at before this run — the rollback
+    #     target. rollback() restores installed_plugins.json, and that backup
+    #     names this folder; deleting it left a rollback pointing at nothing.
+    #   · any version whose `.in_use/<pid>` marker names a live process. Claude
+    #     Code 2.1.278 writes these ({"pid", "procStartFt"}, measured on this
+    #     machine 2026-09-22: 9 live markers in 3.47.0) but does not always
+    #     remove them on exit, so dead ones are pruned below.
+    keep = previous_versions(ctx)
     for entry in entries:
+        if entry.name in keep:
+            log_warn(f"preserved {entry.name}/ (previous install — rollback target)")
+            continue
         if should_preserve_cache_entry(entry):
             log_warn(f"preserved {entry.name}/ (active session or protected cache entry)")
             continue
@@ -457,6 +470,13 @@ def phase3_cache_cleanup(ctx: Context) -> None:
 # ─────────────────────────────────────────────────────────────
 # Phase 4: Registry reconciliation + install
 # ─────────────────────────────────────────────────────────────
+
+
+def previous_versions(ctx: Context) -> set[str]:
+    """Versions the registry named before this run, minus the target (a
+    target-equal folder is reinstalled fresh, not kept)."""
+    entries = ctx.installed_versions.get(PLUGIN_REF, [])
+    return {e.get("version") for e in entries if e.get("version")} - {ctx.target_version}
 
 
 def should_preserve_cache_entry(entry: Path) -> bool:
@@ -685,6 +705,12 @@ def main() -> None:
         print(UI.warn(f"      Recover with: git -C {MARKETPLACE_DIR} stash list"))
     print()
     print(UI.dim("Restart Claude Code to load the new plugin version."))
+    prev = sorted(previous_versions(ctx))
+    if prev and ctx.backup_path:
+        print(UI.dim(
+            f"Rollback: copy {ctx.backup_path} over {INSTALLED_JSON} and restart — "
+            f"it points at the kept v{', v'.join(prev)} cache folder."
+        ))
 
 
 if __name__ == "__main__":

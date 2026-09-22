@@ -107,6 +107,54 @@ run_case "직전 실행 결과 적재" FAIL
 stub codex 2 ''
 run_case "다음 실행에서 낡은 FAIL 이 남지 않는다" UNVERIFIED
 
+echo "== 4. v3.48.0 — --out · --base · 빈 diff · stderr 로그 =="
+
+# H1: a lane that had nothing to review answered pass. Its verdict is now
+# `unverified`, and it must not vote.
+stub codex 0 '{"verdict":"unverified","reason":"empty diff"}'
+run_case "빈 diff 레인(unverified)은 통과가 아니다" UNVERIFIED
+
+# H2: codex-review required --out while cross-verify rejected it.
+stub codex 0 '{"verdict":"pass","high_findings":[]}'
+out="$(cd "$TMP" && bash "$TMP/cross-verify.sh" --mode review --tag t --out "$TMP/o2" 2>/dev/null)"; rc=$?
+check "--out 을 받는다 (exit 0)" "[ $rc -eq 0 ]"
+check "레인 출력이 --out 폴더에 떨어진다" "[ -s '$TMP/o2/t-codex.out' ] && printf '%s\n' \"\$out\" | grep -q '^VERDICT PASS'"
+
+cat > "$TMP/codex-review.sh" <<EOF
+#!/usr/bin/env bash
+printf '%s ' "\$@" > "$TMP/args"
+out=""
+while [ \$# -gt 0 ]; do [ "\$1" = "--out" ] && out="\$2"; shift; done
+printf '%s' '{"verdict":"pass","high_findings":[]}' > "\$out"
+EOF
+printf -- '---\r\nplan_id: x\r\nbase: "staging"\r\n---\r\n\r\n# p\r\n' > "$TMP/plan.md"
+(cd "$TMP" && bash "$TMP/cross-verify.sh" --mode review --tag t --out "$TMP/o3" --plan "$TMP/plan.md" >/dev/null 2>&1)
+check "--plan frontmatter base 를 레인에 --base 로 넘긴다(따옴표·CRLF 제거)" "grep -q -- '--base staging ' '$TMP/args'"
+(cd "$TMP" && bash "$TMP/cross-verify.sh" --mode review --tag t --out "$TMP/o3" --plan "$TMP/plan.md" --base main >/dev/null 2>&1)
+check "--base 직접 인자가 계획서보다 우선" "grep -q -- '--base main ' '$TMP/args'"
+(cd "$TMP" && bash "$TMP/cross-verify.sh" --mode review --tag t --out "$TMP/o3" >/dev/null 2>&1)
+check "base 가 없으면 --base 를 넘기지 않는다" "! grep -q -- '--base' '$TMP/args'"
+check "없는 계획서는 usage 오류" \
+  "! (cd '$TMP' && bash '$TMP/cross-verify.sh' --mode review --tag t --out '$TMP/o3' --plan '$TMP/nope.md' >/dev/null 2>&1)"
+
+# H3: a timed-out lane left a 0-byte result and its stderr went to /dev/null.
+# Real codex-review.sh here, with a codex that never answers.
+mkdir -p "$TMP/real"; cp "$CROSS" "$CODEX" "$TMP/real/"
+R="$TMP/repo"
+git init -q "$R" && git -C "$R" config user.email t@example.com && git -C "$R" config user.name T
+echo a > "$R/f.txt"; git -C "$R" add -A >/dev/null 2>&1; git -C "$R" commit -qm init >/dev/null 2>&1
+echo b >> "$R/f.txt"
+cat > "$TMP/slowcodex" <<'EOF'
+#!/usr/bin/env bash
+echo "slow codex: still thinking" >&2
+exec sleep 10
+EOF
+chmod +x "$TMP/slowcodex"
+out="$(cd "$R" && CODEX_BIN="$TMP/slowcodex" bash "$TMP/real/cross-verify.sh" --mode review --tag to --out "$TMP/o4" --timeout 1 2>/dev/null)"; rc=$?
+check "타임아웃: exit 0 + VERDICT UNVERIFIED" "[ $rc -eq 0 ] && printf '%s\n' \"\$out\" | grep -q '^VERDICT UNVERIFIED'"
+check "타임아웃: <out>.stderr.log 에 codex stderr 가 남았다" "grep -q 'still thinking' '$TMP/o4/to-codex.out.stderr.log'"
+check "타임아웃: 레인 결과 파일이 비지 않은 unverified" "grep -q '\"verdict\":\"unverified\"' '$TMP/o4/to-codex.out'"
+
 echo
 echo "== 결과: $pass 통과 / $fail 실패 =="
 [ $fail -eq 0 ]

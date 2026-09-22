@@ -15,16 +15,36 @@
 # arm, not a rewrite.
 #
 # Usage:
-#   scripts/cross-verify.sh --mode review --tag p45 [--timeout 420] [--effort high]
+#   scripts/cross-verify.sh --mode review --tag p45 [--plan MD | --base BRANCH] [--out DIR] [--timeout 420] [--effort high]
 #   scripts/cross-verify.sh --mode prompt --tag p05 --prompt-file FILE [...]
 #
-#   --lanes codex        which lanes to run (default codex; a missing CLI is
-#                        reported as unavailable, never fatal)
-#   --dir DIR            where lane outputs land (default .lens/verify, gitignored)
+# Arguments — the same table heads scripts/codex-review.sh; keep the two in step:
+#   --mode review|prompt  review = structured review of the change set (/cc Phase 4.5)
+#                         prompt = free-form prompt from a file (/cp P0.5, deep D2)
+#   --prompt-file FILE    prompt mode input
+#   --base BRANCH         review: also review the commits since
+#                         merge-base(origin/BRANCH, HEAD) — passed to each lane
+#   --out PATH            here: the lane output folder (default .lens/verify);
+#                         each lane writes DIR/TAG-LANE.out + .out.stderr.log
+#                         codex-review: the result file
+#   --timeout SEC         here 420 · codex-review 300
+#   --effort LEVEL        default high
+#   cross-verify only:
+#   --tag NAME            required — names the output files
+#   --plan MD             read `base:` from the plan's frontmatter as --base
+#                         (an explicit --base wins)
+#   --lanes codex         which lanes to run (default codex; a missing CLI is
+#                         reported as unavailable, never fatal)
+#   --dir DIR             old name of --out (kept for existing callers)
+#
+# v3.48.0: --out was rejected here while codex-review required it (13:29 "--out
+# is required", 15:31 "unknown arg: --out" in one session), and a lane whose
+# diff was empty answered "pass". An empty diff is now `verdict=unverified`
+# and does not vote.
 #
 # Output — one LANE line per lane, one FINDING line per high finding, one VERDICT
 # line. Parse the VERDICT line; read a lane's `out=` file only when you want the
-# detail behind it.
+# detail behind it, and `<out>.stderr.log` when a lane timed out or went down.
 #
 # Exit codes:
 #   0  ran (read VERDICT to learn pass/fail) — including the all-lanes-down case
@@ -45,6 +65,8 @@ TIMEOUT=420
 EFFORT=high
 LANES="codex"
 DIR=".lens/verify"
+BASE=""
+PLAN=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -54,8 +76,10 @@ while [ $# -gt 0 ]; do
     --timeout)     TIMEOUT="${2:-}"; shift 2 ;;
     --effort)      EFFORT="${2:-}"; shift 2 ;;
     --lanes)       LANES="${2:-}"; shift 2 ;;
-    --dir)         DIR="${2:-}"; shift 2 ;;
-    -h|--help)     sed -n '2,35p' "$0"; exit 0 ;;
+    --dir|--out)   DIR="${2:-}"; shift 2 ;;
+    --base)        BASE="${2:-}"; shift 2 ;;
+    --plan)        PLAN="${2:-}"; shift 2 ;;
+    -h|--help)     sed -n '2,55p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -63,6 +87,18 @@ done
 [ -n "$TAG" ] || { echo "--tag is required (names the output files)" >&2; exit 1; }
 [ "$MODE" = "prompt" ] && [ -z "$PROMPT_FILE" ] && { echo "--mode prompt needs --prompt-file" >&2; exit 1; }
 mkdir -p "$DIR" || { echo "cannot create $DIR" >&2; exit 1; }
+
+# The plan names its base branch; without it a review right after a commit sees
+# only the (empty) worktree. First frontmatter block only, quotes and CR dropped.
+if [ -n "$PLAN" ] && [ -z "$BASE" ]; then
+  [ -f "$PLAN" ] || { echo "plan not found: $PLAN" >&2; exit 1; }
+  BASE="$(awk 'NR==1 { if ($0 !~ /^---\r?$/) exit; next }
+               /^---\r?$/ { exit }
+               /^base:/ { sub(/^base:[ \t]*/, ""); gsub(/["\047\r]/, ""); sub(/[ \t]+$/, ""); print; exit }' "$PLAN")"
+  [ "$BASE" = "null" ] && BASE=""
+fi
+BASE_ARG=()
+[ -n "$BASE" ] && BASE_ARG=(--base "$BASE")
 
 # ── Run the lanes concurrently ───────────────────────────
 # Backgrounded and waited on here rather than left to the caller: two lanes are
@@ -91,14 +127,16 @@ for lane in ${LANES//,/ }; do
   # this path — and a stale FAIL read as a fresh one is the worst kind of wrong,
   # because it looks like the gate working.
   : > "${LANE_OUTF[$li]}"
+  # A lane's stderr is how a timeout explains itself — it used to go to /dev/null.
+  : > "${LANE_OUTF[$li]}.stderr.log"
 
   if [ "$MODE" = "prompt" ]; then
     ( bash "$script" --mode prompt --prompt-file "$PROMPT_FILE" --out "${LANE_OUTF[$li]}" \
-        --timeout "$TIMEOUT" --effort "$EFFORT" >/dev/null 2>&1 </dev/null
+        --timeout "$TIMEOUT" --effort "$EFFORT" >/dev/null 2>>"${LANE_OUTF[$li]}.stderr.log" </dev/null
       echo $? > "${LANE_RCF[$li]}" ) &
   else
-    ( bash "$script" --mode review --out "${LANE_OUTF[$li]}" \
-        --timeout "$TIMEOUT" --effort "$EFFORT" >/dev/null 2>&1 </dev/null
+    ( bash "$script" --mode review ${BASE_ARG[@]+"${BASE_ARG[@]}"} --out "${LANE_OUTF[$li]}" \
+        --timeout "$TIMEOUT" --effort "$EFFORT" >/dev/null 2>>"${LANE_OUTF[$li]}.stderr.log" </dev/null
       echo $? > "${LANE_RCF[$li]}" ) &
   fi
   LANE_PID[$li]=$!
@@ -132,6 +170,7 @@ if(!hit){
 }
 function safe(s){ try{ const m=s.match(/\{[\s\S]*\}/); return pick(JSON.parse(m?m[0]:s)); }catch{ return null } }
 if(!hit){ console.log("unknown"); process.exit(0); }
+if(hit.verdict==="unverified"){ console.log("unverified"); process.exit(0); }
 const f=Array.isArray(hit.high_findings)?hit.high_findings:[];
 console.log(hit.verdict==="fail"||f.length?"fail":"pass");
 f.forEach(x=>console.log("F "+String(x).replace(/[\r\n]+/g," ")));
@@ -174,6 +213,7 @@ for lane in ${LANES//,/ }; do
   # about, so it must not be reintroduced one layer up.
   case "$status:$verdict" in
     ok:pass|ok:fail|ok:collected) lanes_ok=$((lanes_ok+1)) ;;
+    ok:unverified) lanes_down=$((lanes_down+1)); status=unverified ;;  # e.g. empty diff — nothing was reviewed
     *) lanes_down=$((lanes_down+1)); [ "$status" = "ok" ] && status=unparsable ;;
   esac
   [ "$verdict" = "fail" ] && any_fail=1

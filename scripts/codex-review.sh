@@ -14,17 +14,37 @@
 # 클로드 못 잡은 버그를 아주 많이 잡았어."
 #
 # Usage:
-#   scripts/codex-review.sh --mode review  --out FILE [--timeout 300] [--effort high]
-#   scripts/codex-review.sh --mode prompt  --out FILE --prompt-file FILE [...]
+#   scripts/codex-review.sh --mode review [--base BRANCH] [--out FILE] [--timeout 300] [--effort high]
+#   scripts/codex-review.sh --mode prompt --prompt-file FILE [--out FILE] [...]
 #
-#   --mode review   structured review of the uncommitted worktree (/cc Phase 4.5)
-#   --mode prompt   free-form prompt from a file (/cp P0.5 research, deep D2)
+# Arguments — the same table heads scripts/cross-verify.sh; keep the two in step:
+#   --mode review|prompt  review = structured review of the change set (/cc Phase 4.5)
+#                         prompt = free-form prompt from a file (/cp P0.5, deep D2)
+#   --prompt-file FILE    prompt mode input
+#   --base BRANCH         review: also review the commits since
+#                         merge-base(origin/BRANCH, HEAD) — local BRANCH when there
+#                         is no origin/BRANCH. Without it: uncommitted changes, or,
+#                         when there are none, the commits ahead of the upstream.
+#   --out PATH            here: the result file (default: a temp file). The path is
+#                         printed as `out=PATH`; codex's stderr goes to PATH.stderr.log
+#                         cross-verify: the lane output folder (default .lens/verify)
+#   --timeout SEC         here 300 · cross-verify 420
+#   --effort LEVEL        default high
+#   (cross-verify only: --tag NAME · --plan MD · --lanes codex · --dir = --out)
+#
+# Review scope (v3.48.0): the owner's rule is "always commit", so a review that
+# read only the worktree saw nothing right after every commit — measured: a
+# 34-file, +4,681-line commit got a 37-byte "pass", and the same commit reviewed
+# by hand had a cross-seller access flaw. `.lens/` runtime state is never part of
+# the diff. Nothing left to review → {"verdict":"unverified","reason":"empty
+# diff"} and Codex is not called: silence is not a pass.
 #
 # Exit codes:
-#   0  Codex ran and wrote $OUT
-#   1  bad usage
+#   0  Codex ran and wrote $OUT — or the diff was empty ($OUT says unverified)
+#   1  bad usage (including a --base that resolves to no ref)
 #   2  Codex not found or not authenticated   → caller decides degrade vs stop
-#   3  timed out (partial output may still be in $OUT)
+#   3  timed out — $OUT keeps partial output, or {"verdict":"unverified",
+#      "reason":"timeout <sec>s"} when there was none (never an empty file)
 #
 # Two hard-won invariants live in the call itself, not in the caller:
 #   * `</dev/null` — `codex exec` appends piped stdin to the prompt. Under a
@@ -45,6 +65,7 @@ OUT=""
 PROMPT_FILE=""
 TIMEOUT=300
 EFFORT=high
+BASE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -53,13 +74,33 @@ while [ $# -gt 0 ]; do
     --prompt-file) PROMPT_FILE="${2:-}"; shift 2 ;;
     --timeout)     TIMEOUT="${2:-}"; shift 2 ;;
     --effort)      EFFORT="${2:-}"; shift 2 ;;
-    -h|--help)     sed -n '2,30p' "$0"; exit 0 ;;
+    --base)        BASE="${2:-}"; shift 2 ;;
+    -h|--help)     sed -n '2,47p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
 
-[ -n "$OUT" ] || { echo "--out is required" >&2; exit 1; }
 [ "$MODE" = "prompt" ] && [ -z "$PROMPT_FILE" ] && { echo "--mode prompt needs --prompt-file" >&2; exit 1; }
+
+# --base must resolve before anything runs: a base that silently resolved to
+# nothing would shrink the review back to the worktree — the defect above.
+MERGE_BASE=""
+if [ "$MODE" = "review" ] && [ -n "$BASE" ]; then
+  BASE_REF="origin/$BASE"
+  git rev-parse --verify -q "$BASE_REF^{commit}" >/dev/null 2>&1 || BASE_REF="$BASE"
+  git rev-parse --verify -q "$BASE_REF^{commit}" >/dev/null 2>&1 \
+    || { echo "base not found: origin/$BASE or $BASE" >&2; exit 1; }
+  MERGE_BASE="$(git merge-base "$BASE_REF" HEAD 2>/dev/null)" \
+    || { echo "no merge-base between $BASE_REF and HEAD" >&2; exit 1; }
+fi
+
+# A caller without --out used to get "--out is required" and no review (/cp deep
+# D2 calls it that way). Default to a temp file and say where it is.
+[ -n "$OUT" ] || OUT="$(mktemp "${TMPDIR:-/tmp}/codex_out_XXXXXX.txt")" || exit 1
+echo "out=$OUT"
+# A timeout used to leave a 0-byte result and no trace of why (p05, 420s).
+LOG="$OUT.stderr.log"
+: > "$LOG"
 
 # ── 1. Detect ────────────────────────────────────────────
 # Three-step fallback, same order as docs/rules/codex-integration.md §2.
@@ -109,11 +150,15 @@ if [ "$MODE" = "review" ]; then
   SCHEMA="$(mktemp "${TMPDIR:-/tmp}/codex_schema_XXXXXX.json")"
   printf '%s' '{"type":"object","additionalProperties":false,"properties":{"verdict":{"type":"string","enum":["pass","fail"]},"high_findings":{"type":"array","items":{"type":"string"}}},"required":["verdict","high_findings"]}' > "$SCHEMA"
 
+  # Whole tree from the top, minus Lens runtime state at any depth.
+  PATHS=(-- ':(top)' ':(top,exclude,glob)**/.lens/**')
   DIFF="$(mktemp "${TMPDIR:-/tmp}/codex_diff_XXXXXX.txt")"
+  WORK="$(mktemp "${TMPDIR:-/tmp}/codex_work_XXXXXX.txt")"
+  COMMITTED="$(mktemp "${TMPDIR:-/tmp}/codex_committed_XXXXXX.txt")"
   {
-    git diff 2>/dev/null
-    git diff --cached 2>/dev/null
-    git ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do
+    git diff "${PATHS[@]}" 2>/dev/null
+    git diff --cached "${PATHS[@]}" 2>/dev/null
+    git ls-files --others --exclude-standard "${PATHS[@]}" 2>/dev/null | while IFS= read -r f; do
       [ -f "$f" ] || continue
       # Symlinks are not followed. One link pointing outside the repo is
       # enough to put an unrelated secret file into an external prompt.
@@ -125,11 +170,36 @@ if [ "$MODE" = "review" ]; then
       # Silent truncation lets a reviewer pass a file it only half read.
       [ "$(wc -c < "$f")" -gt 60000 ] && echo "…[잘림: $f 는 앞 60000바이트만 실렸습니다 — 전량 검토되지 않았습니다]"
     done
+  } > "$WORK"
+
+  # Committed changes: since the merge-base with --base, or — only when nothing
+  # is uncommitted — since the merge-base with the upstream HEAD is ahead of.
+  FROM="$MERGE_BASE"
+  if [ -z "$BASE" ] && [ ! -s "$WORK" ] \
+     && [ "$(git rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)" -gt 0 ]; then
+    FROM="$(git merge-base '@{u}' HEAD 2>/dev/null)"
+  fi
+  [ -n "$FROM" ] && git diff "$FROM" HEAD "${PATHS[@]}" > "$COMMITTED" 2>/dev/null
+  {
+    if [ -s "$COMMITTED" ]; then
+      echo "### 커밋된 변경: ${FROM:0:12}..HEAD"
+      cat "$COMMITTED"
+      echo
+    fi
+    cat "$WORK"
   } > "$DIFF"
+  rm -f "$WORK" "$COMMITTED"
+
+  if [ ! -s "$DIFF" ]; then
+    printf '%s' '{"verdict":"unverified","reason":"empty diff"}' > "$OUT"
+    rm -f "$SCHEMA" "$DIFF"
+    echo "nothing to review — codex not called" >&2
+    exit 0
+  fi
 
   PROMPT="$(mktemp "${TMPDIR:-/tmp}/codex_prompt_XXXXXX.txt")"
   {
-    echo "아래 작업트리 변경을 코드리뷰하세요. 근거 확인이 필요하면 파일을 열되 최대 5개까지만 — 레포 전역 grep 은 금지합니다."
+    echo "아래 변경을 코드리뷰하세요. 근거 확인이 필요하면 파일을 열되 최대 5개까지만 — 레포 전역 grep 은 금지합니다."
     echo "high 기준: 정확성 결함·회귀·보안·리소스 누수만. 스타일 취향은 high 가 아닙니다."
     echo "확인된 결함만 high_findings 에 넣으세요. '정보 부족으로 판단 불가' 는 지적이 아닙니다."
     echo "verdict 는 high 지적이 하나라도 있으면 fail, 없으면 pass."
@@ -151,18 +221,22 @@ if [ "$MODE" = "review" ]; then
   timeout "$TIMEOUT" "$CODEX_BIN" exec --skip-git-repo-check -s read-only \
     "${MODEL_ARG[@]}" -c model_reasoning_effort="$EFFORT" -c service_tier=fast \
     --output-schema "$SCHEMA" --ephemeral -o "$OUT" - < "$PROMPT" \
-    >/dev/null 2>&1
+    >/dev/null 2>>"$LOG"
   rc=$?
   rm -f "$SCHEMA" "$DIFF" "$PROMPT"
 else
   timeout "$TIMEOUT" "$CODEX_BIN" exec --skip-git-repo-check -s read-only \
     "${MODEL_ARG[@]}" -c model_reasoning_effort="$EFFORT" -c service_tier=fast \
-    -o "$OUT" - < "$PROMPT_FILE" >/dev/null 2>&1
+    -o "$OUT" - < "$PROMPT_FILE" >/dev/null 2>>"$LOG"
   rc=$?
 fi
 
 # 124 is timeout(1)'s signal. Partial output is still worth collecting — the
 # caller reports it as "⚠️ 미완 협의" rather than pretending nothing happened.
-[ $rc -eq 124 ] && { echo "codex timed out after ${TIMEOUT}s (partial output kept)" >&2; exit 3; }
-[ $rc -ne 0 ] && { echo "codex failed (rc=$rc)" >&2; exit 2; }
+if [ $rc -eq 124 ]; then
+  [ -s "$OUT" ] || printf '{"verdict":"unverified","reason":"timeout %ss"}' "$TIMEOUT" > "$OUT"
+  echo "codex timed out after ${TIMEOUT}s (partial output kept, stderr: $LOG)" >&2
+  exit 3
+fi
+[ $rc -ne 0 ] && { echo "codex failed (rc=$rc, stderr: $LOG)" >&2; exit 2; }
 exit 0

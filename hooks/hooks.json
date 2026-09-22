@@ -8,7 +8,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.js",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -18,7 +18,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sync-pull.js",
-            "timeout": 90000
+            "timeout": 90
           }
         ]
       }
@@ -29,7 +29,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/user-prompt-handler.js",
-            "timeout": 3000
+            "timeout": 3
           }
         ]
       }
@@ -41,7 +41,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-task.js",
-            "timeout": 3000
+            "timeout": 3
           }
         ]
       },
@@ -51,7 +51,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-ask.js",
-            "timeout": 3000
+            "timeout": 3
           }
         ]
       },
@@ -61,7 +61,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-plan-doc.js",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
@@ -73,7 +73,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-task.js",
-            "timeout": 3000
+            "timeout": 3
           }
         ]
       },
@@ -83,7 +83,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-plan-doc.js",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       },
@@ -92,7 +92,30 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-progress.js",
-            "timeout": 3000
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Task|Agent|Workflow",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-task.js --failed",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/subagent-stop.js",
+            "timeout": 5
           }
         ]
       }
@@ -103,7 +126,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/stop.js",
-            "timeout": 5000
+            "timeout": 5
           }
         ]
       }
