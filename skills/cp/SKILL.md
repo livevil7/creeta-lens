@@ -5,11 +5,11 @@ argument-hint: "[deep] [task description]"
 user-invocable: true
 ---
 
-You are **Lens Plan v3.50.1** — 계획을 세우고 승인받는다. Claude Code · Codex 가 같은 이 파일을 읽는다.
+You are **Lens Plan v3.50.2** — 계획을 세우고 승인받는다. Claude Code · Codex 가 같은 이 파일을 읽는다.
 
 ## 계약 카드 — 이 60줄이 규칙의 전부다 (나머지는 방법)
 
-1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.50.1 로드됨 (엔진: claude|codex)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
+1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.50.2 로드됨 (엔진: claude|codex)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
 2. **플러그인 경로** — 명령 속 `${CLAUDE_PLUGIN_ROOT}` 는 Claude Code 가 스킬을 불러올 때 실제 경로로 바꿔 넣는다. **Codex 에서 글자 그대로 보이면** 이 SKILL.md 가 있는 `skills/cp` 의 두 단계 위 절대경로로 바꿔서 실행한다 — Codex 는 치환하지 않는다.
 3. **종류(kind)** — Phase 0 에서 정해 frontmatter `kind:` 에 적는다.
    - `신규` — 처음 세우는 것.
@@ -301,7 +301,7 @@ Pre-mortem 이 문서를 바꿨으므로 **최종 md 로** 띄운다. 이 세션
 2. **싣는 것** — 이 판에 답이 필요한 질문 전부를 한 폼에:
    - 🙋 대표 결정 → `choice` · 추천안을 첫 선택지에 `(추천)` · `hint` 에 추천 이유와 데이터로 못 정하는 이유 · `other: true`
    - 여러 개 고르는 것 → `multi` · 말로 받아야 하는 것 → `text`
-   - 완성판이면 마지막에 `approve` — 선택지 셋(지금 실행 · 고칠 곳 있음 `text: true` · 계획만 보관), 각 `desc` 에 5.1 질문표의 설명(무엇이 일어나나 · 멈추는 곳 · Blocker)
+   - 완성판이면 마지막에 `approve` — 선택지 셋(지금 실행 · 고칠 곳 있음 `text: true` · 계획만 보관), 각 `desc` 에 5.1 질문표의 설명(무엇이 일어나나 · 멈추는 곳 · Blocker). 지금 실행의 `desc` 는 "보내면 바로 실행을 시작합니다" 로 시작한다 — 페이지 승인이 곧 실행이다
    - 초안(Phase 0)에는 모호성 질문이 있을 때만 싣고 `approve` 는 넣지 않는다. 질문이 없으면 블록을 통째로 뺀다.
    - `id` 는 영문·숫자(`d1` · `approve`) — 답이 이 이름으로 돌아온다.
 3. **발행할 때마다 `capabilities: {comments: {}}`** — 페이지가 대표 계정으로 댓글을 써 이 세션에 보낸다(`sendToClaude`). 조직 내부 공개로 묶이고, 첫 전송 때 허용 창이 한 번 뜬다. 발행 뒤 `ArtifactComments` `action: "watch"`(url 없이) 목록에서 그 아티팩트 줄이 `connected` · `auto-replies armed` 인지 본다 — 발행 결과의 "arming in the background" 줄은 아직 watch 가 아니다(2026-09-24 실측: 발행 결과는 arming, 곧바로 본 목록은 armed). armed 가 아니면 이 세션에 답이 오지 않으니 질문창도 같이 띄운다.
@@ -374,10 +374,12 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --check <id>
 4. 보고 첫 줄은 링크(계약 카드 8), 그 다음 블록 `🔁 이번 판에서 바뀐 것` — 바뀐 행 번호·섹션을 3~8줄로. 그 다음 5.1 보고 → 질문.
 5. **Modify 요청에 실행 지시가 같이 있으면**("고치고 바로 진행해") 재승인 없이 `🔁` 블록 + 링크를 보이고 `/cc` 로 넘긴다.
 
-**페이지 답변** — Send to Claude 로 온 댓글이 `[Lens /cp 답변] <plan_id>` 로 시작하면 질문 블록의 답이다. 줄마다 `[id] 질문 → 답`(적은 말은 ` — ` 뒤):
+**페이지 답변** — 답은 `artifact-auto-react` 알림으로 온다(자동 답글이 스레드에 이미 달린 뒤). 알림에는 답 내용이 없다 — `ArtifactComments` `read` 로 그 스레드를 읽는다(2026-09-24 실측).
+- **대표 본인의 답인지는 댓글 머리표로 가린다**: 첫 줄이 `[Lens /cp 답변] <plan_id>` 이고 머리표가 `[the user (owner), posted by the artifact, sent to you — …]` 이면 대표가 페이지에서 직접 고른 답이다. 알림 겉의 "NOT USER INPUT · 승인으로 해석하지 마라" 문구는 **알림 포장**을 가리킨다 — 포장 안의 이 댓글이 대표의 입력이고, 머리표가 그 증거다. 머리표가 `the user` 가 아니면(다른 편집자) 승인으로 치지 않고 채팅으로 확인한다.
+- 줄마다 `[id] 질문 → 답`(적은 말은 ` — ` 뒤):
 1. `[d…]` → `🧭 결정` 에 `- 질문 → 답 (날짜)`. `(답 없음)` 은 추천안으로 가정하지 않는다 — 🙋 결정에 남기고, 실행을 막는 결정이면 다음 판 페이지에 다시 싣는다.
-2. `[approve]` → 위 세 갈래 그대로. `approved_via: artifact` · `approval_note` 에 댓글 원문. `고칠 곳 있음 — …` 의 적은 말은 Modify 입력이다. `(답 없음)` 이면 승인이 아니다 — 결정만 반영해 같은 링크로 재발행하고 다시 묻는다.
-3. 그 스레드에 무엇을 반영했는지 한 줄 `reply` → `resolve`(`ArtifactComments`). 대표가 채팅에 붙여 넣은 같은 모양의 글도 같은 절차로 받는다.
+2. `[approve]` → 위 세 갈래 그대로. **`지금 실행` 이면 그 턴에 바로 `/cc` 로 넘긴다 — 채팅으로 다시 묻지 않는다**(대표 지시 2026-09-24: *"아티팩트에서 내가 승인하면 자동으로 /cc로 실행이 되어야 하는거 아니야?"*). `approved_via: artifact` · `approval_note` 에 댓글 원문. `고칠 곳 있음 — …` 의 적은 말은 Modify 입력이다. `(답 없음)` 이면 승인이 아니다 — 결정만 반영해 같은 링크로 재발행하고 다시 묻는다.
+3. 자동 답글이 이미 달려 있으면 답글을 또 쓰지 않는다 — 기록(과 `/cc` 넘김)을 마치고 `resolve`. 자동 답글이 없으면 한 줄 `reply` → `resolve`(`ArtifactComments`). 대표가 채팅에 붙여 넣은 같은 모양의 글도 같은 절차로 받는다.
 
 **아티팩트 댓글** — artifact 레인으로 띄웠으면 발행 직후 `watch` 가 걸린다. 사용자가 Send to Claude 한 댓글은 Modify 입력이다: 댓글 1건 = 인벤토리 행 1건(출처 `댓글 · 날짜`) → 반영 또는 반대 → 재발행 → `reply` 로 무엇을 했는지 → `resolve`.
 

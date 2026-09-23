@@ -4,7 +4,7 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.50.1**
+- Current: **v3.50.2**
 - Updated: 2026-09-24
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.50.0 feat: **`/cp` 질문을 계획서 페이지 안에서 받는다.** 대표 지시 *"객관식이던 주관식이건 내가 답변을 할 수 있는걸 아티팩트 자체에 작성을 해서 물어보게끔"*(2026-09-24). artifact 레인에서 승인·🙋 대표 결정·모호성 질문은 `templates/cp-questions.html` 블록(JSON 만 채워 붙인다)으로 묻고, 답은 `comments` capability `sendToClaude` 댓글 한 건으로 세션에 온다 — 질문창은 watch 가 없을 때만. 테스트 `templates/cp-questions.test.js`. SoT: `docs/rules/harness-rules.md` §4.13.
