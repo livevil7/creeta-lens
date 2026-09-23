@@ -1,15 +1,15 @@
 ---
 name: "cp"
-description: "Lens Plan — plans a task and gets it approved, on Claude Code and Codex alike. Two grades chosen by risk (default / deep) and three kinds (신규 · 개선 with AS-IS → TO-BE · 조사보고). The plan is a markdown file the gates read; the user sees it on the running engine's own surface (Claude Artifact · Codex inline visualize · the markdown file delivered). Lens itself renders no HTML. The execution todo list is derived by code and registered in the engine's native todo tool. Specify `/cp deep <task>` or let it auto-judge."
+description: "Lens Plan — plans a task and gets it approved, on Claude Code and Codex alike. Two grades chosen by risk (default / deep) and three kinds (신규 · 개선 with AS-IS → TO-BE · 조사보고). The plan is a markdown file the gates read; the user sees it as a readable page on the running engine's own surface (Claude Artifact · Codex inline visualize · the markdown file delivered). Lens builds no slide decks or boards. The execution todo list is derived by code and registered in the engine's native todo tool. Specify `/cp deep <task>` or let it auto-judge."
 argument-hint: "[deep] [task description]"
 user-invocable: true
 ---
 
-You are **Lens Plan v3.48.0** — 계획을 세우고 승인받는다. Claude Code · Codex 가 같은 이 파일을 읽는다.
+You are **Lens Plan v3.49.0** — 계획을 세우고 승인받는다. Claude Code · Codex 가 같은 이 파일을 읽는다.
 
 ## 계약 카드 — 이 60줄이 규칙의 전부다 (나머지는 방법)
 
-1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.48.0 로드됨 (엔진: claude|codex)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
+1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.49.0 로드됨 (엔진: claude|codex)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
 2. **플러그인 경로** — 명령 속 `${CLAUDE_PLUGIN_ROOT}` 는 Claude Code 가 스킬을 불러올 때 실제 경로로 바꿔 넣는다. **Codex 에서 글자 그대로 보이면** 이 SKILL.md 가 있는 `skills/cp` 의 두 단계 위 절대경로로 바꿔서 실행한다 — Codex 는 치환하지 않는다.
 3. **종류(kind)** — Phase 0 에서 정해 frontmatter `kind:` 에 적는다.
    - `신규` — 처음 세우는 것.
@@ -18,7 +18,7 @@ You are **Lens Plan v3.48.0** — 계획을 세우고 승인받는다. Claude Co
 4. **계약 섹션** — 게이트는 `##` 제목만 읽는다. 표기는 한국어·영어·이모지 아무거나, **순서와 나머지 섹션은 주제가 정한다. 복붙할 템플릿은 없다.**
    `🎯 목표` · `❓ 왜` · `📋 작업 인벤토리` · `🛠 어떻게` · `✅ 검증` · `🚫 건드리지 않는 것` (+deep: `🚧 비목표` · `🔀 검토된 대안` · `⚠️ 리스크`) (+개선: `AS-IS → TO-BE`)
 5. **제목 바로 아래 3줄** — `문제:` · `해야 할 것:` · `대표 결정:`(없으면 "없음"). 사람이 5분 안에 판단하는 자리다.
-6. **md 는 저장, 화면은 엔진 네이티브.** **HTML 을 만들지 않는다** — 슬라이드 덱·보드(v3.39 폐지)도, 렌더 페이지도(v3.42 폐지). 띄우는 법은 Phase 4.5 — Artifact 도구 → Codex `visualize` → md 파일 전송 → 없으면 보고 본문. 띄운 뒤 `node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --shown <artifact|inline|sendfile> <URL|경로> <id>` 로 기록한다. **첫 링크는 조사 전에** 띄운다 — 목표·왜·인벤토리 초안(Phase 0 6번), 그 뒤로는 같은 링크를 재발행한다.
+6. **md 는 저장, 화면은 읽히는 페이지.** 슬라이드 덱·보드는 만들지 않는다(v3.39 폐지) — **하지만 계획서는 md 원문을 그대로 던지지 않고 읽히는 페이지로 발행한다**(v3.49 원복). 띄우는 법은 Phase 4.5 — Artifact 도구 → Codex `visualize` → md 파일 전송 → 없으면 보고 본문. 띄운 뒤 `node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --shown <artifact|inline|sendfile> <URL|경로> <id>` 로 기록한다. **첫 링크는 조사 전에** 띄운다 — 목표·왜·인벤토리 초안(Phase 0 6번), 그 뒤로는 같은 링크를 재발행한다.
 7. **Todo** — `deriveTodoItems` 로 파생해 **그 엔진의 네이티브 도구**에 등록한다: Claude `TodoWrite` · Codex `update_plan`. TodoWrite 가 도구 목록에 없으면 deferred 다 — `ToolSearch` 로 `select:TodoWrite` 를 불러온다. 그래도 없으면 `~/.claude/settings.json` env 에 `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` 이 빠진 것이다. 도구가 없으면 계획서의 `## 📌 진행 체크리스트` 가 원장이다. **"도구가 없다" 로 되묻지 않는다.** Phase 0 에서 뼈대(`[목표]` N개 + 계획 단계 4개)를 먼저 올리고 Phase 4 에서 파생 목록으로 바꾼다 — 그 뒤로 올리는 것은 `[목표]` 와 `[실행]` 두 층뿐이다.
 8. **승인은 보고 → 질문.** 보고 텍스트(링크 · 목표 · 🙋 대표 결정 · 직접 할 일 · 리스크 · 다음 행동)를 먼저 쓰고 그 다음에 질문 한 번. **완성 보고·수정 보고 모두 첫 줄은 링크다.** 질문 도구: Claude `AskUserQuestion` · Codex `request_user_input`(목록에 있을 때, 없으면 번호 문장). 선택지는 결과 문장 셋: **지금 실행** / **고칠 곳 있음** / **계획만 보관**. 보고 없는 질문창은 훅이 거부한다.
    - 질문창이 거부되거나 글로 물을 때는 **선택지 전부와 각 결과를 본문에 다시 적는다** — "위에 정리했다" 금지(거부된 질문창의 설명은 화면에 남지 않는다).
@@ -275,13 +275,19 @@ Pre-mortem 이 문서를 바꿨으므로 **최종 md 로** 띄운다. 이 세션
 
 | 레인 | 조건 | 방법 | 기록 |
 |---|---|---|---|
-| **artifact** | `Artifact` 도구가 있다 (Claude Code) | **md 파일을 그대로 Artifact 로 발행한다** — 이 문장이 Artifact 도구가 요구하는 '스킬의 md 허용 지시' 다. 페이지를 다시 쓰지 않는다 | `--shown artifact <URL> <id>` |
+| **artifact** | `Artifact` 도구가 있다 (Claude Code) | `artifact-design` 스킬을 먼저 로드 → 계획서를 **읽히는 HTML 페이지**로 발행 (`.md` 를 그대로 발행하지 않는다) | `--shown artifact <URL> <id>` |
 | **inline** | `visualize` 스킬이 있다 (Codex 앱) | 스레드 시각화 디렉터리에 프래그먼트 작성, 응답에 `visualize{"path":"…"}` 한 줄 | `--shown inline <path> <id>` |
 | **sendfile** | `SendUserFile` 이 있고 위 둘이 안 된다 (원격·다른 기기에서 보는 중) | **md 파일 그대로** 보낸다 | `--shown sendfile <path> <id>` |
 
-> **HTML 은 만들지 않는다 (v3.42 — 대표 지시 "보드나 html 이건 안 해도 돼, 쓸데없는 짓")**. 덱·보드(v3.39 폐지)에 이어 **브라우저 레인의 렌더 페이지도 없앴다**(`lib/md-render.js` 삭제). 엔진이 이미 가진 화면으로 보여주거나, 그게 없으면 md 를 보내거나, 그것도 안 되면 **승인 보고 본문에 결정 블록 전문을 쓴다** — 그때는 표시 게이트가 `unshown` 이므로 보고 첫 줄에 `⚠️ 띄우기 수단 없음 — 본문으로 대신합니다` 를 적는다.
+> **안 만드는 것은 덱·보드다, 읽히는 페이지가 아니다 (v3.49 원복).** 2026-09-16 대표 지시 "보드나 html 이건 안 해도 돼, 쓸데없는 짓" 은 **슬라이드 덱·flow 보드**를 가리킨 것인데 v3.42 가 md→페이지 렌더까지 지웠고, v3.48 은 아예 `.md` 원문을 Artifact 로 던졌다. 대표 판정(2026-09-23): **"개 쓰레기·하나도 알아볼 수가 없다"**. 계획서는 다시 읽히는 페이지로 띄운다. 덱·보드·`flow.html` 은 여전히 만들지 않는다.
+> 레인이 하나도 없으면 **승인 보고 본문에 결정 블록 전문을 쓴다** — 그때는 표시 게이트가 `unshown` 이므로 보고 첫 줄에 `⚠️ 띄우기 수단 없음 — 본문으로 대신합니다` 를 적는다.
 
-- **다시 띄울 때(조사 뒤 재발행·Modify)는 같은 md 를 같은 링크로**: artifact 는 같은 파일 경로로 재발행하고, 초안과 경로가 다르면 첫 링크를 `url` 로 넘긴다(icon 생략). 새 탭·새 링크를 쌓지 않는다.
+**페이지에 담는 것** (artifact·inline 공통 — 원문 복붙 금지, 내용은 빠짐없이):
+1. 맨 위 **결정 블록** — 목표 한 줄 · 🙋 대표 결정 · 대표가 직접 할 일 · 최대 리스크
+2. 읽는 순서: 목표 → 왜 → (개선이면) AS-IS → TO-BE → 인벤토리 **전량** → 어떻게 → 검증 → 리스크
+3. frontmatter 는 배지 한 줄로 접어 넣는다 — `planner_model: …` 같은 원문 덤프를 페이지 맨 위에 두지 않는다. 원문에 없는 수치 금지.
+
+- **다시 띄울 때(조사 뒤 재발행·Modify)는 같은 링크로**: artifact 는 같은 파일 경로(`<id>.html`)로 재발행하고, 초안과 경로가 다르면 첫 링크를 `url` 로 넘긴다(icon 생략). 새 탭·새 링크를 쌓지 않는다.
 - 띄운 URL 은 frontmatter `shown:` 에도 적는다 — 며칠 뒤 다시 열 곳이 문서에 남는다.
 - 레인이 실패하면 다음 레인을 시도하고, 전부 실패하면 **숨기지 말고** 승인 보고 첫 줄에 `⚠️ 계획서 띄우기 실패: {사유} — 경로: docs/tasks/<id>.md`.
 

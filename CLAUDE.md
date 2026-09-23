@@ -4,8 +4,8 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.48.0**
-- Updated: 2026-09-22
+- Current: **v3.49.0**
+- Updated: 2026-09-23
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.48.0 fix: **실사용 오류 일괄 수정 — 세션 17개·자동 실행 3,557건 대화 기록 조사 근거.** 대표 지적 *"완료 조건 17건이 아직 확인되지 않아 이어서 작업합니다 … 이런게 계속 떠"* · *"설문창을 제대로 못띄워서 그냥 계속 텍스트로 질문을 하네?"*(2026-09-22). ① **세션 상태 저장소**(`lib/session-store.js`) — 진행보고 시계·현황판·Stop 차단 카운터를 `session_id` 별로(워크스페이스 세션끼리 공유되던 것) ② **Stop 은 대기를 막지 않는다** — `background_tasks`(subagent·workflow) 통과, manual 비차단, 사용자 화면 문구 삭제, 해제는 조용히 ③ **질문창** — 기록 지연으로 거짓 거부(9/16 이후 31회 중 30회)하던 것을 `tool_use_id` 판단 보류로 ④ **계획서 작성자** — 서브에이전트는 자기 기록의 모델로 ⑤ **`lens-gate` · `lens-cli`** — 스킬의 `node -e` 한 줄 전부 대체, 증거는 Lens 가 검사를 직접 돌려야 met(schema 2) ⑥ Workflow 백그라운드를 done 으로 적던 것(`lib/spawn-envelope.js`) ⑦ 커밋 뒤 Codex 리뷰가 빈 diff 에 PASS 하던 것 ⑧ 훅 timeout 단위(초) ⑨ `.lens/` 를 `info/exclude` 에 자동 등록 ⑩ `/cp` 는 md 를 그대로 Artifact 로, 첫 링크를 조사 전에. SoT: `docs/rules/harness-rules.md` §4.10·§4.12, 계획서 `docs/tasks/2026-09-22-lens-runtime-fixes.md`.
 - v3.41.0 breaking: **Grok 레인 제거.** 대표 지시 *"lens 스킬에 Grok 들어가 있는거 제거해. 그거 구독 취소했어."*(2026-09-15). `/cc` 읽기 위임·Phase 1.35 정찰은 Codex 하나로, Phase 4.5 는 **Supervisor + Codex 2중 검증**으로, `/cp` Phase 0.5 외부 조사도 Codex 만. `scripts/grok-review.sh` 삭제, `delegate.sh`·`cross-verify.sh` 는 `grok` 을 usage 오류로 거부한다. 과거 버전 노트·CHANGELOG·계획서의 Grok 언급은 이력이라 그대로 둔다. 상세: `CHANGELOG.md` · `docs/rules/codex-integration.md` §8.6.
