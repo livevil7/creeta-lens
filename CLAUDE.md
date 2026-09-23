@@ -4,9 +4,10 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.49.0**
-- Updated: 2026-09-23
+- Current: **v3.50.0**
+- Updated: 2026-09-24
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.50.0 feat: **`/cp` 질문을 계획서 페이지 안에서 받는다.** 대표 지시 *"객관식이던 주관식이건 내가 답변을 할 수 있는걸 아티팩트 자체에 작성을 해서 물어보게끔"*(2026-09-24). artifact 레인에서 승인·🙋 대표 결정·모호성 질문은 `templates/cp-questions.html` 블록(JSON 만 채워 붙인다)으로 묻고, 답은 `comments` capability `sendToClaude` 댓글 한 건으로 세션에 온다 — 질문창은 watch 가 없을 때만. 테스트 `templates/cp-questions.test.js`. SoT: `docs/rules/harness-rules.md` §4.13.
 - v3.48.0 fix: **실사용 오류 일괄 수정 — 세션 17개·자동 실행 3,557건 대화 기록 조사 근거.** 대표 지적 *"완료 조건 17건이 아직 확인되지 않아 이어서 작업합니다 … 이런게 계속 떠"* · *"설문창을 제대로 못띄워서 그냥 계속 텍스트로 질문을 하네?"*(2026-09-22). ① **세션 상태 저장소**(`lib/session-store.js`) — 진행보고 시계·현황판·Stop 차단 카운터를 `session_id` 별로(워크스페이스 세션끼리 공유되던 것) ② **Stop 은 대기를 막지 않는다** — `background_tasks`(subagent·workflow) 통과, manual 비차단, 사용자 화면 문구 삭제, 해제는 조용히 ③ **질문창** — 기록 지연으로 거짓 거부(9/16 이후 31회 중 30회)하던 것을 `tool_use_id` 판단 보류로 ④ **계획서 작성자** — 서브에이전트는 자기 기록의 모델로 ⑤ **`lens-gate` · `lens-cli`** — 스킬의 `node -e` 한 줄 전부 대체, 증거는 Lens 가 검사를 직접 돌려야 met(schema 2) ⑥ Workflow 백그라운드를 done 으로 적던 것(`lib/spawn-envelope.js`) ⑦ 커밋 뒤 Codex 리뷰가 빈 diff 에 PASS 하던 것 ⑧ 훅 timeout 단위(초) ⑨ `.lens/` 를 `info/exclude` 에 자동 등록 ⑩ `/cp` 는 md 를 그대로 Artifact 로, 첫 링크를 조사 전에. SoT: `docs/rules/harness-rules.md` §4.10·§4.12, 계획서 `docs/tasks/2026-09-22-lens-runtime-fixes.md`.
 - v3.41.0 breaking: **Grok 레인 제거.** 대표 지시 *"lens 스킬에 Grok 들어가 있는거 제거해. 그거 구독 취소했어."*(2026-09-15). `/cc` 읽기 위임·Phase 1.35 정찰은 Codex 하나로, Phase 4.5 는 **Supervisor + Codex 2중 검증**으로, `/cp` Phase 0.5 외부 조사도 Codex 만. `scripts/grok-review.sh` 삭제, `delegate.sh`·`cross-verify.sh` 는 `grok` 을 usage 오류로 거부한다. 과거 버전 노트·CHANGELOG·계획서의 Grok 언급은 이력이라 그대로 둔다. 상세: `CHANGELOG.md` · `docs/rules/codex-integration.md` §8.6.
 - v3.40.0 feat: **승인 한 번이면 끝까지 — `/cc` 무정지 실행.** 대표 지시 *"맞아 그건 필요해. 진행해."*(2026-09-14) · 근거 *"1,2,3 다 해. 싹다 해 멀 자꾸 하나하나 할라그래 싹 다 하라고."*(2026-09-04). 승인 뒤 마지막 검증까지 묻지 않고, **정지 3종**(되돌리기 어려운 행동 · 돈/외부 발송 · 범위 변경)만 멈추고, 그중 배포·머지=배포·DB 변경·대량 삭제·force push·발송은 계획에 있어도 멈춘다(대표가 "묻지 말고 하라" 고 한 것만 예외). `/cc` 5.0 경로 전환은 자동, manual 검증은 끝에 한 번 `검증 확인`. `hooks/pre-tool-ask.js` 가 이 세션의 게이트 원장이 열린 동안 허용 header 6개(`실행 승인`·`정지:비가역`·`정지:외부영향`·`정지:범위변경`·`검증 확인`·`실행 종료`) 외 질문창을 거부한다. 상세: `CHANGELOG.md` · `docs/rules/harness-rules.md` §4.11.
@@ -116,6 +117,7 @@ lens/
 │   └── report-viewer.js       # show record · stale detection (v3.42 — records only; Lens opens nothing)
 ├── templates/                     # AI reference only — code (generatePlanContent) does NOT read these at runtime
 │   ├── plan.template.md           # /cp work plan structure reference
+│   ├── cp-questions.html          # /cp 질문 블록 — 계획서 페이지에 그대로 붙인다 (v3.50, test: cp-questions.test.js)
 │   ├── execution-result.template.md # Post-execution result structure reference
 │   └── synthesis.template.md      # /cc synthesis output structure reference
 ├── docs/

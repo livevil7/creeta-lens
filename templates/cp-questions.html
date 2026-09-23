@@ -1,0 +1,172 @@
+<!--
+  Lens /cp 질문 블록 (v3.50) — 대표가 계획서 페이지 안에서 바로 답한다.
+
+  쓰는 법 (skills/cp/SKILL.md 「질문은 페이지 안에서」):
+  1. 이 파일 전체를 계획서 페이지의 결정 블록 바로 아래에 그대로 붙인다.
+  2. 바꾸는 곳은 id="lens-cp-questions" JSON 하나뿐이다. 나머지는 손대지 않는다.
+       plan_id    계획서 id
+       questions  [{ id, text, hint?, type, options?, other?, placeholder? }]
+         id       영문·숫자 (d1, d2, approve …) — 답이 이 이름으로 돌아온다
+         type     choice(하나 고름) · multi(여러 개) · text(직접 적기)
+         options  문자열 또는 { label, desc?, text? } — text:true 면 고를 때 적는 칸이 열린다
+         other    true 면 「기타 — 직접 적기」 선택지를 덧붙인다
+  3. Artifact 발행 시 capabilities: {comments: {}} — 답은 sendToClaude 로 이 세션에 도착한다.
+  질문이 없으면 이 블록을 통째로 뺀다.
+-->
+<section id="lens-cp-ask" class="lens-ask" aria-labelledby="lens-cp-ask-title">
+  <h2 id="lens-cp-ask-title">답해 주실 것</h2>
+  <p class="lens-ask-lead">고르거나 적은 뒤 <b>답변 보내기</b>를 누르면 Claude 가 이어서 반영합니다.</p>
+  <form id="lens-cp-form" onsubmit="return false"></form>
+  <div class="lens-ask-actions">
+    <button type="button" id="lens-cp-send">답변 보내기</button>
+    <span id="lens-cp-status" role="status" aria-live="polite"></span>
+  </div>
+  <div id="lens-cp-fallback" hidden>
+    <p id="lens-cp-fallback-why"></p>
+    <textarea id="lens-cp-fallback-text" readonly aria-label="채팅창에 붙여 넣을 답변"></textarea>
+    <button type="button" id="lens-cp-copy">복사</button>
+  </div>
+</section>
+<script type="application/json" id="lens-cp-questions">
+{
+  "plan_id": "YYYY-MM-DD-slug",
+  "questions": [
+    { "id": "d1", "text": "대표 결정 질문", "hint": "추천 이유 · 데이터로 못 정하는 이유", "type": "choice",
+      "options": ["추천안 (추천)", "다른 안"], "other": true },
+    { "id": "approve", "text": "이 계획으로 진행할까요?", "type": "choice", "options": [
+      { "label": "지금 실행", "desc": "검증까지 묻지 않고 진행 · 멈추는 곳: 없음" },
+      { "label": "고칠 곳 있음", "desc": "고칠 번호와 방향을 적어 주세요", "text": true },
+      { "label": "계획만 보관", "desc": "승인으로 기록하고 실행은 나중에" } ] }
+  ]
+}
+</script>
+<style>
+  .lens-ask { border: 2px solid color-mix(in srgb, currentColor 28%, transparent); border-radius: 12px; padding: 16px; margin: 16px 0; }
+  .lens-ask h2 { margin: 0 0 4px; }
+  .lens-ask-lead { margin: 0 0 16px; opacity: .8; }
+  .lens-ask fieldset { border: 0; padding: 0; margin: 0 0 20px; min-width: 0; }
+  .lens-ask legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
+  .lens-ask .lens-hint { margin: 0 0 8px; opacity: .75; font-size: .92em; }
+  .lens-ask .lens-opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; margin: 6px 0; min-height: 44px; box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 8px; cursor: pointer; }
+  .lens-ask .lens-opt:has(input:checked) { border-color: currentColor; background: color-mix(in srgb, currentColor 6%, transparent); }
+  .lens-ask .lens-opt input { margin-top: 3px; flex: none; }
+  .lens-ask .lens-desc { display: block; opacity: .75; font-size: .92em; }
+  .lens-ask textarea { display: block; width: 100%; box-sizing: border-box; min-height: 76px; margin-top: 6px; padding: 8px 10px; font: inherit; color: inherit;
+    background: transparent; border: 1px solid color-mix(in srgb, currentColor 28%, transparent); border-radius: 8px; resize: vertical; }
+  .lens-ask textarea[hidden] { display: none; }
+  .lens-ask button { font: inherit; min-height: 44px; padding: 10px 18px; border-radius: 8px; cursor: pointer; }
+  .lens-ask button:disabled { cursor: default; opacity: .55; }
+  .lens-ask-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  #lens-cp-fallback { margin-top: 16px; }
+  #lens-cp-fallback button { margin-top: 8px; }
+</style>
+<script>
+/* 순수 함수 — templates/cp-questions.test.js 가 Node 에서 돌린다. */
+function lensCpAnswerText(data, answers) {
+  var clean = function (s) { return String(s || '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim(); };
+  var lines = ['[Lens /cp 답변] ' + data.plan_id];
+  data.questions.forEach(function (q) {
+    var a = answers[q.id] || {};
+    var body = [(a.picked || []).map(clean).join(', '), clean(a.text)].filter(Boolean).join(' — ');
+    lines.push('[' + q.id + '] ' + clean(q.text) + ' → ' + (body || '(답 없음)'));
+  });
+  return lines.join('\n');
+}
+
+function lensCpOptions(q) {
+  var opts = (q.options || []).map(function (o) { return typeof o === 'string' ? { label: o } : o; });
+  if (q.other) opts.push({ label: '기타 — 직접 적기', text: true });
+  return opts;
+}
+
+if (typeof document !== 'undefined') (function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var data = JSON.parse($('lens-cp-questions').textContent);
+  var form = $('lens-cp-form'), send = $('lens-cp-send'), status = $('lens-cp-status');
+  var mk = function (tag, text) { var e = document.createElement(tag); if (text) e.textContent = text; return e; };
+
+  data.questions.forEach(function (q, i) {
+    var fs = mk('fieldset');
+    fs.appendChild(mk('legend', (i + 1) + '. ' + q.text));
+    if (q.hint) { var h = mk('p', q.hint); h.className = 'lens-hint'; fs.appendChild(h); }
+    var opts = q.type === 'text' ? [] : lensCpOptions(q);
+    var ta = mk('textarea');
+    ta.dataset.q = q.id; ta.maxLength = 1500;
+    ta.placeholder = q.placeholder || (q.type === 'text' ? '여기에 적어 주세요' : '자세히 적어 주세요');
+    ta.setAttribute('aria-label', q.text);
+    opts.forEach(function (o) {
+      var lab = mk('label'); lab.className = 'lens-opt';
+      var inp = mk('input');
+      inp.type = q.type === 'multi' ? 'checkbox' : 'radio';
+      inp.name = q.id; inp.value = o.label; inp.dataset.text = o.text ? '1' : '';
+      var span = mk('span', o.label);
+      if (o.desc) { var d = mk('small', o.desc); d.className = 'lens-desc'; span.appendChild(d); }
+      lab.appendChild(inp); lab.appendChild(span); fs.appendChild(lab);
+    });
+    ta.hidden = opts.length > 0;
+    fs.appendChild(ta);
+    form.appendChild(fs);
+  });
+
+  form.addEventListener('change', function (e) {
+    var name = e.target.name;
+    if (!name) return;
+    var ta = form.querySelector('textarea[data-q="' + name + '"]');
+    var open = Array.prototype.some.call(form.querySelectorAll('input[name="' + name + '"]:checked'),
+      function (x) { return x.dataset.text === '1'; });
+    if (ta) ta.hidden = !open;
+  });
+  form.addEventListener('input', function () { send.disabled = false; });
+
+  function collect() {
+    var out = {};
+    data.questions.forEach(function (q) {
+      var picked = Array.prototype.map.call(form.querySelectorAll('input[name="' + q.id + '"]:checked'), function (x) { return x.value; });
+      var ta = form.querySelector('textarea[data-q="' + q.id + '"]');
+      out[q.id] = { picked: picked, text: ta && !ta.hidden ? ta.value : '' };
+    });
+    return out;
+  }
+
+  var WHY = {
+    no_session: '지금 이 답을 받을 Claude 세션이 없습니다.',
+    writers_only: '편집 권한이 있는 사람만 Claude 로 바로 보낼 수 있습니다.',
+    consent_required: '댓글 권한 허용 창이 닫혀 보내지 못했습니다.',
+    forbidden: '이 화면에서는 페이지가 댓글을 쓸 수 없게 되어 있습니다.',
+    too_long: '답변이 너무 길어 한 번에 보낼 수 없습니다.'
+  };
+  function fallback(text, code) {
+    $('lens-cp-fallback-why').textContent = (WHY[code] || '이 화면에서는 바로 보낼 수 없습니다.') + ' 아래 내용을 복사해 채팅창에 붙여 주세요.';
+    $('lens-cp-fallback-text').value = text;
+    $('lens-cp-fallback').hidden = false;
+    status.textContent = '';
+  }
+  $('lens-cp-copy').addEventListener('click', function () {
+    var box = $('lens-cp-fallback-text');
+    var done = function () { status.textContent = '복사했습니다 — 채팅창에 붙여 주세요.'; };
+    var manual = function () { box.focus(); box.select(); status.textContent = '선택해 두었습니다 — Ctrl+C 로 복사해 주세요.'; };
+    if (navigator.clipboard) navigator.clipboard.writeText(box.value).then(done, manual); else manual();
+  });
+
+  var commentsP = window.claude && window.claude.use ? window.claude.use('comments').catch(function () { return null; }) : Promise.resolve(null);
+
+  send.addEventListener('click', async function () {
+    var text = lensCpAnswerText(data, collect());
+    if (new TextEncoder().encode(text).length > 4000) return fallback(text, 'too_long');
+    send.disabled = true; status.textContent = '보내는 중…';
+    try {
+      var c = await commentsP;
+      if (!c) throw { code: 'not_granted' };
+      var can = await c.canSendToClaude();
+      if (can !== 'available') throw { code: can };
+      await c.sendToClaude({ anchor: await c.anchorFor($('lens-cp-ask')), text: text });
+      status.textContent = '보냈습니다 — Claude 가 이어서 반영합니다.';
+      $('lens-cp-fallback').hidden = true;
+    } catch (e) {
+      send.disabled = false;
+      fallback(text, e && e.code);
+    }
+  });
+})();
+</script>
