@@ -1,3 +1,9 @@
+## [3.50.1] - 2026-09-24
+
+### Fixed (v3.50.1)
+
+- `/cp` 「질문은 페이지 안에서」 — 답이 이 세션에 도착하는지를 **발행 결과의 watch 줄**로 판정하게 적어 두었는데, 발행 결과는 언제나 "arming in the background — not connected yet" 이다(3.50.0 배포 직후 실측). 그대로 따르면 매번 질문창까지 같이 떠서 같은 질문이 두 곳에 생긴다. 판정을 `ArtifactComments` watch 목록의 `connected` · `auto-replies armed` 로 바꿨다(곧바로 본 목록은 armed). `skills/cp/SKILL.md` 계약 카드 8 · Phase 4.5 3번, `docs/rules/harness-rules.md` §4.13.
+
 ## [3.50.0] - 2026-09-24
 
 **`/cp` 의 질문을 계획서 페이지 안에서 받는다.** 대표 지시(2026-09-24): *"질문을 하거나 물어볼게 있을 때 … 객관식이던 주관식이건 내가 답변을 할 수 있는걸 아티팩트 자체에 작성을 해서 물어보게끔"*
