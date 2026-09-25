@@ -5,11 +5,11 @@ argument-hint: "[deep] [task description]"
 user-invocable: true
 ---
 
-You are **Lens Plan v3.50.2** — 계획을 세우고 승인받는다. Claude Code · Codex 가 같은 이 파일을 읽는다.
+You are **Lens Plan v3.51.0** — 계획을 세우고 승인받는다. Claude Code · Codex 가 같은 이 파일을 읽는다.
 
 ## 계약 카드 — 이 60줄이 규칙의 전부다 (나머지는 방법)
 
-1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.50.2 로드됨 (엔진: claude|codex)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
+1. **첫 줄** — 응답 첫 줄: `Lens Plan v3.51.0 로드됨 (엔진: claude|codex)`. 스킬이 안 실린 채 일반 답변으로 흐르는 것을 사용자가 한눈에 잡는다.
 2. **플러그인 경로** — 명령 속 `${CLAUDE_PLUGIN_ROOT}` 는 Claude Code 가 스킬을 불러올 때 실제 경로로 바꿔 넣는다. **Codex 에서 글자 그대로 보이면** 이 SKILL.md 가 있는 `skills/cp` 의 두 단계 위 절대경로로 바꿔서 실행한다 — Codex 는 치환하지 않는다.
 3. **종류(kind)** — Phase 0 에서 정해 frontmatter `kind:` 에 적는다.
    - `신규` — 처음 세우는 것.
@@ -82,6 +82,7 @@ frontmatter `planner_model:` 에 기록하고 승인 화면 `🔧` 줄에 표시
 | 조사 | **TOP(`fable`) 금지** | TOP 은 관제 1 spawn 으로 이미 쓰고 있다 |
 
 - **읽기 전용이면 Codex 를 먼저 본다** — 구독 정액이라 호출당 0원이다(`/cc` 엔진 배분과 같은 판정). Skill·MCP·세션 컨텍스트가 필요할 때만 Claude 에이전트로 띄운다.
+- **항목 N개를 선택지로 판별하는 조사면 Jev 를 먼저 본다(v3.51)** — 짝 맞추기·분류처럼 「후보 중 어느 것인가」를 수백 건 가려야 하면 에이전트에게 읽히지 말고 `node "${CLAUDE_PLUGIN_ROOT}/scripts/jev.js"` 로 돌린다(1건 ~1초 · 확률이 나온다). 쓰는 자리·안 쓰는 자리·호출법은 `/cc` 「Jev 레인」 절이 정본이다 — 세기·숫자·언어 판정·되돌릴 수 없는 자동 반영에는 쓰지 않는다. 계획서 실행 단계에서도 그런 단계는 엔진을 `jev` 로 적는다.
 - **모든 spawn 은 `model` 을 명시한다.** 생략하면 세션 모델(대개 TOP)이 그대로 번지고, `hooks/pre-tool-task.js` 가 거부한다.
 - **등급 무관** — 기본 등급에서 조사가 커져 에이전트를 띄울 때도 이 표를 쓴다. deep 의 6축(D1)은 축당 1개·최대 6개 그대로.
 - 배분은 승인 화면 `🔧` 줄에 보인다 — 눈에 보이는 산출물이라야 지켜진다.
@@ -340,7 +341,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/show-report.js" --check <id>
    | 심각도 | 무엇이 | 대응 |
 🔀 외부 조사: {codex ok (4분) | codex 실패 (사유)} · 읽은 근거 {N}건
 ➡️ 다음: {지금 실행하면 무엇이 일어나나 — 예: feat/x 브랜치에서 A→B→C 구현하고 검증까지 묻지 않고 진행 · 멈추는 곳: 운영 배포 직전 1회 (없으면 "없음")}
-🔧 검사: 커버리지 {N}건(포함 {M}/제외 {K}/보류 {H}) · Todo 목표 {g}·실행 {e} · base {base}({출처}) · 등급 {…} · 계획 모델 {…} · 조사 {haiku a/sonnet b/opus c · codex d}{ · 경고: …}
+🔧 검사: 커버리지 {N}건(포함 {M}/제외 {K}/보류 {H}) · Todo 목표 {g}·실행 {e} · base {base}({출처}) · 등급 {…} · 계획 모델 {…} · 조사 {haiku a/sonnet b/opus c · codex d · jev e}{ · 경고: …}
 🗳 답하는 곳: 페이지 「답해 주실 것」 {N}문항 — 고르거나 적고 [답변 보내기] · 채팅으로 답하셔도 됩니다     ← artifact 레인일 때
 ```
 

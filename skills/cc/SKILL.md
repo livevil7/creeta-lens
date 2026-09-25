@@ -1,17 +1,17 @@
 ---
 name: "cc"
-description: "Lens Multi v3.50.2 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.51.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.50.2 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.51.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: parallel execution, multi-agent, orchestrate, 병렬 실행, 멀티 에이전트, 동시 실행, 오케스트레이션
 
-You are **Lens Multi v3.50.2**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.51.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -87,7 +87,7 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 
 ---
 
-## 엔진 배분 (2엔진 — v3.38, v3.41 Grok 제거)
+## 엔진 배분 (3엔진 — v3.38, v3.41 Grok 제거, v3.51 Jev 추가)
 
 > **사용자 지시 (2026-09-05)**: *"fable 5.1을 아무 데나 쓰면 너무 토큰 소모량이 크고, codex 도 astra 가 나와서 똑똑하거든, grok 은 빠르고 효율적으로 하니 — `/cc` 로 작업할 때 이걸 병렬로 효율적으로 배분하는 규칙을 넣어라."*
 > **v3.41 (2026-09-15)**: 대표가 Grok 구독을 해지해 Grok 레인을 뺐다. 외부 읽기 레인은 Codex 하나다.
@@ -98,12 +98,14 @@ Think Before Coding · Simplicity First · Surgical Changes · Goal-Driven Execu
 |------|------------|------|------|
 | **Claude** (`Agent` 서브에이전트) | **쓰는 일 전부** · Skill 필요 · MCP 도구 필요 · 세션 컨텍스트/게이트 원장 필요 | 하네스 안 — 훅·원장·권한이 관측한다 | **종량 · 유일한 유료 자원** |
 | **Codex** (모델 캐시 priority 1 = 현재 `gpt-6-astra`) | 조사·분석 **읽기** 전부: 위치 찾기·전수 나열·사용처 수집·아키텍처 추적·결함 가설·데이터 흐름·정합성 검토 | 읽기 전용 샌드박스. 느리다(수십~수백 초) | 구독 정액 · 0 |
+| **Jev** (v3.51, `scripts/jev.js`) | **항목 N개를 정해진 선택지 중 하나로 판별**: 이름 짝 맞추기·분류·관련 있음/없음 | 글을 안 쓰고 파일도 안 읽는다. 답 = 고른 것 + 확률. 한 건 ~1초 | 입력 토큰만 · 거의 0 |
 
 **판정 순서 — 서브태스크마다 이 순서로 묻는다**
 
 1. **파일을 쓰는가? Skill(`ui-ux-pro-max` 등)이나 MCP 도구가 필요한가? 세션 컨텍스트·게이트 원장을 봐야 하는가?** → 하나라도 예면 **Claude 레인**. 그 다음에야 난이도 사다리로 모델을 고른다.
-2. **아니면(= 읽고 답하는 일이면) Codex 레인이다.** **"Claude 도 할 수 있다"는 Claude 레인에 남길 이유가 아니다** — 같은 품질이면 정액이 이긴다.
-3. **Codex 가 못 하면(`empty`·`timeout`·`unavailable`) 그 서브태스크만 Claude 레인으로 되돌린다.**
+2. **데이터 항목을 선택지로 판별하는 일인가?**(아래 「Jev 레인」의 쓰는 자리) → **Jev 레인**. 항목 목록·선택지는 코드로 만들고, Jev 결과를 반영하는 일은 Claude 레인이다.
+3. **아니면(= 읽고 답하는 일이면) Codex 레인이다.** **"Claude 도 할 수 있다"는 Claude 레인에 남길 이유가 아니다** — 같은 품질이면 정액이 이긴다.
+4. **외부 레인이 못 하면(`empty`·`timeout`·`unavailable`) 그 서브태스크만 Claude 레인으로 되돌린다.**
 
 **왜 외부 레인은 읽기 전용인가 (양보 불가)**: Codex 가 코드를 쓰면 Codex 는 Phase 4.5 에서 **자기가 쓴 코드의 독립 리뷰어일 수 없다** — Supervisor + Codex 게이트가 조용히 Supervisor 단독으로 무너진다. 소유자가 *"그 규칙으로 클로드 못 잡은 버그를 아주 많이 잡았어"* 라고 한 그 게이트다. 토큰을 아끼자고 그걸 깎는 것은 나쁜 거래다. 게다가 외부 쓰기는 Lens 의 어떤 것도 관측하지 못한다 — PreToolUse 게이트·agent tracker·게이트 원장이 전부 밖이다. **쓰기는 Claude 레인에 남고 읽기가 옮겨 간다. 토큰이 가던 곳이 읽기다.**
 
@@ -135,7 +137,41 @@ DISPATCH DONE ok=1 down=1
 
 > **모델 슬러그를 하드코딩하지 마라.** Codex 레인은 `~/.codex/models_cache.json` 의 priority 1 을 자동 선택한다(현재 `gpt-6-astra`). 리더보드가 움직이면 자동으로 따라 올라가고, 이름을 박으면 조용히 강등된다.
 
-**보고 필수**: Phase 7 최종 보고에 `엔진 배분: claude N / codex M — 위임 실패 J건({사유})` 을 **한 줄로 반드시 넣는다.** 눈에 보이는 산출물이 되어야 산문 지시가 이행된다.
+### Jev 레인 — 쓰는 자리가 데이터로 정해져 있다 (v3.51)
+
+> **대표 지시 (2026-09-25)**: *"lens에서 cp를 하건 cc를 하건 할때 쓸수 있는 모델에 jev를 추가"* — 쓰는 자리는 SnapHolo 실측(`snapholo/docs/tasks/2026-09-24-jev-ai-evaluation.md`)이 정한다.
+
+| 쓴다 | 실측 |
+|---|---|
+| 코드로 후보를 **100개 이하로 좁힌 뒤** 「그중 어느 것인가」 — 번역·표기가 달라 글자로는 못 맞추는 짝 맞추기 | 세트 이름 208건 175초 · $0.29 · 문턱 0.80 위 **44/44 정답** (글자 유사도는 264건 중 1건) |
+| 「없음」 선택지를 두고 짝이 없는 것을 가려내기 | 실제 자료에서 98건 「없음」 — 구조 계산(≥109)과 일치 |
+
+| 안 쓴다 | 이유 |
+|---|---|
+| 세기·숫자·날짜 · 번호 대조 | 판매사 스스로 「코드에 두라」 |
+| 글자 종류로 가르는 일(언어 판정 등) | 간체 중국어 카드 50여 장을 일본어로 0.8~0.95 확신 — 글자 세기로 한다 |
+| 되돌릴 수 없는 곳에 자동 반영(장부 발급·삭제) | 형제 후보를 **0.93 확신으로** 고른다. Jev 답은 제안까지, 반영은 코드 관문 뒤 |
+| 이미지·긴 잡음 입력·글쓰기·코드 읽기 | 못 한다 — Codex/Claude 레인 |
+
+**호출** — 항목과 선택지는 코드(Claude 레인)가 JSON 으로 만든다. 지시문은 **영어로**(판매사: 영어가 가장 정확):
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/jev.js" --job .lens/delegate/{id}-jev.json --out .lens/delegate/{id}-jev.out.json [--one-to-one]
+# job: {"instructions": "...", "options": {"key": "설명", ...}, "items": [{"id": "...", "state": "..."}]}
+```
+
+```
+JEV DONE items=208 auto=60 review=41 none=98 collide=9 error=0 tokens=966791 elapsed=175s out=...
+JEV UNAVAILABLE reason=no-key
+```
+
+- 판정은 스크립트가 한다 — `auto`(확신 ≥ 0.80) · `review`(문턱 아래 → 사람/Claude) · `none` · `collide` · `error`. **짝 맞추기는 `--one-to-one` 필수** — 한 선택지를 둘 이상이 문턱 위로 집으면 둘 다 `collide` 로 내린다(억지 선택 24건 중 22건이 형제 후보였다. 문턱으로는 못 거른다).
+- 선택지는 255개 상한 · 한 건 토큰 ≈ 선택지 수 × 45. **좁히기가 값을 정한다.**
+- `auto` 결과도 반영 전에 **표본을 눈으로 대조**한다(Jev 결과를 확인 없이 쓰지 않는다).
+- 키: `JEV_AI_API_KEY`, 없으면 위로 올라가며 `livevil-setting/env/solutions/ai.env`. `UNAVAILABLE` 이면 Claude 레인 폴백.
+- 한 번 돌리면 끝나는 일에만 — **주기 작업(cron·러너)에 넣지 않는다.**
+
+**보고 필수**: Phase 7 최종 보고에 `엔진 배분: claude N / codex M / jev K — 위임 실패 J건({사유})` 을 **한 줄로 반드시 넣는다.** 눈에 보이는 산출물이 되어야 산문 지시가 이행된다.
 
 ---
 
@@ -366,7 +402,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" create {plan-id} --plan {plan_
 
 #### 1.4 모델 할당 (난이도 사다리 — v3.24+)
 
-**엔진 배분이 먼저다 (v3.38).** 각 서브태스크에 「엔진 배분」 절의 판정 순서를 먼저 적용해 `claude`/`codex` 를 정하고, **`claude` 로 판정된 것에만** 아래 사다리를 적용합니다. 외부 레인 서브태스크는 모델 칸이 `—` 입니다.
+**엔진 배분이 먼저다 (v3.38).** 각 서브태스크에 「엔진 배분」 절의 판정 순서를 먼저 적용해 `claude`/`jev`/`codex` 를 정하고, **`claude` 로 판정된 것에만** 아래 사다리를 적용합니다. 외부 레인 서브태스크는 모델 칸이 `—` 입니다.
 
 Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모델 무차별 배정 금지 — 사용자 지시). 난이도 라벨(Easy/Medium/Hard/Critical)이 곧 배정 기준. **판정 한 줄: 사고과정(트레이드오프 판단)이 들어가면 상위 티어 이상, 정형 반복이면 중간 티어 이하.**
 - **Easy** (반복·조회·기계적 작업 — 파일 읽기·검색·자료 수집·단순 수정. 사고과정 없음): 경량 티어 (현재 haiku)
@@ -398,14 +434,14 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 보고 텍스트를 먼저 쓴다(박스 문자 금지 — VS Code·앱에서 줄이 접히면 깨진다. 마크다운 표):
 
 ```markdown
-**Lens Multi v3.50.2 — 실행 계획** · 요청: {사용자 원본 요청}
+**Lens Multi v3.51.0 — 실행 계획** · 요청: {사용자 원본 요청}
 
 | # | 서브태스크 | 엔진 | 할당 스킬 | 모델 | 난이도 | 건드릴 파일 |
 |---|---|---|---|---|---|---|
 | 1 | 구현 | claude | /skill | sonnet | Medium | src/a.ts |
 | 2 | 조사·나열 | codex | — | — | Easy | (읽기 전용) |
 
-엔진 배분: claude {N} / codex {M} · TOP(fable) {n}/2 {· TOP 사유: …}
+엔진 배분: claude {N} / codex {M} / jev {K} · TOP(fable) {n}/2 {· TOP 사유: …}
 정찰: {1.35 위임 결과 | Leader 직접 정찰(사유)} · 읽은 근거 문서: {실제로 Read 한 경로}
 검증: Supervisor 리뷰 + QA · 2분 주기 보고 · 최대 반복 5회
 ➡️ 지금 실행하면: {무엇이 어떤 순서로} — 검증까지 묻지 않고 진행 · 멈추는 곳: {정지 3종에 해당하는 단계, 없으면 "없음"}
@@ -458,7 +494,7 @@ N+2. 서브태스크 #1: [설명] — execution level
 
 **같은 메시지에서 모든 Worker 를 시작합니다 (= `Agent` 도구 N회 병렬 호출).** Worker 간 대기 없음.
 
-**위임 서브태스크도 같은 턴에서 출발한다 (v3.38).** 엔진 배분에서 `codex` 로 판정된 서브태스크는 프롬프트를 `.lens/delegate/{id}.txt` 에 쓰고 `delegate.sh` 를 **한 번** 호출한다(`--task` 를 태스크 수만큼 붙인다). Claude Worker N회 병렬 spawn 과 `delegate.sh` 1회 호출이 **같은 어시스턴트 턴**에 들어가야 벽시계가 합이 아니라 max(레인) 이 된다. `delegate.sh` 는 `run_in_background: true` 로 띄우거나 `timeout: 450000` 을 준다 — 하네스 기본 120초로는 Codex 가 끝나기 전에 죽는다.
+**위임 서브태스크도 같은 턴에서 출발한다 (v3.38).** 엔진 배분에서 `codex` 로 판정된 서브태스크는 프롬프트를 `.lens/delegate/{id}.txt` 에 쓰고 `delegate.sh` 를 **한 번** 호출한다(`--task` 를 태스크 수만큼 붙인다). Claude Worker N회 병렬 spawn 과 `delegate.sh` 1회 호출이 **같은 어시스턴트 턴**에 들어가야 벽시계가 합이 아니라 max(레인) 이 된다. `delegate.sh` 는 `run_in_background: true` 로 띄우거나 `timeout: 450000` 을 준다 — 하네스 기본 120초로는 Codex 가 끝나기 전에 죽는다. `jev` 로 판정된 서브태스크는 job JSON 이 준비되는 대로 `jev.js` 를 같은 턴에 띄운다(항목을 만드는 일이 먼저 필요하면 그 Claude Worker 가 끝난 턴에).
 
 **위임 결과 수령**: `status=ok` 인 태스크는 `out=` 파일을 Read 해서 Leader 가 Phase 7 에서 **재서술**한다 — 서브에이전트와 같은 계약이다. 외부 엔진의 출력도 사용자에게 자동 전달되지 않는다. `ok` 가 아닌 태스크(`empty`·`timeout`·`unavailable`)는 **그 서브태스크만** Claude 레인으로 되돌려 재실행하고, 사유를 최종 보고에 적는다. **위임 실패를 조용히 "완료"로 닫지 마라** — 산출물이 빈 위임은 아무 말도 하지 않은 것이다.
 
@@ -700,7 +736,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.50.2 — 반복 {N}/5
+Lens Multi v3.51.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -870,7 +906,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" abandon {scope} {id} --reason 
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.50.2 — 최종 결과                       ║
+║   Lens Multi v3.51.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -996,7 +1032,7 @@ Goal 달성이 N == M 이면 `/cd` 로 이어서 마감한다(7.3). `/cp done` �
 Lens Multi — 최종 결과
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 반복: {n}/5  |  Supervisor: {점수}/100  |  교차검증: codex {pass|fail|사유} — 지적 N건→반영 M건
-엔진 배분: claude {N} / codex {M} — 위임 실패 {J}건({사유})  |  TOP(fable) {n}/2
+엔진 배분: claude {N} / codex {M} / jev {K} — 위임 실패 {J}건({사유})  |  TOP(fable) {n}/2
 
 ✓ {완료한 서브태스크}  (…)
 

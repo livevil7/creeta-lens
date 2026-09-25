@@ -1,3 +1,18 @@
+## [3.51.0] - 2026-09-25
+
+**`/cp`·`/cc` 에 Jev 레인.** 대표 지시(2026-09-25): *"lens에서 cp를 하건 cc를 하건 할때 쓸수 있는 모델에 jev를 추가"* · *"snapholo 세션에서 … jev가 어떤 경우에 유용한지 이미 데이터로 검증"*. Jev 는 글을 쓰지 않는 판별 전용 모델이라 `Agent` 모델이 아니라 Codex 와 같은 외부 레인으로 붙였다. 쓰는 자리는 SnapHolo 실측(`snapholo/docs/tasks/2026-09-24-jev-ai-evaluation.md` — 208건 175초 · $0.29 · 문턱 0.80 위 44/44)을 그대로 옮겼다.
+
+### Added (v3.51.0)
+
+- `scripts/jev.js` — job JSON(지시문 · 선택지 ≤254 · 항목)을 동시 8건으로 Jev 에 묻고 `JEV DONE items= auto= review= none= collide= error= tokens= elapsed= out=` 한 줄로 답한다. 판정(문턱 0.80 · `--one-to-one` 1:1 충돌)은 스크립트가 한다. Cloudflare 1010 을 피하는 User-Agent · 429/5xx 재시도 · 키 없으면 `JEV UNAVAILABLE`. 키는 `JEV_AI_API_KEY`, 없으면 위로 올라가며 `livevil-setting/env/solutions/ai.env`.
+- `scripts/jev.test.js` — 문턱 · 「없음」 · 1:1 충돌 · 분류 모드(충돌 검사 없음) · 선택지 255 거부 · 로컬 모의 서버 종단 시험. 6/6.
+
+### Changed (v3.51.0)
+
+- `skills/cc/SKILL.md` 엔진 배분 — 3엔진 표에 Jev 행, 판정 순서 2번 「데이터 항목을 선택지로 판별하는 일 → Jev」, 「Jev 레인」 절(쓴다/안 쓴다 실측 표 · 호출 · 판정 · 주기 작업 금지), 보고 줄 `claude N / codex M / jev K`.
+- `skills/cp/SKILL.md` 조사 배분 — 항목 판별 조사는 Jev 를 먼저 본다, 🔧 줄에 `jev e`.
+- `docs/rules/harness-rules.md` §4.9.1 신설.
+
 ## [3.50.2] - 2026-09-24
 
 ### Fixed (v3.50.2)
