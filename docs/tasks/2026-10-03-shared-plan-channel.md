@@ -476,7 +476,7 @@ Done: (1단계 현황판 + 계획 모아보기라면) 대표가 docs.blex.co 에
 
 브리프는 "가능하면 1회 묶음"이었으나, 추천안(단계 경로)이 "현황판 + 계획 모아보기를 먼저 가동하고 멈출 수 있음"을 약속하므로 안별로 나눴다. 「안 A 한 번에」를 고르면 ①과 ②를 연속으로 실행해 멈춤은 사실상 1회다. 어느 지점에서도 **Lens 태그 push 는 라이브 확인이 통과한 뒤에만** 한다(실패 시 토큰 삭제·정책 제거 → 워커 되돌림 순서로 되돌리고, Lens 는 전 머신에 배포되지 않은 상태로 멈춘다).
 
-- [ ] S1-① 기반 + 현황판 (+ 계획 모아보기) 운영 반영 — 아래 순서를 바꾸지 않는다(순서 자체가 Blocker 대응 — Codex #14). Lens 변경 0
+- [x] S1-① 기반 + 현황판 (+ 계획 모아보기) 운영 반영 — 아래 순서를 바꾸지 않는다(순서 자체가 Blocker 대응 — Codex #14). Lens 변경 0
       a. **D1·배포용 토큰 출처 확인** — livevil-setting env/livevil-data.env(계정 전체 권한, 이 PC 에는 없음)를 livevil-setting 최신 master 에서 받는다(credential-index.md 로 위치 확인). 레포에도 없으면 Cloudflare 대시보드에서 Workers 배포 + D1 편집 범위만 가진 새 API 토큰을 만들어 env/livevil-data.env 로 커밋한 뒤 진행. 토큰이 없으면 b 로 가지 않는다
       b. D1 표를 `wrangler d1 execute --remote` 로 생성(표 먼저) — 고른 조합의 표: 현황판이면 machines, 계획 모아보기까지면 plans·plan_versions 도, **「안 B 만」이면 machines 없이 artifact_src·artifact_versions·artifact_imports 를 여기서**(S1-③ a 를 앞당김 — 권한 시험에 기계 경로가 필요하기 때문, 대조 4)
       c. **Access 서비스 토큰 1개 발급(정책은 아직 안 붙임 — 정책 없는 토큰은 어디에도 못 들어간다)** → Client ID 를 받는다(Cloudflare API 토큰은 env/solutions/cloudflare.env). 비밀값은 아직 파일에 쓰지 않는다
@@ -507,7 +507,7 @@ Done: (1단계 현황판 + 계획 모아보기라면) 대표가 docs.blex.co 에
 
 ### 가동 (G) — 되돌릴 수 있어 정지 아님
 
-- [ ] G1 머신 배포 — 1대 시험 → 확대 → 옛 보고 제거 (Codex #16)
+- [x] G1 머신 배포 — 1대 시험 → 확대 → 옛 보고 제거 (Codex #16)
       파일: 각 머신 로컬 설정(코드 변경 없음) · 끝에 livevil-setting scripts/fleet-status.sh(삭제) · fleet/status/*.json 5개(삭제) · macmini fleet-status launchd(해제)
       변경: a. 현황판을 골랐으면 F3 를 master 에 병합한다 — 수집기 선언의 스케줄 대상 목록에 **sj-omen 만** 들어 있으므로 다른 머신은 병합을 받아도 등록하지 않는다(대조 6). 이 PC 에서 fleet-sync 실행 → 스케줄 등록(명령줄에 `--env` 경로 포함) → 예약 실행이 실제로 돌아 「머신」 표에 sj-omen 이 정상으로 뜨는 것을 2회차(20분)까지 실측. 그 사이 다른 머신에서 `schtasks /Query`·`launchctl print` 로 수집기 스케줄 0 확인(검증 48) → b. 확대 = 스케줄 대상 목록에 머신을 **한 줄씩** 더하는 커밋(sj-rog → win002 → macmini(-p 22) → mac-001 → 결정 ③에서 넣으면 window-001). 각 머신에서 /cs 또는 pull → fleet-sync(자기 이름이 목록에 있으면 등록) → 「머신」 표 확인 뒤 다음 머신. **window-001 은 먼저 livevil-setting 체크아웃과 fleet-sync 실행 가능 여부(bash·python)를 SSH 로 실측**하고 없으면 clone 뒤 등록(Claude 폴더가 없어도 수집기는 `--env` 인자로 출입증을 찾는다 — 대조 11) · Claude 가 있는 머신은 setup 으로 LENS_DOCS_ENV 도 주입(안 B 용) → c. 기대 목록 전부가 정상 또는 없음으로 구분되면 **그때 한 커밋으로** fleet-sync 8절 git 전송을 ~/.claude/lens/fleet-sync.last.json 쓰기로 바꾸고 옛 fleet-status.sh·fleet/status/*.json·macmini fleet-status launchd 를 지운다(해제는 그 등록을 아는 코드로) → d. Lens 갱신(S1-② 또는 S1-③ 뒤에만 — win002 는 fleet-sync 미등록이라 수동 + core.longpaths 확인·$LASTEXITCODE 확인) → 머신마다 `codex --version` 과 로그인 유무를 1줄로 기록(인벤토리 141 — Codex 왕복 시험 머신을 여기서 정한다) → 안 B 면 4대에서 시험 발행 1건으로 머신·계정 라벨 확인, 세션 시작 신호가 탭에 보이는지 확인
       검증: a 의 sj-omen 2회차 정상 · a 동안 다른 머신 수집기 스케줄 0 · 현황판 「머신」 표에 닿는 5대(+window-001) 정상(20분 안 수신), sj-x1 끊김/없음 · c 뒤 fleet-status 참조 grep 0 · 8절 `git push` 줄 grep 0 · 안 B: 시험 발행이 탭에 머신·계정 라벨과 함께 보임, 머신별 마지막 신호·훅 실행 4대 · Codex 유무 표 1장 → 통과
@@ -1026,9 +1026,10 @@ Codex 결과(.lens/verify/d2-shared-plan-codex.md, 18건 — 방향 동의 + "�
 - **다른 레포 작업 위치**: livevil-data `feat/plan-channel-board` — 2026-10-03 이 계획의 실행이 `origin/main`(f1dd2b5) 위에서 생성, 작업 폴더는 홈 아래 `.lens-worktrees/livevil-data-plan-channel`(GIT 루트 밖 — /cs 가 훑지 않게) · livevil-setting `master` 직접
 - **마지막 업데이트**: 2026-10-03
 - **현재 경로**: 권장 경로 — 결정 ① 1단계(현황판 + 계획 모아보기)
-- **재개 포인트**: C0~C5·F1~F3·A1~A3·R2 완료(로컬 검증·커밋) → **정지: S1-① 운영 반영 직전** — 대표 확인 뒤 S1-① a~g → G1(sj-omen 1대 시험 → 확대) → G3
-- **Goal 달성(로컬 단계)**: 자동 확인 7/7 통과 · 대표 확인 4건(M1 라이브 권한 시험 · M2 현황 탭 · M3 계획 탭 · M4 라이브 클릭)은 운영 반영 뒤
-- **커밋**: livevil-data `feat/plan-channel-board` 6b30587(push, main 병합은 S1-① 에서) · livevil-setting master 936f5a5(+ 다른 세션 커밋 f7ae800 에 함께 들어간 1단계 파일) · creeta-lens `feat/shared-plan-channel`(이 계획서)
+- **재개 포인트**: S1-① 운영 반영·G1 가동 완료(2026-10-03 21:00) → **대표 확인 4건 대기**(라이브 「현황」「계획」 탭 화면·권한·클릭) → 확인되면 G3 기록 마무리 후 /cd. 다음 단계(2단계 승인 채널·안 B)는 1단계를 써 본 뒤 다시 고른다
+- **Goal 달성**: 자동 확인 7/7 · 라이브 — 권한 시험 7/7(토큰 없음 302 · 기계로 관리 API 403×5 · 기계 경로 200) · 현황판 수신 6대(sj-omen 21·sj-rog 23·win002 4·window-001 2·macmini 24·mac-001 2 레포) · 없음 2대(sj-x1 꺼짐·sj-macbookair 접속 불가) · 계획 678건 · 막힘 0 / 대표 확인 4건(M1~M4) 대기
+- **커밋·배포**: livevil-data main f57c8f3(docs.blex.co 워커 버전 74e7cb01, D1 새 표 3개) · livevil-setting master — 수집기·예약 등록 c11ed64(출입증)·4a2ce68·c78ab4c·2e8ac11·781a4db(옛 보고 제거), 예약 대상 e4f6659·50c190e · creeta-lens `feat/shared-plan-channel`(이 계획서)
+- **되돌리기**: ① 각 머신 `bash scripts/fleet-sync.sh --unregister fleet-report`(또는 skills.json fleet.report.machines 에서 빼고 커밋) ② Cloudflare Access 앱 「브랜드 문서 관리」의 정책 fleet-collector 삭제 + 서비스 토큰 docs-blex-fleet-collector 삭제 ③ `wrangler rollback`(워커) — 이 순서. D1 새 표 3개는 기존 표와 연결이 없어 남겨도 무해
 
 ### 편차 기록 (계획 ↔ 실제)
 - C4 "새 표 전부 선언" → 이번 범위(1단계) 표 3개(machines·plans·plan_versions)만 선언 (이유: 안 쓰는 표를 미리 두지 않는다 — 2단계·안 B 표는 그 단계를 고를 때)
@@ -1043,7 +1044,16 @@ Codex 결과(.lens/verify/d2-shared-plan-codex.md, 18건 — 방향 동의 + "�
 - 확인 조건 2건 수정: G5(사용자 경로) — 다른 계획서 단계 문구의 변수 이름 `$ADMIN_REPO` 를 사용자 경로로 오인 → 실제 경로 모양만 보도록 · G7 — 기존 파일 형식이 `CREATE TABLE machines`(IF NOT EXISTS 없음)라 찾는 글자 수정. 코드는 처음부터 맞았음
 - 계획서 본문 안 이 PC 경로(사용자 이름 포함)는 docs.blex.co 에 그대로 올라간다 — Access 뒤지만 대표 인지 필요(secret-patterns.md 의 「개인정보는 통과」 한계)
 
+- 운영 반영 S1-① 실제 순서: 토큰(공용 cloudflare.env) → D1 표 3개 → 서비스 토큰 발급(정책 없이) → MACHINE_CLIENT_ID 넣고 배포 → Access 정책 fleet-collector(non_identity) 추가 → 즉시 권한 시험 7/7 → 출입증 커밋 → main 병합. 계획대로. live-smoke 는 LINK_PEPPER(env/livevil-data.env — 닿는 6대 어디에도 없음, sj-x1 추정)가 없어 못 돌림 → live-script-clean 통과 · 공개 /d 경로 404 페이지 정상으로 대신
+- G1-a 첫 실제 전송 장애: 이 PC 계획서 678건을 한 요청에 실어 60초 읽기 시간 초과, D1 에 24건만 → 수집기 「바뀐 계획만(메타 지문) · 한 요청 10건 · 전송 예산 45초는 수집 뒤부터 · 회당 상한 120초」, 서버 「한 요청 12건 초과 413」으로 고치고 재배포(워커 74e7cb01). 원인은 D1 호출당 한도보다 응답 지연(수집만 33~48초)으로 판단
+- G1-b 확대를 「한 줄씩」 대신 두 번에: ① sj-rog(Windows)+macmini(macOS) → 수신 확인 → ② win002·mac-001·window-001 (이유: 회차마다 10분 대기 — 플랫폼별 1대씩 먼저 확인하는 것으로 계획 취지 유지)
+- macmini 레포 9개만 잡힘 → GIT_ROOTS 가 있으면 기본 자리를 안 보던 것 수정, 기본 자리(~/projects 등)와 홈을 늘 같이(24개)
+- macOS launchd 수집기가 멈춤(mac-001 은 첫 실행부터, macmini 는 ~/Documents 를 보게 된 뒤부터) — TCC 보호 폴더 open() 무한 대기. 보호 폴더는 3초 시험 뒤 건너뛰게 수정. mac-001 은 ~/projects/livevil-setting(7월부터 있던 체크아웃)으로 다시 등록하고 제가 ~/Documents 에 받은 사본은 미푸시 0 확인 뒤 삭제. mac-001 의 ~/Documents/GIT 레포는 전체 디스크 접근 권한을 줘야 보임(대표 할 일, 선택)
+- window-001 호스트명 DESKTOP-KS3LLSE → machine_id 가 desktop-ks3llse 로 잡힘 → machine-identity §2(그 머신이 별칭을 정함)대로 그 머신 ~/.claude/settings.json 에 AGENTMEMORY_PROJECT_NAME=livevil@window-001 (원래 파일 없음, 새로 만듦)
+- win002·window-001 은 fleet-sync 첫 실행이라 수집기 외에 선언된 개인 스킬 3개(agent-reach·aside-browser·video-use) 연결도 함께 됨 — fleet-sync 원래 동작
+- G1-c: 8절을 로컬 ~/.claude/lens/fleet-sync.last.json 쓰기로, fleet-status.sh·fleet/status/*.json 6개 삭제, macmini com.livevil.fleet-status 내림(plist 는 /tmp 로 옮겨 둠). fleet-sync 300행의 fleet/status 더티 예외는 전환기 동안 남김(옛 코드가 쓴 파일이 ff 를 막지 않게)
+
 ### 실행 지표
-- **추가 질문 수**: 0 (정지 지점 S1-① 확인 1건 예정)
-- **편차 건수**: 10
-- **게이트**: 통과(로컬 단계 자동 7/7) · 대표 확인 4건은 운영 반영 뒤
+- **추가 질문 수**: 1 (정지 지점 S1-① 확인 — 페이지 답 「진행」)
+- **편차 건수**: 18
+- **게이트**: 자동 7/7 통과 · 대표 확인 4건(라이브 화면) 대기
