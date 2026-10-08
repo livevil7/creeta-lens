@@ -1170,7 +1170,15 @@ def prune(
                         )
                         continue
                     # --force 없이: git 이 미추적·잠금을 한 번 더 거부한다.
-                    _git(repo, "worktree", "remove", str(holder["path"]))
+                    try:
+                        _git(repo, "worktree", "remove", str(holder["path"]))
+                    except subprocess.CalledProcessError:
+                        # 다른 프로세스가 폴더를 쥐고 있으면 git 은 등록은 지우고
+                        # 빈 폴더 삭제에서 "Permission denied" 로 실패한다(실측,
+                        # snapholo-data-overhaul). 등록이 사라졌으면 브랜치 삭제는 안전하다.
+                        if any(w["path"] == holder["path"] for w in _worktrees(repo)):
+                            raise
+                        skipped.append("%s: 워크트리 등록은 지웠지만 빈 폴더 %s 는 다른 프로세스가 사용 중 — 손으로 지울 것" % (name, holder["path"]))
                     removed_worktrees.append(str(holder["path"]))
                 # 판정 SHA(브랜치)와 판정 base SHA(verify)를 한 트랜잭션에 실은
                 # 원자적 삭제(branch-lifecycle.md §7.1). 판정과 삭제 사이에 다른
