@@ -4,7 +4,7 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.52.0**
+- Current: **v3.52.1**
 - Updated: 2026-10-08
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.52.0 feat: **`/cd` 가 끝까지 닫는다** — 병합(`pr-manual` 레포는 PR 까지) → 완료 내용은 계획서·git 에서 채움(질문 없음) → history 커밋·푸시 → `prune_branches.py --finish` 로 병합된 브랜치·워크트리 전부 정리 + 원래 체크아웃 base 최신화. 이름만 예약한 계획서는 `never-branched`(`--no-pr`). 테스트 `scripts/prune_finish.test.py`.
