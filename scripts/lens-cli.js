@@ -11,12 +11,13 @@
  * Usage:
  *   node scripts/lens-cli.js branch entry     <repo> [planBranch] [--plan <md>]
  *   node scripts/lens-cli.js branch ownership <repo> <branch> <base> <planDoc>
- *   node scripts/lens-cli.js branch merged    <repo> <branch> <base> [--plan <md>] [--pr-merged]
+ *   node scripts/lens-cli.js branch merged    <repo> <branch> <base> [--plan <md>] [--pr-merged] [--no-pr]
  *   node scripts/lens-cli.js branch base      <repo>
  *   node scripts/lens-cli.js plan structure|coverage|todo|gate <md>
  *
  *   branch merged always fetches first ({fetch: true}), like every skill call did.
  *   --pr-merged = the caller confirmed the PR was merged (gh) → opts.prMerged.
+ *   --no-pr     = the caller confirmed zero PRs of any state for this head (gh) → opts.noPr.
  *   plan gate   = structure + coverage + todo, the /cp Phase 5.0 check.
  *
  * Output: JSON on stdout. Exit: `plan …` → 1 when not valid · `branch …` → 0
@@ -37,7 +38,7 @@ function usage(msg) {
 
 function parse(argv) {
   const pos = [];
-  const opt = { plan: null, prMerged: false };
+  const opt = { plan: null, prMerged: false, noPr: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--plan') {
@@ -45,6 +46,8 @@ function parse(argv) {
       opt.plan = path.resolve(argv[++i]);
     } else if (a === '--pr-merged') {
       opt.prMerged = true;
+    } else if (a === '--no-pr') {
+      opt.noPr = true;
     } else {
       pos.push(a);
     }
@@ -75,8 +78,8 @@ function branch(cmd, pos, opt) {
       return out(gb.verifyOwnership(repo, a, b, readPlan(path.resolve(pos[3])).content), true);
     }
     case 'merged':
-      if (!a || !b) usage('branch merged <repo> <branch> <base> [--plan <md>] [--pr-merged]');
-      return out(gb.mergedState(repo, a, b, { fetch: true, prMerged: opt.prMerged, planDoc: opt.plan }));
+      if (!a || !b) usage('branch merged <repo> <branch> <base> [--plan <md>] [--pr-merged] [--no-pr]');
+      return out(gb.mergedState(repo, a, b, { fetch: true, prMerged: opt.prMerged, noPr: opt.noPr, planDoc: opt.plan }));
     case 'base': {
       const p = gb.preflight(repo);
       return out({ resolved: gb.resolveBase(repo), base: p.base, issues: p.issues });

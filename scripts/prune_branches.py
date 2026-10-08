@@ -297,6 +297,40 @@ def _git_maybe(repo: Path, *args: str) -> str | None:
         return None
 
 
+def _worktrees(repo: Path) -> list[dict]:
+    """`git worktree list --porcelain` as dicts: path, branch (short or None), locked.
+
+    The first entry is the main worktree. Paths are resolved so they compare
+    equal to ``repo.resolve()`` on Windows too.
+    """
+    out = _git_maybe(repo, "worktree", "list", "--porcelain") or ""
+    items: list[dict] = []
+    for block in out.replace("\r\n", "\n").split("\n\n"):
+        item: dict = {"path": None, "branch": None, "locked": False}
+        for line in block.split("\n"):
+            if line.startswith("worktree "):
+                item["path"] = Path(line[len("worktree ") :]).resolve()
+            elif line.startswith("branch refs/heads/"):
+                item["branch"] = line[len("branch refs/heads/") :]
+            elif line == "locked" or line.startswith("locked "):
+                item["locked"] = True
+        if item["path"]:
+            items.append(item)
+    return items
+
+
+def _pushed_names(repo: Path) -> set[str]:
+    """Branch names that have a remote-tracking ref — they left this machine once.
+
+    A worktree whose branch never left the machine may be one another session
+    created moments ago (zero commits = trivially "merged"); it is kept. The
+    upstream config is not evidence: `worktree add -b x <path> origin/main`
+    records one without pushing anything (measured).
+    """
+    out = _git_maybe(repo, "for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes") or ""
+    return {line for line in out.split("\n") if line and line != "HEAD"}
+
+
 def _read_config() -> dict:
     try:
         return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
@@ -1003,7 +1037,15 @@ def _render(report: list[dict], remote: str | None, base_ref: str) -> str:
 
 
 def prune(
-    repo: Path, report: list[dict], *, remote: str | None, base: str, base_sha: str | None
+    repo: Path,
+    report: list[dict],
+    *,
+    remote: str | None,
+    base: str,
+    base_sha: str | None,
+    worktrees: list[dict] | None = None,
+    removed_worktrees: list[str] | None = None,
+    pushed: set[str] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Delete only the `delete` verdicts. Returns (deleted, skipped-with-reason).
 
@@ -1049,6 +1091,12 @@ def prune(
     """
     deleted: list[str] = []
     skipped: list[str] = []
+    if removed_worktrees is None:
+        removed_worktrees = []
+    if worktrees is None and not remote:
+        worktrees = _worktrees(repo)
+    if pushed is None:
+        pushed = _pushed_names(repo)
     # classify() 가 이미 protected_name 으로 강등하지만, prune() 은 삭제를
     # 실행하는 마지막 지점이므로 여기서도 같은 목록을 다시 검사한다 —
     # open_pr 이 verdict 강등 + prune 재검사로 이중 가드인 것과 같은 패턴.
@@ -1104,6 +1152,26 @@ def prune(
                         "%s: 현재 체크아웃된 브랜치 — 삭제하면 HEAD 가 깨진다. 건너뜀, 다른 브랜치로 이동 후 재실행" % name
                     )
                     continue
+                # 다른 워크트리에 체크아웃된 브랜치도 같은 이유로 그냥 지우면
+                # 그 워크트리의 HEAD 가 깨진다. 병합이 증명된 브랜치의 워크트리는
+                # 정리 대상이다 — 단 미커밋 변경·잠금·한 번도 push 안 된 것
+                # (다른 세션이 막 만든 빈 워크트리일 수 있다)은 남긴다.
+                holder = next((w for w in (worktrees or []) if w["branch"] == name), None)
+                if holder:
+                    if holder["locked"]:
+                        skipped.append("%s: 워크트리 %s 잠김 — 건너뜀" % (name, holder["path"]))
+                        continue
+                    if _git_maybe(holder["path"], "status", "--porcelain"):
+                        skipped.append("%s: 워크트리 %s 에 미커밋 변경 — 건너뜀" % (name, holder["path"]))
+                        continue
+                    if name not in pushed:
+                        skipped.append(
+                            "%s: 워크트리 %s 의 브랜치가 push 된 적 없음 — 진행 중일 수 있어 건너뜀" % (name, holder["path"])
+                        )
+                        continue
+                    # --force 없이: git 이 미추적·잠금을 한 번 더 거부한다.
+                    _git(repo, "worktree", "remove", str(holder["path"]))
+                    removed_worktrees.append(str(holder["path"]))
                 # 판정 SHA(브랜치)와 판정 base SHA(verify)를 한 트랜잭션에 실은
                 # 원자적 삭제(branch-lifecycle.md §7.1). 판정과 삭제 사이에 다른
                 # 프로세스가 브랜치를 진전시켰든 base 를 움직였든 git 이 전체를
@@ -1331,6 +1399,76 @@ def _render_multi(results: list[dict], skipped_dirs: list[str]) -> str:
     return "\n".join(lines)
 
 
+def finish(repo: Path, *, base: str | None, delete_without_pr_check: bool) -> int:
+    """/cd 마무리 한 번에: fetch → 로컬 base 최신화 → 원격·로컬 병합 브랜치와 그 워크트리 정리.
+
+    판정·보호·lease 는 전부 기존 경로(_judge_repo / prune)를 그대로 탄다.
+    여기서 더하는 것은 순서와 fetch 하나다. 로컬 판정은 로컬 base 를 기준으로
+    하므로, 워크트리에서만 일해 뒤처진 원래 체크아웃의 base 를 먼저 맞춘다.
+    """
+    lines: list[str] = []
+    if not _git_ok(repo, "fetch", "--prune", "origin"):
+        print("fetch 실패 — 원격 상태 확인 불가, 아무것도 지우지 않았다", file=sys.stderr)
+        return 1
+    resolved_base = base or resolve_base(repo)["base"]
+    if not resolved_base:
+        print("base 를 해석하지 못했다 — --base 로 지정하라", file=sys.stderr)
+        return 1
+
+    holder = next((w for w in _worktrees(repo) if w["branch"] == resolved_base), None)
+    if holder is None:
+        ok = _git_ok(repo, "fetch", "origin", "%s:%s" % (resolved_base, resolved_base))
+        lines.append("base %s: %s" % (resolved_base, "원격에 맞춤" if ok else "fast-forward 불가 — 그대로 둠"))
+    elif _git_maybe(holder["path"], "status", "--porcelain", "--untracked-files=no"):
+        lines.append("base %s: %s 에 미커밋 변경 — 최신화 건너뜀" % (resolved_base, holder["path"]))
+    else:
+        ok = _git_ok(holder["path"], "merge", "--ff-only", "--quiet", "origin/%s" % resolved_base)
+        lines.append(
+            "base %s: %s" % (resolved_base, "원격에 맞춤" if ok else "fast-forward 불가(로컬에만 있는 커밋) — 그대로 둠")
+        )
+
+    blocked = False
+    removed: list[str] = []
+    # 원격 삭제가 tracking ref 를 지우기 전에 「push 된 적 있음」을 잡아 둔다.
+    pushed = _pushed_names(repo)
+    for remote in ("origin", None):
+        result = _judge_repo(repo, base=resolved_base, remote=remote)
+        where = "원격" if remote else "로컬"
+        if result["skipped"]:
+            lines.append("%s: 건너뜀 — %s" % (where, result["skipped"]))
+            continue
+        if result["push_target_ok"] is False:
+            blocked = True
+            lines.append("%s: 차단 — fetch/push 대상이 다르다 (%s)" % (where, result.get("push_target_reason")))
+            continue
+        if not result["pr_guard_ok"] and not delete_without_pr_check:
+            blocked = True
+            lines.append("%s: 차단 — 열린 PR 보호 검사 불가: %s" % (where, "; ".join(result["warnings"])))
+            continue
+        if not result["default_guard_ok"]:
+            blocked = True
+            lines.append("%s: 차단 — 기본 브랜치 조회 실패 (%s)" % (where, result.get("default_guard_reason")))
+            continue
+        deleted, skipped = prune(
+            repo,
+            result["branches"],
+            remote=remote,
+            base=result["base"],
+            base_sha=result.get("base_sha"),
+            removed_worktrees=removed,
+            pushed=pushed,
+        )
+        lines.append("%s 브랜치 삭제 %d: %s" % (where, len(deleted), ", ".join(deleted) or "없음"))
+        lines.extend("  %s" % note for note in skipped)
+    _git_ok(repo, "worktree", "prune")
+    lines.append("워크트리 제거 %d: %s" % (len(removed), ", ".join(removed) or "없음"))
+    detached = [str(w["path"]) for w in _worktrees(repo)[1:] if w["branch"] is None]
+    if detached:
+        lines.append("브랜치 없는(detached) 워크트리 — 사람 확인: %s" % ", ".join(detached))
+    print("\n".join(lines))
+    return 1 if blocked else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     _force_utf8_output()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1365,11 +1503,23 @@ def main(argv: list[str] | None = None) -> int:
         "PR 목록을 직접 확인한 뒤에만 쓸 것",
     )
     parser.add_argument("--json", action="store_true", help="emit the report as JSON")
+    parser.add_argument(
+        "--finish",
+        action="store_true",
+        help="/cd 마무리: fetch → 로컬 base fast-forward → 원격·로컬 병합 브랜치와 그 워크트리 삭제 (한 레포)",
+    )
     args = parser.parse_args(argv)
+
+    if args.finish:
+        if args.repo_root or args.remote or args.apply or args.json:
+            parser.error("--finish 는 --repo/--base/--delete-without-pr-check 하고만 쓴다 (스스로 적용한다)")
+        return finish(
+            (args.repo or Path.cwd()).resolve(), base=args.base, delete_without_pr_check=args.delete_without_pr_check
+        )
 
     if args.repo and args.repo_root:
         parser.error("--repo 와 --repo-root 는 함께 쓸 수 없다")
-    if args.delete_without_pr_check and not args.apply:
+    if args.delete_without_pr_check and not (args.apply or args.finish):
         parser.error("--delete-without-pr-check 는 --apply 와 함께만 의미가 있다")
 
     if args.repo_root:

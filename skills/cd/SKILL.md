@@ -1,17 +1,19 @@
 ---
 name: "cd"
-description: "Lens Done — closes a finished task: confirms completion, decides the git state (branch merged? PR closed?), cleans the branch under a lease, and moves the plan from docs/tasks/ to docs/history/. Split out of /cp in v3.34 — completing work is a different activity from planning it, and most of this is git plumbing."
+description: "Lens Done — closes a finished task end to end: confirms completion, merges the task branch into base (stops at the PR where merge = deploy, per syncPolicy), writes the history doc from the plan and git log, commits and pushes it, then removes every merged branch and its worktree and fast-forwards the base checkout. Split out of /cp in v3.34 — completing work is a different activity from planning it, and most of this is git plumbing."
 argument-hint: "[task name or plan path]"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cd | Lens Done — 완료 처리 · 브랜치 정리 · History 이관. `/cp` 에서 분리(v3.34). | MIT |
+| cd | Lens Done — 완료 처리 · 병합 · History 이관 · 커밋·푸시 · 브랜치·워크트리 정리. `/cp` 에서 분리(v3.34), 끝까지 닫기(v3.52). | MIT |
 
 Triggers: done, complete, finish task, close out, wrap up, 완료, 완료 처리, 끝냄, 마무리, 히스토리 이관
 
-`/cd` 는 **끝난 작업을 닫는다.** 완료를 확인하고, git 상태를 판정하고(머지됐나·PR 이 닫혔나), 브랜치를 lease 로 안전하게 정리하고, 계획 문서를 `docs/tasks/` → `docs/history/` 로 옮긴다.
+`/cd` 는 **끝난 작업을 끝까지 닫는다.** 완료를 확인하고 → task 브랜치를 base 로 **병합**하고(배포가 걸린 레포는 PR 까지) → 계획서와 git log 로 history 를 **직접 써서** → 그 문서 변경을 **커밋·푸시**하고 → 병합된 브랜치와 **워크트리를 전부 지우고** 원래 체크아웃의 base 를 원격에 맞춘다. 대표 승인은 Phase 1.3 한 번뿐이다.
+
+> **왜 v3.52 에서 끝까지 닫게 했나**: 2026-10-08 snapholo 실측 — `/cd` 가 병합도, 완료 문서 커밋도, 워크트리 정리도 하지 않아 snapholo-data 에 **병합 끝난 워크트리 21개 · 원격 브랜치 21개**가 남고 원래 체크아웃의 main 은 **42커밋 뒤처졌다.** 계획서에 이름만 적고 main 에 바로 작업한 web 계획서 15개는 「병합 증명 불가」로 영원히 닫히지 않았다. 대표: *"내가 불편하니까."*
 
 > **왜 `/cp` 에서 분리했나 (v3.34)**: `/cp` 1,526줄 중 294줄(19%)이 이 모드였고, 그 대부분이 git 배관이다. 계획을 세우는 일과 끝난 일을 닫는 일은 서로 다른 활동이라, 한 스킬에 두면 계획을 하려고 부를 때마다 완료 처리 절차가 통째로 컨텍스트에 실렸다. **`/cp` = 이번 작업의 계획, `/cd` = 그 작업의 종료.**
 
@@ -88,7 +90,7 @@ Triggers: done, complete, finish task, close out, wrap up, 완료, 완료 처리
 #### Phase 1.4: 안전 규칙 (절대 준수)
 
 - **분류는 추정일 뿐** — 자동 판정이 아니라 "이 정도면 완료일 가능성 높음" 이라는 확률적 제안. 최종 판단은 **항상 사용자 승인**.
-- **자동 삭제 절대 금지** — 사용자 승인 후 Phase 2~4(완료 인터뷰 → 브랜치 정리 → history 작성 → task 삭제)를 수행하므로 내용 손실은 없음. 내용 보존 강제.
+- **자동 삭제 절대 금지** — 사용자 승인 후 Phase 2~4(완료 내용 수집 → 브랜치 정리 → history 작성 → task 삭제)를 수행하므로 내용 손실은 없음. 내용 보존 강제.
 - **"수동 확인 필요"는 완료 추정 묶음에 넣지 않음** — 파싱 불가 항목은 사용자가 눈으로 판정해야 함. 추정 분류는 신뢰도가 높은 항목만.
 - **기존 Progress 섹션 존중** — 사용자가 손으로 적어둔 "재개 포인트" / "마지막 업데이트"를 근거로 삼되, 불명확하면 수동 확인 대상으로 넘김.
 
@@ -140,15 +142,24 @@ gh pr list --repo <OWNER/REPO> --head <branch> --state all --json number,state,b
 node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" branch merged . feat/<slug> <base> --plan docs/tasks/<id>.md --pr-merged
 ```
 
+**`unknown` 이고 PR 조회가 0건(상태 불문)이면 `--no-pr` 로 재판정한다** — 브랜치가 만들어진 적이 없다는 뜻이다(이름만 예약하고 base 에 바로 작업). `never-branched` 가 나오면 지킬 ref 가 없으므로 아카이브로 간다. gh 조회 실패는 0건이 아니다 — 그때는 `--no-pr` 를 주지 않는다.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" branch merged . feat/<slug> <base> --plan docs/tasks/<id>.md --no-pr
+```
+
+frontmatter `branch:` 가 `없음 …`(조사보고) 처럼 브랜치 이름이 아니면 `branch` 필드가 없는 것과 같이 다룬다(1.5.1 하위호환).
+
 `--pr-merged`(= `mergedState` 의 `prMerged: true`)는 **로컬·원격 ref 가 둘 다 없을 때만** 참조된다(내용 증거가 있으면 그쪽이 우선). 지울 ref 가 없으므로 이 경로의 오판이 삭제로 이어지지 않는다. ⚠️ PR 상태를 **확인하지 않은 채** `prMerged: true` 를 주지 마라 — 그리고 **base 자격 검사 없이도 주지 마라.** 이름 일치 + MERGED 는 증명이 아니라 가정이다.
 
 | 상태 | 의미 | 처리 | 판정에 쓴 SHA 기록 |
 |---|---|---|---|
-| `unpushed` | 원격에 브랜치가 없고, **내용이 base 에 없음이 증명됐다** | **push + PR 생성 제안** (AskUserQuestion). history 이동 보류 | — (원격 ref 없음) |
+| `unpushed` | 원격에 브랜치가 없고, **내용이 base 에 없음이 증명됐다** | **Phase 1.6 병합** 후 재판정. `pr-manual` 레포는 push + PR 생성 후 In Review 로 멈춤 | — (원격 ref 없음) |
 | `merged-deleted` | 원격 브랜치가 없지만 **로컬 ref 기준으로 내용이 base 에 들어갔음이 증명됐다** — 머지 직후 head 를 삭제한 정상 흐름(§3 이 규정한 것). 원격·로컬 ref 가 **둘 다 없어도** ① base 에 이 브랜치 이름을 담은 병합 커밋이 있거나(`merge --no-ff` 레포) ② 계획서 frontmatter `last_tip:`(/cc 7.5 가 기록)이 base 의 조상이면 이 상태다 — `reason` 에 어느 근거인지 적힌다(이때 `localSha` 는 `null`, 로컬 삭제는 "이미 정리됨") | `merged`/`patch-merged` 와 동일하게 Phase 2 이후 진행. 브랜치 정리(Phase 2.5)는 **원격 삭제를 건너뛴다**(지울 ref 가 없다) — **로컬 브랜치만** 삭제 | `branchSha` 는 `null`(원격 ref 부재). 대신 `localSha` 를 로컬 삭제의 lease 로 쓴다 |
-| `unmerged` (PR 없음) | 원격에 있고 미머지, PR 도 아직 없다 | **PR 생성 제안**. history 이동 보류 | `origin/<branch>` tip |
-| `unmerged` (PR 열림) | 리뷰 대기 | **history 로 내리지 않는다** → **"In Review"** 로 보고. task 파일은 `docs/tasks/` 에 그대로 둔다 | `origin/<branch>` tip |
-| `merged` / `patch-merged` | 병합이 증명됐다 | Phase 2(완료 인터뷰) → **Phase 2.5(브랜치 정리)** → Phase 3(history 기록) → Phase 4(task 정리) 순으로 진행 — **브랜치 정리가 아카이브보다 먼저다** | **필수** — `origin/<branch>` tip + 비교에 쓴 `origin/<base>` tip. Phase 2.5 가 이 값을 lease 로 쓴다 |
+| `unmerged` (PR 없음) | 원격에 있고 미머지, PR 도 아직 없다 | **Phase 1.6 병합** 후 재판정. `pr-manual` 레포는 PR 생성 후 In Review 로 멈춤 | `origin/<branch>` tip |
+| `unmerged` (PR 열림) | PR 이 열려 있다 | **Phase 1.6 에서 그 PR 을 병합** 후 재판정. `pr-manual` 레포는 **"In Review"** 로 보고하고 task 파일은 `docs/tasks/` 에 그대로 둔다 | `origin/<branch>` tip |
+| `merged` / `patch-merged` | 병합이 증명됐다 | Phase 2(완료 내용 수집) → **Phase 2.5(브랜치 정리)** → Phase 3(history 기록) → Phase 4(task 정리) 순으로 진행 — **브랜치 정리가 아카이브보다 먼저다** | **필수** — `origin/<branch>` tip + 비교에 쓴 `origin/<base>` tip. Phase 2.5 가 이 값을 lease 로 쓴다 |
+| `never-branched` | 원격·로컬 ref 가 없고 **gh 로 이 이름의 PR 이 상태 불문 0건**임을 확인했다(`--no-pr`) — 계획서에 이름만 적고 base 에 바로 작업한 경우 | Phase 2 이후 진행. 브랜치 정리(Phase 2.5)는 지울 ref 가 없어 **skip** | — |
 | `unknown` | **도구가 증명하지 못했다** — 계보가 다르거나, 원격 ref 가 없는데 내용 반영 여부도 확인 불가(merge-tree 충돌·구버전 git·로컬 ref 도 없고 병합 커밋·`last_tip` 근거도 없음) | **자동 처리 금지.** 사람 확인 요청 — history 이동·브랜치 삭제 **둘 다 보류**. ⚠️ **push + PR 생성을 제안하지 않는다** — 이미 머지된 작업일 수 있다(그 제안은 `unpushed` 전용) | 기록만(사람 확인용). 삭제 근거로는 쓰지 않는다 |
 
 **판정에 쓴 SHA 를 기록한다** — fetch 직후 판정에 실제로 사용한 tip SHA 를 판정 결과와 함께 남긴다. 이 값이 Phase 2.5 의 **lease** 다: 삭제 명령에 이 SHA 를 **실어 보내고**, 원격 tip 이 다르면 git 이 삭제를 거부한다("확인한 뒤 삭제" 가 아니다 — Phase 2.5). **SHA 없이 나온 판정으로는 브랜치를 삭제하지 않는다.**
@@ -164,9 +175,11 @@ Phase 1.2 의 완료추정 로직(체크리스트 ≥80% / 검증표 통과 / �
 
 `ahead` 개수나 조상 관계만 보면 **rebase·squash 머지된 브랜치가 영원히 미병합으로 보인다** — 두 방식 모두 커밋을 새로 쓰기 때문이다(실측: `livevil-research` PR #4). 판정은 2단이다: ① `git merge-base --is-ancestor` 빠른 경로 → ② 실패 시 **patch-id 동등성**(`git cherry origin/<base> origin/<branch>` 에 `^+` 행이 없으면 병합됨 = `patch-merged`). 둘 다 통과 못 하면 `unknown` 이고, **`unknown` 은 절대 자동 처리하지 않는다** (리베이스 중 충돌을 손으로 해결해 patch-id 가 바뀐 경우 — 도구가 병합을 증명할 수 없다는 뜻).
 
-#### 1.5.3 `Returns_ERP_v20` 예외 — 완료 처리가 배포가 되지 않게
+#### 1.5.3 병합이 곧 배포인 레포 — 설정으로만 판단한다
 
-`Returns_ERP_v20` 의 base 는 `staging` 이고 **staging 머지는 곧 배포**다. 이 레포에서는 DONE 모드가 **PR 생성까지만** 하고 **머지는 사람이 한다.** `/cd` 이 머지를 대행하면 "완료 처리 = 배포"가 되어, 문서 정리 의도로 실행한 명령이 라이브 배포를 트리거한다. 따라서 이 레포의 task 는 `unmerged` (PR 열림) → **In Review 보고에서 멈춘다.** 이후 사람이 머지한 뒤 `/cd` 을 다시 실행하면 `merged` 판정으로 정상 마감된다.
+`lens.config.json` 의 `syncPolicy[<레포 폴더명>]` 이 `"pr-manual"` 이면 그 레포의 base 병합은 **곧 배포**다(지금은 `Returns_ERP_v20` → `staging`). 이 레포에서는 `/cd` 가 **PR 생성까지만** 하고 **머지는 사람이 한다** — 문서 정리 의도로 부른 명령이 라이브 배포를 트리거하면 안 된다. task 는 `unmerged` (PR 열림) → **In Review 보고에서 멈추고**, 사람이 머지한 뒤 `/cd` 를 다시 부르면 `merged` 로 마감된다.
+
+레포 이름을 본문에 박지 않는다. **새로 staging 을 두는 레포(예: snapholo)** 는 `syncPolicy` 에 한 줄(`"snapholo-web": "pr-manual"`)과 `baseBranch` 에 `"staging"` 을 넣으면 같은 규칙을 탄다. `pr-manual` 이 아닌 레포의 base 병합은 배포가 아니다(snapholo 는 `ship` 명령으로만 배포) — Phase 1.6 이 직접 병합한다.
 
 #### 1.5.4 In Review 보고 형식
 
@@ -184,18 +197,35 @@ In Review — history 로 내리지 않았습니다 (머지 미확인)
 
 `unknown` 은 같은 표에 `unknown (병합 증명 불가 — 사람 확인 필요)` 로 싣고, 무엇을 확인해야 하는지(어느 브랜치의 어느 커밋인지)까지 적는다.
 
-### Phase 2: 완료 인터뷰
+### Phase 1.6: 병합 (v3.52 — `pr-manual` 이 아닌 레포)
 
-Task 파일의 내용을 읽은 후, 5개 질문으로 결과를 수집합니다.
-AskUserQuestion을 사용하여 한 번에 물어봅니다:
+Phase 1.5 가 `unpushed` · `unmerged`(PR 없음/열림) 를 낸 task 는 **여기서 병합하고 Phase 1.5 를 다시 돈다.** Phase 1.3 승인이 「이 task 를 닫아라」였으므로 다시 묻지 않는다. 단 `syncPolicy: pr-manual` 레포는 병합하지 않고 PR 만 만든 뒤 In Review 로 멈춘다(1.5.3).
 
-```
-Q1. 무엇을 했나요? (한두 문장 요약)
-Q2. 주요 결정 사항은? (왜 이 방식으로?)
-Q3. 변경된 파일들은?
-Q4. 어떻게 검증했나요?
-Q5. 남은 작업이나 주의사항? (선택)
-```
+1. **열린 PR 이 있으면** — `gh pr merge <번호> --repo <OWNER/REPO> --merge` (squash 아님 — 판정이 merge 커밋을 증거로 읽는다). head 삭제는 Phase 2.5 가 lease 로 한다(`--delete-branch` 쓰지 않음).
+2. **PR 이 없으면** — base 가 체크아웃된 워크트리(`git worktree list` 에서 `[<base>]`)로 가서:
+   ```bash
+   git fetch origin
+   git merge --ff-only origin/<base>          # 로컬 base 를 원격에 맞춘다
+   git merge --no-ff <branch> -m "Merge <branch> — <task 제목>"
+   git push origin <base>
+   ```
+   `unpushed`(로컬에만 있는 브랜치)도 같은 경로다 — base 에 병합해 push 하면 내용이 원격에 남는다.
+3. **멈추는 경우(병합하지 않고 보고)** — 병합 충돌(`git merge --abort` 후 충돌 파일 보고) · base 워크트리에 미커밋 변경 · task 브랜치 워크트리에 미커밋 변경(그 작업이 브랜치에 아직 없다) · push 거부(원격 진전 — fetch 후 재실행). force 는 어떤 경우에도 쓰지 않는다.
+4. 병합 뒤 **Phase 1.5 재판정** → `merged` 가 나와야 다음으로 간다.
+
+### Phase 2: 완료 내용 수집 (묻지 않는다 — v3.52)
+
+대표에게 질문하지 않는다. 아래 다섯 칸을 **문서와 git 에서 직접** 채운다 — 답은 이미 거기 있다.
+
+| 칸 | 출처 |
+|---|---|
+| 무엇을 했나 | 계획서 `## 🎯 What`/목표 + `## 진행상황` 마지막 갱신 |
+| 주요 결정 | 계획서 결정 표·Plan B 전환 기록·`## 진행상황` 의 편차 |
+| 변경 파일 | `git diff --stat <시작 SHA>..<병합 커밋>` (시작 SHA = 진행상황 「작업 브랜치」 줄 / `never-branched` 면 계획서 created 이후 base 커밋 중 계획서 파일 목록에 걸리는 것) |
+| 검증 | 계획서 `✅ 검증` 표의 통과 판정 + /cc QA 결과 |
+| 남은 일 | 미체크 항목·`재개 포인트`·보류 사유 |
+
+출처에 없는 칸은 「기록 없음」으로 둔다 — 지어내지 않는다.
 
 ### Phase 2.5: 브랜치 정리 (v3.25+ — 아카이브 전 게이트)
 
@@ -240,6 +270,8 @@ lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "
 - 로컬 ref 가 **존재하는데** tip 이 판정 SHA 와 다르면 — 그것이 진짜 push 안 된 로컬 커밋이다 → 지우지 않고 "로컬에 미푸시 커밋 있음 — 삭제 보류" 로 보고한다.
 - 그 외 모든 경우(`unknown`·`unmerged`·판정 SHA 없음·증명 없음)에는 **`-D` 금지가 그대로다.** 여기서 열리는 것은 "**증명이 끝난** 브랜치의 중복 조상 검사 우회" 하나뿐이고, "증명 없는 강제 삭제" 는 열리지 않는다.
 
+**task 브랜치가 다른 워크트리에 있으면(v3.52)** — 그 워크트리에 미커밋 변경이 없으면 `git worktree remove <경로>`(force 없이) 후 위 로컬 삭제를 한다. 미커밋 변경이 있으면 이동 실패와 같은 fail-closed. 아카이브(Phase 3·4)는 base 가 체크아웃된 워크트리에서 한다 — task 워크트리 안에서는 `git checkout <base>` 가 「already checked out」으로 거부된다.
+
 **체크아웃된 브랜치 — skip 이 아니라 base 로 이동 후 삭제** — `/cc` 가 task 브랜치를 만들어 그 위에서 작업을 끝내고 곧바로 `/cd` 을 실행하는 것이 **가장 흔한 사용 경로**이고, 그 시점에 삭제 대상 task 브랜치가 체크아웃돼 있는 것은 **정상 상태**다. 여기서 로컬 삭제를 "체크아웃 중"이라고 건너뛰고 아카이브로 진행하면, Phase 3(history 작성)·Phase 4(task 삭제)의 문서 변경이 **이미 머지됐고 원격 ref 도 지워진 그 브랜치 위에서** 커밋된다 — 완료 기록이 base 에 영영 도달하지 못하고 고립된다. 아카이브는 **정리가 지속될 브랜치 위에서** 실행돼야 한다. 따라서 삭제 대상 `branch` 가 현재 체크아웃돼 있으면:
 
 1. 이 검사·이동은 이 task 브랜치 정리의 **첫 단계**다 — 원격 lease 삭제보다도 먼저 실행한다. 이동에서 멈출 때 "원격만 지워진" 어중간한 상태를 만들지 않기 위해서다.
@@ -282,27 +314,40 @@ lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "
 **완료일**: YYYY-MM-DD
 
 ## 요약
-{Q1 답변}
+{무엇을 했나}
 
 ## 주요 결정 사항
-{Q2 답변 — 리스트 형식}
+{주요 결정 — 리스트 형식}
 
 ## 변경 파일
-{Q3 답변 — 파일 경로 리스트}
+{변경 파일 — 경로 리스트}
 
 ## 테스트 & 검증
-{Q4 답변}
+{검증}
 
 ## 추가 사항
-{Q5 답변, 있을 시}
+{남은 일, 있을 시}
 ```
 
-### Phase 4: 정리
+### Phase 4: 정리 · 커밋 · 푸시
 
 > Phase 2.5(브랜치 정리)를 **삭제 성공 또는 정당한 skip** 으로 통과한 task 만 여기 도달한다. 삭제를 시도했다 거부·실패한 task 는 Phase 2.5 에서 멈춰 `docs/tasks/` 에 그대로 남아 있다.
 
 1. `docs/tasks/`에서 원본 Task 파일 **삭제**
 2. 그 엔진의 todo 도구(Claude `TodoWrite` · Codex `update_plan`, 없으면 계획서 `📌 진행 체크리스트`) 항목 전부 `completed` 처리
-3. 완료 메시지 표시: 생성된 history 파일 경로 + 삭제된 task 파일 + **Phase 2.5 의 브랜치 정리 결과** — 삭제된 브랜치(로컬/원격) 또는 삭제하지 않은 사유(skip 사유 포함)
+3. **커밋·푸시 (v3.52)** — history 추가와 task 삭제(같은 slug 의 `.research.md`·`.files` 포함)를 base 위에서 한 커밋으로:
+   ```bash
+   git add docs/history/<id>.md && git rm -q --cached --ignore-unmatch docs/tasks/<id>.* && git add -u docs/tasks
+   git commit -m "docs(history): <task 제목> — 완료"
+   git push origin <base>
+   ```
+   `syncPolicy: pr-manual` 레포는 base push 가 곧 배포라 `docs/history-<slug>` 브랜치로 push 하고 PR 만 연다. push 거부면 `git pull --rebase origin <base>` 한 번 후 재시도, 그래도 거부면 보고하고 멈춘다(force 금지).
+4. **워크트리·브랜치 일괄 정리 (v3.52)** — 이번 task 만이 아니라 **이 레포에서 병합이 증명된 모든 브랜치와 그 워크트리**를 지우고 원래 체크아웃의 base 를 원격에 맞춘다. 작업자 브랜치(`<branch>-*`)는 계획서에 기록이 없어 Phase 2.5 가 못 본다 — 이 단계가 줍는다:
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py" --repo <base 워크트리> --finish
+   ```
+   판정·lease·열린 PR 보호는 기존 정리 도구 그대로다. 미커밋 변경·잠김·한 번도 push 안 된 워크트리(다른 세션이 막 만든 것일 수 있다)는 남기고 사유를 보고한다. 브랜치 없는(detached) 워크트리는 지우지 않고 목록만 보고한다. gh 를 못 쓰는 환경(열린 PR 보호 검사 불가)이면 차단으로 끝난다 — 보고하고 넘어간다.
+   **현재 세션이 지울 워크트리 안에 있으면** 먼저 base 워크트리로 작업 위치를 옮긴다 — 자기 폴더는 지워지지 않는다.
+5. 완료 메시지 표시: history 파일 + 커밋 SHA·push 결과 + 삭제한 브랜치(원격/로컬)·워크트리 + 남긴 것과 사유
 
 ---
