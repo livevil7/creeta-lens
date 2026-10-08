@@ -1,3 +1,26 @@
+## [3.52.0] - 2026-10-08
+
+### Added (v3.52.0)
+
+### Changed (v3.52.0)
+
+### Fixed (v3.52.0)
+
+## [3.52.0] - 2026-10-08
+
+**`/cd` 가 끝까지 닫는다.** 대표 지시(2026-10-08): *"cd로 마무리를 하면 문서화해서 정리를 하고, 커밋하고 푸시하고, 워크트리 브랜치 까지 다 정리하게끔"* · *"cd 개선을 하라고. 내가 불편하니까."* 실측: snapholo-data 에 병합 끝난 워크트리 21개·원격 브랜치 21개가 남고 원래 체크아웃 main 이 42커밋 뒤처졌다. web 계획서 15개는 브랜치 없이 main 에서 작업해 영원히 닫히지 않았다.
+
+### Added (v3.52.0)
+
+- `scripts/prune_branches.py --finish` — fetch → 원래 체크아웃의 base fast-forward → 원격·로컬 병합 브랜치 삭제 → 그 워크트리 제거를 한 번에. 판정·lease·열린 PR 보호는 기존 경로 그대로.
+- `scripts/prune_finish.test.py` — 임시 레포 실측: base 최신화 · 병합 워크트리 제거 · 미커밋 워크트리 유지 · push 안 된 워크트리 유지. 7/7.
+- `never-branched` 판정(`lens-cli branch merged … --no-pr`) — ref 도 PR 도 없는 계획서는 지킬 것이 없으니 아카이브한다(`lib/git-branch.js`).
+
+### Changed (v3.52.0)
+
+- `skills/cd/SKILL.md` — Phase 1.6 병합 신설(`syncPolicy: pr-manual` 레포는 PR 까지만) · Phase 2 질문 5개 삭제, 계획서·git 에서 채움 · Phase 4 에 커밋·푸시와 `--finish` 일괄 정리 · 1.5.3 의 Returns_ERP 고정 예외를 설정 규칙으로(snapholo 가 staging 을 두면 config 한 줄).
+- `prune_branches.py` 로컬 삭제 — 다른 워크트리에 체크아웃된 브랜치를 그대로 지워 그 워크트리 HEAD 를 깨뜨리던 것을, 깨끗하면 워크트리부터 지우고 아니면 건너뛰게.
+
 ## [3.51.0] - 2026-09-25
 
 **`/cp`·`/cc` 에 Jev 레인.** 대표 지시(2026-09-25): *"lens에서 cp를 하건 cc를 하건 할때 쓸수 있는 모델에 jev를 추가"* · *"snapholo 세션에서 … jev가 어떤 경우에 유용한지 이미 데이터로 검증"*. Jev 는 글을 쓰지 않는 판별 전용 모델이라 `Agent` 모델이 아니라 Codex 와 같은 외부 레인으로 붙였다. 쓰는 자리는 SnapHolo 실측(`snapholo/docs/tasks/2026-09-24-jev-ai-evaluation.md` — 208건 175초 · $0.29 · 문턱 0.80 위 44/44)을 그대로 옮겼다.
