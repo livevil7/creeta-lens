@@ -21,8 +21,8 @@
       "homepage": "https://github.com/livevil7/creeta-lens",
       "repository": "https://github.com/livevil7/creeta-lens",
       "source": {
-        "source": "github",
-        "repo": "livevil7/creeta-lens",
+        "source": "url",
+        "url": "https://github.com/livevil7/creeta-lens.git",
         "ref": "v3.52.1"
       },
       "license": "MIT",
