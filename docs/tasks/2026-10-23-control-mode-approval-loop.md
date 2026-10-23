@@ -15,6 +15,7 @@ repo: creeta-lens
 base: master
 branch: feat/control-mode-approval-loop
 pr: null
+last_tip: 6d99389780a84c049edf600a717f027925ab4db0
 refs: [https://claude.ai/artifact/LDAd7pY2twdYyb1eU6aY6j, docs/tasks/2026-10-23-control-mode-approval-loop.research.md, docs/tasks/2026-10-03-shared-plan-channel.md, docs/tasks/2026-09-14-cc-nonstop-execution.md]
 shown: https://claude.ai/artifact/UjNe5owEnFx8M8sRPx5eqw
 ---
