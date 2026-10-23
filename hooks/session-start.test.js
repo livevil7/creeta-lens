@@ -240,5 +240,59 @@ test('continuation with a corrupt board recovers instead of throwing', () => {
   assert.ok(fs.existsSync(boardPath(p.sid)));
 });
 
+console.log('\n== stalled-plan line from the plan-scan cache only (v3.53 A4) ==');
+
+/** A cache as `lens-cli plan scan` writes it. */
+function seedScanCache(dir, stalled, scannedAt = '2026-10-23T05:07:00.000Z') {
+  fs.mkdirSync(path.join(dir, '.lens'), { recursive: true });
+  const item = id => ({ id, title: `${id} 제목`, path: `docs/tasks/${id}.md`, status: 'executing', where: '체크 1/3', why: '맡은 세션 없음' });
+  fs.writeFileSync(path.join(dir, '.lens', 'plan-scan.json'), JSON.stringify({
+    root: dir, scannedAt, firstLine: '', stalled: stalled.map(item), waiting: [], parked: [], approved: [item('2026-10-20-live')], done: [], unknown: [],
+  }));
+}
+const hhmm = iso => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+test('cache with 1 stalled plan → one line with the scan time, and Recent Plans from the cache', () => {
+  const p = newProject();
+  seedScanCache(p.dir, ['2026-10-21-a']);
+  const out = runHook(p, payload(p, 'startup'));
+  const line = `[Lens] 멈춘 계획 1건 (스캔 ${hhmm('2026-10-23T05:07:00.000Z')} 기준) — /cp 로 보기`;
+  assert.ok(context(out).startsWith(line), context(out).slice(0, 120));
+  assert.ok(String(out.systemMessage).includes(line));
+  assert.match(context(out), /## Recent Plans[\s\S]*\| 2026-10-21 \| 2026-10-21-a 제목 \| executing \(멈춤\) \|/);
+  assert.match(context(out), /\| 2026-10-20 \| 2026-10-20-live 제목 \| executing \|/);
+});
+
+test('no cache → no line and no Recent Plans (plan-state.json is no longer read)', () => {
+  const p = newProject();
+  fs.mkdirSync(path.join(p.dir, '.lens'), { recursive: true });
+  fs.writeFileSync(path.join(p.dir, '.lens', 'plan-state.json'), JSON.stringify({ x: { id: 'x', task: 'old', status: 'approved', createdAt: '2026-10-01' } }));
+  const out = runHook(p, payload(p, 'startup'));
+  assert.ok(!/멈춘 계획/.test(context(out)));
+  assert.ok(!/Recent Plans/.test(context(out)));
+});
+
+test('compact → no stalled line even with a cache', () => {
+  const p = newProject();
+  seedScanCache(p.dir, ['2026-10-21-a']);
+  assert.ok(!/멈춘 계획/.test(context(runHook(p, payload(p, 'compact')))));
+});
+
+test('workspace folder → caches one level down are summed', () => {
+  const p = newProject();
+  seedScanCache(path.join(p.dir, 'repo-a'), ['2026-10-21-a']);
+  seedScanCache(path.join(p.dir, 'repo-b'), ['2026-10-22-b', '2026-10-22-c']);
+  assert.match(context(runHook(p, payload(p, 'startup'))), /^\[Lens\] 멈춘 계획 3건 /);
+});
+
+test('the hook finishes within 1 s with a cache present (budget 5 s covers everything)', () => {
+  const p = newProject();
+  seedScanCache(p.dir, ['2026-10-21-a']);
+  const t0 = Date.now();
+  runHook(p, payload(p, 'startup'));
+  const ms = Date.now() - t0;
+  assert.ok(ms < 1000, `${ms}ms`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

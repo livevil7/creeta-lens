@@ -14,7 +14,12 @@
  *   node lens-gate.js evidence <scope> <gateId> --note <관측> --confirmed-by <누가> [--root <repo>]
  *   node lens-gate.js abandon <scope> <gateId> --reason <사유> [--root <repo>]
  *   node lens-gate.js reopen <scope> [gateId] [--root <repo>]
- *   node lens-gate.js close <scope> [--root <repo>]
+ *   node lens-gate.js close <scope> [--status cancelled --reason <사유>] [--root <repo>]
+ *
+ * v3.53: the plan document's `status:` follows the ledger — create → executing,
+ * reopen → executing, close → done only when unmet·abandoned·invalid are all 0
+ * (a closed ledger is not a met goal), otherwise blocked + which gate and why.
+ * A missing document or a failed write is a `planWarning`, never a failure.
  *
  * gates JSON = [{id, criterion, kind?:'auto'|'manual', check?, expect?, cwd?}]
  * Output: one JSON line. Exit 0 = the command did its job (read the states in the
@@ -28,6 +33,7 @@ const path = require('path');
 const { spawn, execFileSync } = require('child_process');
 
 const ledger = require(path.join(__dirname, '..', 'lib', 'gate-ledger'));
+const { setPlanStatus } = require(path.join(__dirname, '..', 'lib', 'plan-scan'));
 
 const RUN_TIMEOUT_S = 600;
 const PROBE_TIMEOUT_S = 120; // create's one trial run (G2)
@@ -146,6 +152,23 @@ function gateCwd(root, gate) {
   return gate && gate.cwd ? path.resolve(root, gate.cwd) : root;
 }
 
+/** Write the plan's status line; the ledger command already did its job, so problems are warnings. */
+function syncPlan(root, l, status, opts) {
+  if (!l || !l.planDoc) return {};
+  const r = setPlanStatus(path.resolve(root, l.planDoc), status, opts);
+  return r.ok ? { plan: r } : { planWarning: `계획서 상태를 못 썼다(${l.planDoc}): ${r.error}` };
+}
+
+/** `G2 미충족 · G3 포기(사유)` — what kept a closed ledger from being done. */
+function openGates(l) {
+  const words = { abandoned: '포기', invalid: '무효' };
+  return (l.gates || [])
+    .map(g => ({ g, st: ledger.gateState(g, l.schema) }))
+    .filter(x => x.st !== 'met')
+    .map(x => `${(x.g && x.g.id) || '?'} ${words[x.st] || '미충족'}${x.st === 'abandoned' ? `(${x.g.abandonReason})` : ''}`)
+    .join(' · ');
+}
+
 const isAuto = gate => String((gate && gate.kind) || (gate && gate.check ? 'auto' : 'manual')).toLowerCase() !== 'manual';
 
 // ── commands ─────────────────────────────────────────────
@@ -215,13 +238,17 @@ async function create(root, scope, flags) {
     probes.push({ id, exit: r.exit, timedOut: r.timedOut });
   }
 
+  // Stored relative to the repo root, so any checkout of this repo resolves it.
+  const planDoc = typeof flags.plan === 'string'
+    ? path.relative(root, path.resolve(root, flags.plan)).split(path.sep).join('/')
+    : null;
   const made = ledger.createLedger(root, {
     scope,
-    planDoc: typeof flags.plan === 'string' ? flags.plan : null,
+    planDoc,
     goal: typeof flags.goal === 'string' ? flags.goal : null,
     gates,
   });
-  return made.ok ? { ...made, scope: ledger.sanitizeScope(scope), probes } : made;
+  return made.ok ? { ...made, scope: ledger.sanitizeScope(scope), probes, ...syncPlan(root, { planDoc }, 'executing') } : made;
 }
 
 async function run(root, scope, gateId, flags) {
@@ -282,12 +309,25 @@ async function main() {
     case 'abandon':
       if (!scope || !gateId) return { ok: false, error: 'abandon <scope> <gateId> --reason <사유>' };
       return ledger.abandonGate(root, scope, gateId, typeof flags.reason === 'string' ? flags.reason : '');
-    case 'reopen':
+    case 'reopen': {
       if (!scope) return { ok: false, error: 'reopen <scope> [gateId]' };
-      return ledger.reopenLedger(root, scope, gateId);
-    case 'close':
+      const r = ledger.reopenLedger(root, scope, gateId);
+      return r.ok ? { ...r, ...syncPlan(root, readLedger(root, scope), 'executing') } : r;
+    }
+    case 'close': {
       if (!scope) return { ok: false, error: 'close <scope>' };
-      return ledger.closeLedger(root, scope);
+      const cancel = flags.status === 'cancelled';
+      if (flags.status !== undefined && !cancel) return { ok: false, error: 'close --status 는 cancelled 만 받는다' };
+      if (cancel && typeof flags.reason !== 'string') return { ok: false, error: 'close --status cancelled --reason <사유>' };
+      const before = readLedger(root, scope);
+      const r = ledger.closeLedger(root, scope);
+      if (!r.ok) return r;
+      if (cancel) return { ...r, cancelled: flags.reason, ...syncPlan(root, before, 'cancelled', { reason: flags.reason }) };
+      const open = r.unmet + r.abandoned + r.invalid;
+      return open
+        ? { ...r, ...syncPlan(root, before, 'blocked', { reason: openGates(before) }) }
+        : { ...r, ...syncPlan(root, before, 'done') };
+    }
     default:
       return { ok: false, error: `알 수 없는 명령: ${cmd || '(없음)'} — status|create|run|evidence|abandon|reopen|close` };
   }

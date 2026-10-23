@@ -94,6 +94,10 @@ echo "[7/9] skills/cs/SKILL.md"
 sed "${SEDI[@]}" -E "s/Creeta Install v[0-9]+\.[0-9]+(\.[0-9]+)?/Creeta Install v$NEW_VERSION/g" skills/ci/SKILL.md
 echo "[8/9] skills/ci/SKILL.md"
 
+# 8b. skills/ct/SKILL.md (Lens Control banner) — v3.53
+sed "${SEDI[@]}" -E "s/Lens Control v[0-9]+\.[0-9]+(\.[0-9]+)?/Lens Control v$NEW_VERSION/g" skills/ct/SKILL.md
+echo "[8b/9] skills/ct/SKILL.md"
+
 # 9a. CLAUDE.md (Current version + Updated date)
 sed "${SEDI[@]}" -E "s/Current: \*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*/Current: **v$NEW_VERSION**/" CLAUDE.md
 sed "${SEDI[@]}" -E "s/Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Updated: $TODAY/" CLAUDE.md
@@ -134,11 +138,12 @@ COUNT=$(grep -rl "v$NEW_VERSION\|\"$NEW_VERSION\"" \
   skills/cp/SKILL.md \
   skills/cs/SKILL.md \
   skills/ci/SKILL.md \
+  skills/ct/SKILL.md \
   CLAUDE.md \
   README.md \
   CHANGELOG.md 2>/dev/null | wc -l)
 
-echo "Files with v$NEW_VERSION: $COUNT/11 (+README, +CHANGELOG)"
+echo "Files with v$NEW_VERSION: $COUNT/13"
 
 # Check stale version remnants — any v[0-9].[0-9].[0-9] that is NOT the new
 # version, across version-bearing files (excludes CHANGELOG and docs/history

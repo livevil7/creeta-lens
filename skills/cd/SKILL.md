@@ -17,7 +17,7 @@ Triggers: done, complete, finish task, close out, wrap up, 완료, 완료 처리
 
 > **왜 `/cp` 에서 분리했나 (v3.34)**: `/cp` 1,526줄 중 294줄(19%)이 이 모드였고, 그 대부분이 git 배관이다. 계획을 세우는 일과 끝난 일을 닫는 일은 서로 다른 활동이라, 한 스킬에 두면 계획을 하려고 부를 때마다 완료 처리 절차가 통째로 컨텍스트에 실렸다. **`/cp` = 이번 작업의 계획, `/cd` = 그 작업의 종료.**
 
-**진입**: 인자가 있으면 그 task, 없으면 `docs/tasks/` 를 스캔해 체크리스트가 전부 완료된 문서를 찾아 **AskUserQuestion 으로 제안**한다. 자동 실행하지 않는다.
+**진입**: 인자가 있으면 그 task, 없으면 `docs/tasks/` 를 스캔해 체크리스트가 전부 완료된 문서를 찾아 **AskUserQuestion 으로 제안**한다. 자동 실행하지 않는다. 입력이 `{repo, plan, session}` 목록이면(관제 `/ct 마감`) 맨 아래 **일괄 모드**로 간다.
 
 ---
 
@@ -337,10 +337,11 @@ lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "
 2. 그 엔진의 todo 도구(Claude `TodoWrite` · Codex `update_plan`, 없으면 계획서 `📌 진행 체크리스트`) 항목 전부 `completed` 처리
 3. **커밋·푸시 (v3.52)** — history 추가와 task 삭제(같은 slug 의 `.research.md`·`.files` 포함)를 base 위에서 한 커밋으로:
    ```bash
-   git add docs/history/<id>.md && git rm -q --cached --ignore-unmatch docs/tasks/<id>.* && git add -u docs/tasks
+   git add docs/history/<id>.md && git rm -q --cached --ignore-unmatch docs/tasks/<id>.*
    git commit -m "docs(history): <task 제목> — 완료"
    git push origin <base>
    ```
+   **스테이징은 그 계획의 경로만 (v3.53)** — history 한 파일과 `docs/tasks/<id>.*`(task·sidecar) 삭제뿐이다. `git add -u docs/tasks` 처럼 폴더째 올리지 않는다 — 같은 레포에서 다른 세션이 고치던 계획서까지 이 커밋에 실린다. `<id>.*` 는 git pathspec 이 푼다(파일이 이미 지워져 셸 glob 이 비어도 된다).
    `syncPolicy: pr-manual` 레포는 base push 가 곧 배포라 `docs/history-<slug>` 브랜치로 push 하고 PR 만 연다. push 거부면 `git pull --rebase origin <base>` 한 번 후 재시도, 그래도 거부면 보고하고 멈춘다(force 금지).
 4. **워크트리·브랜치 일괄 정리 (v3.52)** — 이번 task 만이 아니라 **이 레포에서 병합이 증명된 모든 브랜치와 그 워크트리**를 지우고 원래 체크아웃의 base 를 원격에 맞춘다. 작업자 브랜치(`<branch>-*`)는 계획서에 기록이 없어 Phase 2.5 가 못 본다 — 이 단계가 줍는다:
    ```bash
@@ -348,6 +349,33 @@ lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "
    ```
    판정·lease·열린 PR 보호는 기존 정리 도구 그대로다. 미커밋 변경·잠김·한 번도 push 안 된 워크트리(다른 세션이 막 만든 것일 수 있다)는 남기고 사유를 보고한다. 브랜치 없는(detached) 워크트리는 지우지 않고 목록만 보고한다. gh 를 못 쓰는 환경(열린 PR 보호 검사 불가)이면 차단으로 끝난다 — 보고하고 넘어간다.
    **현재 세션이 지울 워크트리 안에 있으면** 먼저 base 워크트리로 작업 위치를 옮긴다 — 자기 폴더는 지워지지 않는다.
+   **`lens.config.json` 의 `autoDeleteMergedBranch` 가 `false` 면 이 단계를 통째로 건너뛴다 (v3.53)** — Phase 2.5 가 지키는 설정을 마지막 정리가 어기면 설정이 반쪽이 된다. 완료 메시지에 「브랜치·워크트리 정리 건너뜀 — autoDeleteMergedBranch:false」 한 줄과 남은 가지·워크트리 목록(`git worktree list` · `git branch -r`)을 적는다.
+   종료 코드 1(차단·삭제 실패·base 최신화 실패)이면 「미완」으로 보고한다 — 0 이 아니면 일부만 지워졌을 수 있다. 무엇이 남았는지는 `--json` 을 붙이면 `failed[{name,reason}]` 로 나온다. `failed` 가 비어 있고 `base_updated:false` 만이면 삭제는 끝났고 base 체크아웃만 손으로 맞추면 된다(로컬에만 있는 커밋·미커밋 변경) — 그렇게 구분해 보고한다.
 5. 완료 메시지 표시: history 파일 + 커밋 SHA·push 결과 + 삭제한 브랜치(원격/로컬)·워크트리 + 남긴 것과 사유
 
 ---
+
+## 일괄 모드 (v3.53 — 여러 세션·레포를 한 번에 닫기)
+
+관제 세션의 `/ct 마감`이 부르거나, 입력이 `{repo, plan, session}` 목록이면 이 모드다. 목록이 없으면 위 단건 절차를 그대로 탄다 — 단건 `/cd` 는 바뀌지 않는다.
+
+1. **전건 판정 (읽기 전용)** — 목록의 각 계획을 그 레포에서:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" cd inspect <repo>/docs/tasks/<plan>.md --json
+   ```
+   → `{closable, reasons[], remaining[], ledger, waitingOn}`. `closable:true` 이고 Phase 1.5 git 판정이 `merged`/`patch-merged`/`merged-deleted`(병합 뒤 head 삭제 — 정상 흐름)/`never-branched`(가지 없이 base 에서 완료)/`unmerged`(병합 가능)인 것이 마감 후보다 — 단건 절차와 같은 상태표(위 1.5 표)를 쓴다. frontmatter 에 `branch` 가 없는 옛 계획서는 1.5 를 건너뛰고 후보로 둔다(1.5.1 하위호환). 나머지는 「보류」 — `reasons` 를 그대로 사유로 쓴다. 이 단계는 아무것도 쓰지 않는다.
+2. **묶음 승인 한 번 (정지 지점)** — 후보 전부를 표 하나로 보여 주고 한 번만 묻는다. 표 칸: 레포 / 계획 / 지울 가지(원격·로컬) / 지울 워크트리 경로 / `remaining` 의 수동 확인 항목. 지울 목록은 그 계획 frontmatter `branch` 와 `git worktree list` 에서 그 가지를 쥔 경로다 — **`<가지>-*` 작업자 가지는 자동으로 넣지 않는다**(다른 세션 가지일 수 있다). 넣을 작업자 가지가 있으면 표에 이름을 직접 적어 승인받는다. 질문 header 는 기존 `작업 완료 — 기존 task 정리`. **관제 모드(관제 표식이 켜져 있음)면** AskUserQuestion 대신 관제판에 같은 표를 올리고 그 답을 승인으로 받는다. 승인에서 빠진 계획은 「보류」로 남긴다.
+3. **실행 — 레포 간 병렬 · 같은 레포 직렬** — 승인된 계획마다 단건 절차 Phase 1.5 → 1.6 → 2 → 2.5 → 3 → 4(1~3)를 돈다. 같은 레포의 두 계획을 동시에 돌리지 않는다(base push·lease 가 서로 거부된다). Phase 4 의 4번(레포 전체 `--finish`)은 **부르지 않는다.**
+4. **레포마다 마지막에 한 번 — 승인된 목록만 정리**:
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py" --repo <base 워크트리> --finish --json --only <승인된 가지,…>
+   ```
+   `--only` 는 이름이 정확히 같은 가지와 그 워크트리만 지운다. 목록 밖에서 병합이 증명된 가지는 `skipped` 에 「범위 밖」으로만 남는다. 결과는 `{removed_remote[], removed_local[], removed_worktrees[], skipped[{name,reason}], failed[{name,reason}], base_updated}` — `failed` 가 비지 않았거나 `base_updated:false` 면 종료 1, 그 레포는 「미완」이다. `autoDeleteMergedBranch:false` 면 이 단계도 건너뛴다(Phase 4 와 같다). 다시 불러도 안전하다 — 이미 지운 가지는 `skipped` 「이미 정리됨」.
+5. **`pr-manual` 레포** — 1.5.3 그대로: PR 까지만 만들고 「In Review」로 둔다. history·task 이동·`--finish` 는 하지 않고, 다음 마감 때 다시 판정한다.
+6. **Notion·운영 반영 확인** — 계획서 `✅ 검증` 표의 `manual` 행(= `inspect` 의 `remaining` 「검증 #N 수동 확인」)과, 운영 배포가 있었던 계획이면 Notion 「배포 기록」 행 유무를 **확인 항목으로 보고**한다. Notion MCP 가 연결돼 있을 때만 작업 상태를 쓴다. 연결이 없으면 쓰지 않고 「Notion 미반영」 한 줄을 남긴다.
+7. **보고 표**:
+
+   | 레포 | 계획 | 판정 | 폴더(task→history) | 가지 원격·로컬 전→후 | 워크트리 전→후 |
+   |---|---|---|---|---|---|
+
+   판정은 「완료」(history 커밋·정리 끝) · 「In Review」(pr-manual, PR 번호) · 「보류」(사유 = `reasons` 또는 실패한 단계). 전→후 숫자는 정리 전후 `git branch -r`·`git branch`·`git worktree list` 를 세서 적고, `--finish --json` 결과의 `failed` 는 표 아래에 그대로 싣는다. 확인 항목(수동 검증·Notion)은 그 아래 따로.

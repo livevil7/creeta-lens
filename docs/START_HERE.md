@@ -4,10 +4,11 @@ This is the first document to read for `creeta-lens`.
 
 ## What This Repo Does
 
-`creeta-lens` is the **source repository of the Lens plugin** for Claude Code — a plan-first execution engine + multi-repo git sync + machine tooling manager. It ships nine user-invocable skills:
+`creeta-lens` is the **source repository of the Lens plugin** for Claude Code — a plan-first execution engine + multi-repo git sync + machine tooling manager. It ships eleven user-invocable skills:
 
 - `/cc` — parallel multi-agent execution (Leader → Workers → Supervisor → QA)
 - `/cp` — plan-first execution (계획서 작성·승인). 완료 처리는 `/cd`, 문서 구조·플로우차트는 `/cps` (`/cps flow` 는 단계↔엔진↔종속 그림을 `docs/rules/flow.md` 하나로 만든다 — HTML 뷰어는 v3.42 폐지)
+- `/ct` — 관제탑: 여러 Claude Code 세션을 역할 이름으로 묶어 배정·보고·관제판 결정·점검(멈춘 계획)·일괄 마감 (`skills/ct/SKILL.md`, Claude Code 전용)
 - `/cps` — generates `docs/START_HERE.md`, a repo orientation + question-routing entry point
 - `/cs` — multi-repo git synchronizer
 - `/ci` — per-user plugin install synchronizer (manifest ↔ installed; installs missing, removes only excluded, reports foreign)

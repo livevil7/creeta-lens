@@ -19,13 +19,18 @@
  *    멀 자꾸 하나하나 할라그래 싹 다 하라고." / 2026-08-14: "이제 그만 물어보고 구현하지?"
  *    Once /cc has opened its gate ledger (Phase 0.5) for THIS session and not closed
  *    it (Phase 7.2.5), a run is in progress. During it, a question dialog is allowed
- *    only under one of six headers: the approval before the run, the three stop
- *    kinds, the batched manual-verification check, and the end of the run.
+ *    only under one of seven headers: the approval before the run, the three stop
+ *    kinds, the batched manual-verification check, the end of the run, and /cd's close-out.
  *
  *    What this enforces is the LABEL. The header is written by the model; a mid-run
  *    "이어서 갈까요?" filed under `실행 승인` passes. The hook turns the rule from
  *    something the model can forget into something it has to misstate on purpose —
  *    the definitions of each label live in skills/cc/SKILL.md 「무정지 실행」.
+ *
+ * 3. CONTROL MODE (v3.53). Owner, 2026-10-16: 작업 세션은 자기 창에서 묻지 않고 관제에
+ *    보낸다. While /ct holds a fresh marker (lib/control-mode.js) listing THIS session as
+ *    a participant, every question is refused and pointed at the control session.
+ *    Unrelated sessions, the control session itself and an expired marker pass.
  *
  * Both rules existed as prose first; prose is what the owner watched fail. A refused
  * tool call with a reason is not skippable.
@@ -49,7 +54,8 @@ const MIN_CHARS = 40;
 const TAIL_BYTES = 768 * 1024;
 
 // SoT: skills/cc/SKILL.md 「무정지 실행」. Keep the two in step.
-const RUN_HEADERS = ['실행 승인', '정지:비가역', '정지:외부영향', '정지:범위변경', '검증 확인', '실행 종료'];
+// `작업 완료 — 기존 task 정리` is /cd's own question (skills/cd/SKILL.md).
+const RUN_HEADERS = ['실행 승인', '정지:비가역', '정지:외부영향', '정지:범위변경', '검증 확인', '실행 종료', '작업 완료 — 기존 task 정리'];
 const normHeader = h => String(h || '').replace(/\s+/g, '').replace(/：/g, ':');
 const ALLOWED_HEADERS = new Set(RUN_HEADERS.map(normHeader));
 
@@ -155,7 +161,7 @@ function runProblem(input) {
   const closeCmd = `node "${pluginRoot}/scripts/lens-gate.js" close ${run.scope} --root "${root}"`;
   const evidenceCmd = `node "${pluginRoot}/scripts/lens-gate.js" evidence ${run.scope} <id> --note '<답 원문>' --confirmed-by 대표 --root "${root}"`;
   return `이 세션에 승인된 실행이 열려 있다(게이트 원장 ${run.scope}) — 승인 한 번이면 끝까지 묻지 않고 간다. `
-    + `이 질문("${String(offending[0].header || '').slice(0, 20)}")의 header 는 허용된 여섯 개가 아니다. `
+    + `이 질문("${String(offending[0].header || '').slice(0, 20)}")의 header 는 허용된 header 가 아니다. `
     + '① 되돌리기 어려운 행동(배포·머지=배포·DB 변경·대량 삭제·force push)이면 `정지:비가역`, 발송·외부 게시·유료 대량 호출이면 `정지:외부영향`, '
     + '승인 범위를 넘어야 하면 `정지:범위변경`, 자동 검증을 끝낸 뒤 manual 행 확인이면 `검증 확인`, 실행이 끝났으면 `실행 종료`, 실행 전 승인이면 `실행 승인` 으로 다시 부른다. '
     + '② 그 어느 것도 아니면 묻지 말고 목표 기준으로 판단해 진행하고 편차 기록에 적는다. '
@@ -168,6 +174,14 @@ function main() {
   try { store.bind(input); } catch { /* fail-open */ }
   if ((input && input.tool_name) !== 'AskUserQuestion') return writeJson({});
   if (/^(0|false|off|no)$/i.test(String(process.env.LENS_ASK_GUARD || ''))) return writeJson({});
+
+  let control = null;
+  try { control = require(path.join(PLUGIN_ROOT, 'lib', 'control-mode')).askProblem(input.session_id); } catch { /* fail-open */ }
+  if (control) {
+    return writeJson({
+      hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: `[Lens] ${control}` },
+    });
+  }
 
   const problems = [];
   try {

@@ -36,7 +36,8 @@
     { "id": "approve", "text": "이 계획으로 진행할까요?", "type": "choice", "options": [
       { "label": "지금 실행", "desc": "보내면 바로 실행을 시작합니다 — 검증까지 묻지 않고 진행 · 멈추는 곳: 없음" },
       { "label": "고칠 곳 있음", "desc": "고칠 번호와 방향을 적어 주세요", "text": true },
-      { "label": "계획만 보관", "desc": "승인으로 기록하고 실행은 나중에" } ] }
+      { "label": "일부만 실행", "desc": "행 번호·범위 (예: 1-5,9)", "text": true },
+      { "label": "계획만 보관", "desc": "보관(parked)으로 기록하고 실행은 나중에" } ] }
   ]
 }
 </script>
@@ -74,6 +75,12 @@ function lensCpAnswerText(data, answers) {
   return lines.join('\n');
 }
 
+/* 질문 JSON 이 깨졌으면 null — 블록 자리에 안내 문구를 그린다(10-20 「클릭도 안 되는데」). */
+var LENS_CP_BROKEN = '질문 블록을 읽지 못했습니다 — 채팅으로 답해 주세요';
+function lensCpParse(text) {
+  try { var d = JSON.parse(text); return d && Array.isArray(d.questions) ? d : null; } catch (e) { return null; }
+}
+
 function lensCpOptions(q) {
   var opts = (q.options || []).map(function (o) { return typeof o === 'string' ? { label: o } : o; });
   if (q.other) opts.push({ label: '기타 — 직접 적기', text: true });
@@ -82,8 +89,9 @@ function lensCpOptions(q) {
 
 if (typeof document !== 'undefined') (function () {
   var $ = function (id) { return document.getElementById(id); };
-  var data = JSON.parse($('lens-cp-questions').textContent);
+  var data = lensCpParse($('lens-cp-questions').textContent);
   var form = $('lens-cp-form'), send = $('lens-cp-send'), status = $('lens-cp-status');
+  if (!data) { form.textContent = LENS_CP_BROKEN; send.hidden = true; return; }
   var mk = function (tag, text) { var e = document.createElement(tag); if (text) e.textContent = text; return e; };
 
   data.questions.forEach(function (q, i) {

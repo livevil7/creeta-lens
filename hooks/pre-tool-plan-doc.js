@@ -1,6 +1,6 @@
 /**
  * Lens - PreToolUse Hook (matcher: Write|Edit)
- * The plan is written by the top model tier, or it is not written at all.
+ * The plan is written by the tier its grade needs (v3.53: 기본 = opus+, deep = fable), or not at all.
  *
  * WHY THIS IS CODE (v3.42)
  * ------------------------
@@ -61,9 +61,13 @@ const store = require(path.join(PLUGIN_ROOT, 'lib', 'session-store'));
 // SoT: hooks/pre-tool-task.js TOP_TIER · docs/rules/harness-rules.md §4.1.
 // Matched against the harness's model id (`claude-fable-5-1`), not equality.
 const TOP_TIER = 'fable';
+// v3.53 (owner 2026-10-23): the tier a plan needs follows its grade — 기본 = opus
+// or above (any grade but deep, incl. standard/none), deep = fable. Index = rank; an unknown model ranks -1.
+const TIER_ORDER = ['haiku', 'sonnet', 'opus', 'fable'];
+const tierRank = model => TIER_ORDER.findIndex(t => String(model || '').includes(t));
 
 const PLAN_DOC = /[\\/]docs[\\/]tasks[\\/][^\\/]+\.md$/i;
-const PAST_APPROVAL = /^(approved|executing|in_progress|blocked|done|completed|superseded)$/i;
+const PAST_APPROVAL = /^(approved|executing|in_progress|blocked|parked|done|completed|superseded)$/i;
 const TAIL_BYTES = 512 * 1024;
 
 /** The model of the last assistant turn in the transcript, or null. */
@@ -112,12 +116,25 @@ function subagentTranscript(transcriptPath, agentId) {
   return null;
 }
 
-/** Legacy (no session id): did this session spawn a top-tier agent? (the pen may be in its hand) */
-function topTierDelegated(projectRoot) {
+/** Legacy (no session id): did this session spawn an agent of `need` tier or above? (the pen may be in its hand) */
+function topTierDelegated(projectRoot, need) {
   const board = safeReadJson(path.join(projectRoot, '.lens', 'agent-dashboard.json'), null);
   const agents = board && Array.isArray(board.agents) ? board.agents : [];
-  if (agents.some(a => String(a && a.model || '').includes(TOP_TIER))) return true;
+  if (agents.some(a => tierRank(a && a.model) >= TIER_ORDER.indexOf(need))) return true;
   return Number(board && board.topTierTotal) > 0;
+}
+
+/** The document after this Edit/MultiEdit lands (old→new applied to the disk text). */
+function afterEdit(disk, toolInput) {
+  const edits = Array.isArray(toolInput && toolInput.edits) ? toolInput.edits : [toolInput || {}];
+  let text = disk;
+  for (const e of edits) {
+    const from = e && typeof e.old_string === 'string' ? e.old_string : '';
+    if (!from || !text.includes(from)) continue;
+    const to = typeof e.new_string === 'string' ? e.new_string : '';
+    text = e.replace_all ? text.split(from).join(to) : text.replace(from, () => to);
+  }
+  return text;
 }
 
 /** frontmatter value, from the content being written or the file on disk. */
@@ -145,6 +162,12 @@ function main() {
   if (PAST_APPROVAL.test(field(text, 'status'))) return writeJson({});
   if (/조사보고/.test(field(text, 'kind'))) return writeJson({});
 
+  // The grade is read from what the file will say — an Edit that turns 기본 into deep is a deep plan.
+  const after = (input.tool_input && input.tool_input.content) || afterEdit(text, input.tool_input);
+  const basic = !/^deep$/i.test(field(after, 'grade')); // 레포 어휘: deep 이 아니면 기본 (standard·없음 포함)
+  const need = basic ? 'opus' : TOP_TIER;
+  const needRank = TIER_ORDER.indexOf(need);
+
   try { store.bind(input); } catch { /* no store → the legacy repo dashboard below */ }
   const agentId = store.isSubagentCall(input) ? input.agent_id.trim() : null;
 
@@ -156,24 +179,25 @@ function main() {
     if (!agentId) return writeJson({}); // an unreadable transcript must never trap a session
     model = null;                       // a subagent falls back to the delegation record
   }
-  if (model && model.includes(TOP_TIER)) return writeJson({});
+  if (model && tierRank(model) >= needRank) return writeJson({});
   if (!agentId && !model) return writeJson({}); // unknown model → fail open
 
   // A subagent whose transcript names its model has been judged by it already.
   if (!(agentId && model)) {
     try {
       const delegated = store.current().sessionId
-        ? store.topTierDelegated(TOP_TIER)
-        : topTierDelegated(resolveProjectRoot({ filePath, cwd: input.cwd }));
+        ? TIER_ORDER.slice(needRank).some(t => store.topTierDelegated(t))
+        : topTierDelegated(resolveProjectRoot({ filePath, cwd: input.cwd }), need);
       if (delegated) return writeJson({});
     } catch { /* a broken board is not evidence either way — fall through to deny */ }
   }
 
-  let who = `이 세션은 ${model} 이고 ${TOP_TIER} 위임 기록도 없다.`;
+  const gradeName = basic ? '기본 등급' : 'deep 등급';
+  let who = `이 세션은 ${model} 이고 ${need} 이상 위임 기록도 없다.`;
   if (agentId) {
     who = (model
       ? `이 서브에이전트(${agentId})는 ${model} 이다.`
-      : `이 서브에이전트(${agentId})의 모델을 기록에서 읽지 못했고 이 세션의 ${TOP_TIER} 위임 기록도 없다.`)
+      : `이 서브에이전트(${agentId})의 모델을 기록에서 읽지 못했고 이 세션의 ${need} 이상 위임 기록도 없다.`)
       + ' 서브에이전트는 결과를 리더에게 넘기고, 위임은 리더가 한다.';
   }
 
@@ -182,9 +206,9 @@ function main() {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
       permissionDecisionReason:
-        `[Lens] 계획서는 최상위 티어(${TOP_TIER})가 쓴다 — ${who} `
+        `[Lens] ${gradeName} 계획서는 ${need} 이상이 쓴다(기본 = opus 이상 · deep = ${TOP_TIER}) — ${who} `
         + `계획서는 되돌리기 어려운 결정을 문서에 박는 일이라, 여기서 틀리면 워커 전원이 틀린 것을 정확하게 만든다(harness-rules §4.1). `
-        + `Agent(model: "${TOP_TIER}") 에 Phase 1~2.5 를 위임하되 **컨텍스트를 통째로** 실어 보내라 — 원본 요청 전문 · 목표/왜 · 조사 결과 · 인벤토리 전량 · 관련 docs/rules·docs/history 경로. `
+        + `Agent(model: "${need}") 에 Phase 1~2.5 를 위임하되 **컨텍스트를 통째로** 실어 보내라 — 원본 요청 전문 · 목표/왜 · 조사 결과 · 인벤토리 전량 · 관련 docs/rules·docs/history 경로. `
         + `컨텍스트 없는 위임은 상위 모델이 아니라 무지한 모델을 쓰는 것이다. 그 에이전트가 이 파일을 쓰면 통과한다. `
         + `계획서가 아닌 문서(조사보고)는 frontmatter 에 kind: 조사보고 를 적는다. `
         + 'Agent 를 부를 수 없는 컨텍스트면 `LENS_PLANNER_GATE=0` 으로 끄고 계획서 `planner_model` 에 사유를 적어라.',

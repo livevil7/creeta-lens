@@ -66,7 +66,7 @@ const LEDGER_SINCE = '2026-08-17';
 
 // Once approved, the document is the executor's to update. Approval-screen
 // instructions on those edits are noise.
-const PAST_APPROVAL = /^(approved|executing|in_progress|blocked|done|completed|superseded)$/i;
+const PAST_APPROVAL = /^(approved|executing|in_progress|blocked|parked|done|completed|superseded)$/i;
 
 // A path that only exists on this machine. `~/…` and repo-relative paths are fine.
 const MACHINE_PATH = /(?:\b[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/][^\\/\s`'"]+|\/Users\/[^/\s`'"]+\/|\/home\/[^/\s`'"]+\/)/;

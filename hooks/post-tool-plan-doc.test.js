@@ -111,6 +111,11 @@ test('an approved plan with nothing wrong is silent', () => {
   assert.strictEqual(run(ctx), '');
 });
 
+test('a parked plan (계획만 보관) is past approval — silent like approved', () => {
+  const ctx = setup(PLAN('status: parked'));
+  assert.strictEqual(run(ctx), '');
+});
+
 test('an approved plan still reports a real problem', () => {
   const ctx = setup(PLAN('status: executing') + '\n로그: C:\\Users\\someone\\secret\\run.log\n');
   assert.match(run(ctx), /절대경로/);

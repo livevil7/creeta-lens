@@ -4,8 +4,8 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.52.1**
-- Updated: 2026-10-08
+- Current: **v3.53.0**
+- Updated: 2026-10-24
 - Source of truth: `.claude-plugin/plugin.json`
 - v3.52.0 feat: **`/cd` 가 끝까지 닫는다** — 병합(`pr-manual` 레포는 PR 까지) → 완료 내용은 계획서·git 에서 채움(질문 없음) → history 커밋·푸시 → `prune_branches.py --finish` 로 병합된 브랜치·워크트리 전부 정리 + 원래 체크아웃 base 최신화. 이름만 예약한 계획서는 `never-branched`(`--no-pr`). 테스트 `scripts/prune_finish.test.py`.
 - v3.51.0 feat: **`/cp`·`/cc` 에 Jev 레인** — 항목 N개를 선택지로 판별하는 일(짝 맞추기·분류)을 `scripts/jev.js` 로. 문턱 0.80 · `--one-to-one` 충돌 검사 내장. 세기·숫자·언어 판정·되돌릴 수 없는 자동 반영에는 쓰지 않는다(SnapHolo 실측). SoT: `docs/rules/harness-rules.md` §4.9.1.
@@ -48,6 +48,7 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 |-------|-------------|----------|
 | `/cc` | 개발(빌드) — 병렬 멀티에이전트 엔진 | Scan → Multi-Match → Parallel Execute → Synthesize |
 | `/cp` | 계획 엔진 — **2등급(기본/deep) · 3종류(신규/개선/조사보고)** | 계약 카드 → 목표·왜·종류 + 조기 보고 → 조사 3축 + 외부 레인 → 인벤토리 → 문서(계약 섹션 + 주제가 요구하는 것) → Pre-mortem → Todo 파생·네이티브 등록 → **엔진 네이티브 화면으로 띄우기** → 게이트 → 보고 → 질문 1회. deep = 6축 조사 + Codex 하드게이트 + 빌드레디 태스크 |
+| `/ct` | 관제탑 — 여러 Claude Code 세션을 역할 이름으로 묶어 배정·보고 6줄·관제판 결정·점검·재시작 복구·일괄 마감 (Claude Code 전용) | 표식 on(`lens-cli control`) → 세션 표(ListAgents) → 역할 기준 배정(`templates/ct-assign.md`) → 관제판(`templates/ct-board.html` = cp 질문 블록) → `/ct 점검`(첫 줄 `plan scan` 멈춘 계획) → `/ct 마감`(→ `/cd` 일괄 모드) → off. 백엔드 `lib/control-mode.js` · `hooks/pre-tool-ask.js` 가 참여 세션 질문창을 관제로 돌림 |
 | `/cps` | Repo orientation doc | Scan docs → Assemble 4 sections → Diff gate → Write → Conditional CLAUDE.md pointer |
 | `/cr` | Creeta Research (라이브 딥리서치) | Refine topic → Read live-research substrate → multi-angle parallel gather (Exa·GitHub·YouTube·community·RSS) → cross-check conflicts → report to conversation (no file saved) |
 | `/crv` | Self-modernization audit | Load registry → probe/web native capabilities → classify KEEP/THIN/OBSOLETE + upgrade/ergonomics → (deep) conversation mining → report + /cp handoff → stamp |

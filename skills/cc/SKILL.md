@@ -1,17 +1,17 @@
 ---
 name: "cc"
-description: "Lens Multi v3.52.1 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.53.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.52.1 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.53.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: parallel execution, multi-agent, orchestrate, 병렬 실행, 멀티 에이전트, 동시 실행, 오케스트레이션
 
-You are **Lens Multi v3.52.1**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.53.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -339,7 +339,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" branch ownership . {branch} {ba
 > 실행되면서도 성공·실패 경로 양쪽에서 `{}` 만 냈다 — 벽이 될 자리에 계측기가 있었다. 원장은 그 훅에
 > 판단 근거를 준다. **미충족 게이트가 남아 있으면 턴이 끝나지 않는다.**
 
-`✅ Review` 표(= 핸드오프 `[VERIFICATION]`)의 각 행을 게이트 1개로 옮긴다. `종류=auto` 행은
+`✅ Review` 표(= 핸드오프 `[VERIFICATION]`)의 각 행을 게이트 1개로 옮긴다. **부분 승인(v3.53)이면** 「됐다는 신호」 칸의 `(#n)` 표기가 가리키는 인벤토리 행이 전부 `보류` 인 검증 행은 게이트로 옮기지 않는다 — 승인 안 된 작업이 완료 조건에 끼면 승인 범위만으로는 끝낼 수 없다. 뺀 행 번호는 `## 진행상황` 편차 기록에 적는다(표기가 없는 행은 늘 옮긴다). `종류=auto` 행은
 `check`(실행할 명령)와 `expect`(**성공했을 때만** 출력에 나오는 문자열)를 채우고, `manual` 행은 둘 다 비운다.
 
 **측정할 수 있으면 auto 다** — check 는 실행 가능한 명령이어야 하고 `lens-gate create` 가 확인한다. manual 은 차단 사유가 아니며 보고에 '대표 확인 필요: …' 한 줄로만 나간다. 사용자 화면에 게이트·원장·N/M 같은 내부 용어를 쓰지 않는다. `create` 는 auto 의 check 를 한 번씩 실제로 돌리므로 배포·발송·DB 변경처럼 부작용이 있는 명령은 check 로 쓰지 않는다(그런 행은 manual). check 는 백그라운드 프로세스(`&`, 서버 띄우기)를 남기지 않는다 — Windows 에서는 부모가 먼저 끝난 자식을 시간 초과 때 끝낼 수 없다.
@@ -357,12 +357,13 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" branch ownership . {branch} {ba
 node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" create {plan-id} --plan {plan_doc_path} --goal "{Goal 한 문장}" --gates .lens/{plan-id}.gates.json
 ```
 
+- **계획서 상태 (v3.53)**: `create` 가 계획서 frontmatter `status:` 를 `executing` 으로 쓴다(`--plan` 은 레포 루트 기준으로 저장, 결과의 `plan`). 문서가 없거나 못 쓰면 결과에 `planWarning` 만 남고 원장은 만들어진다 — 경고를 보고에 한 줄. **게이트 0개라 원장을 만들지 않았으면** 직접 쓴다: `node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" plan status {plan_doc_path} executing`.
 - `create` 가 실행할 수 없는 check(명령 없음·실행 불가)를 지목하며 거부하면, 그 행을 실제 명령으로 고치거나 측정할 수 없는 행이면 manual 로 바꿔 다시 만든다.
 - 남은 조건은 `lens-gate status {plan-id}` 로 본다. 원장 JSON 을 직접 읽거나 고치지 않는다.
 - **`expect` 는 성공/실패 양쪽에서 찍히는 문자열이면 안 된다** — 그러면 게이트가 통과를 증명하지 못한다.
 - 원장은 `.lens/gates/` 에 있고 gitignore 다. **실행 상태이지 산출물이 아니다.**
 - 직접 호출(0.2)로 들어왔어도 Leader 가 도출한 SUCCESS_CRITERIA 로 똑같이 만든다. 게이트 0개면 만들지 않는다.
-- **언제 만드나 (v3.40)**: `/cp` 의 `[APPROVED]` 핸드오프면 여기서 만든다. **직접 호출이면 1.5 승인을 받은 직후에** 만든다 — 승인 전에 만든 원장은 사용자가 취소해도 남아서, 이 세션의 질문을 최대 24시간 막는다(`hooks/pre-tool-ask.js`). 취소·중단으로 끝나면 `lens-gate close {plan-id}` 로 닫는다.
+- **언제 만드나 (v3.40)**: `/cp` 의 `[APPROVED]` 핸드오프면 여기서 만든다. **직접 호출이면 1.5 승인을 받은 직후에** 만든다 — 승인 전에 만든 원장은 사용자가 취소해도 남아서, 이 세션의 질문을 최대 24시간 막는다(`hooks/pre-tool-ask.js`). 취소로 끝나면 `lens-gate close {plan-id} --status cancelled --reason "{사유}"` 로 닫는다(계획서 `status: cancelled`). 중단은 그냥 `close` — 미충족이 남아 계획서가 `blocked` 가 된다.
 - 상한: 같은 미충족 목록으로 **2회** 막은 뒤에는 훅이 자동 해제한다(해제 알림은 모델에게만, 상태당 1회 — 무한 대기 없음).
   끄려면 `lens.config.json` 의 `gateEnforcement: false` 또는 `LENS_GATE_ENFORCEMENT=0`.
 
@@ -414,7 +415,7 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 
 **실행은 사용자 승인 없이 절대 시작하지 않습니다.**
 
-> **`/cp` 핸드오프에 `[APPROVED]` 블록이 있으면 승인표를 다시 띄우지 않는다 (v3.39).** 대표 지적: 한 계획에 두 번 답하고 그 사이에 정찰 대기·브랜치 질문까지 끼었다. 아래 표는 **보고로만** 한 번 쓰고 바로 Phase 2 로 간다. **분해가 승인된 계획과 다를 때만**(계획에 없는 파일·범위를 건드리는 서브태스크가 생김) 그 차이만 보고하고 질문 1개로 묻는다(header `정지:범위변경`). 계획서 frontmatter 가 `status: approved` 인 문서를 페이로드 없이 받아도 같다.
+> **`/cp` 핸드오프에 `[APPROVED]` 블록이 있으면 승인표를 다시 띄우지 않는다 (v3.39).** 대표 지적: 한 계획에 두 번 답하고 그 사이에 정찰 대기·브랜치 질문까지 끼었다. 아래 표는 **보고로만** 한 번 쓰고 바로 Phase 2 로 간다. **분해가 승인된 계획과 다를 때만**(계획에 없는 파일·범위를 건드리는 서브태스크가 생김) 그 차이만 보고하고 질문 1개로 묻는다(header `정지:범위변경`). 계획서 frontmatter 가 `status: approved` 또는 `parked`(「계획만 보관」 — 승인은 그대로다) 인 문서를 페이로드 없이 받아도 같다.
 
 > **헤드리스/무인 폴백 (cron·`claude -p`)**: 환경변수 `LENS_NONINTERACTIVE=1` 이 설정돼 있으면(Mac Mini cron 등 무인 파이프라인) `AskUserQuestion` 은 응답자가 없어 **행(hang)** 한다. 이 경우 승인 게이트를 차단하지 말고:
 > - **비파괴/읽기 위주 작업**: 계획을 출력하고 자동 진행(승인 생략).
@@ -434,7 +435,7 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 보고 텍스트를 먼저 쓴다(박스 문자 금지 — VS Code·앱에서 줄이 접히면 깨진다. 마크다운 표):
 
 ```markdown
-**Lens Multi v3.52.1 — 실행 계획** · 요청: {사용자 원본 요청}
+**Lens Multi v3.53.0 — 실행 계획** · 요청: {사용자 원본 요청}
 
 | # | 서브태스크 | 엔진 | 할당 스킬 | 모델 | 난이도 | 건드릴 파일 |
 |---|---|---|---|---|---|---|
@@ -450,7 +451,7 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 그 다음 질문 한 번(header `실행 승인`). 선택지는 결과 문장:
 1. **지금 실행** — {위 ➡️ 줄}
 2. **고칠 곳 있음** — 분해·접근 방식을 바꾼다
-3. **취소** — 아무것도 바꾸지 않고 멈춘다(원장을 이미 만들었으면 `lens-gate close`)
+3. **취소** — 아무것도 바꾸지 않고 멈춘다(원장을 이미 만들었으면 `lens-gate close {scope} --status cancelled --reason "{사유}"`)
 
 ---
 
@@ -736,7 +737,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.52.1 — 반복 {N}/5
+Lens Multi v3.53.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -906,7 +907,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" abandon {scope} {id} --reason 
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.52.1 — 최종 결과                       ║
+║   Lens Multi v3.53.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
@@ -969,10 +970,13 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" close {scope}
 반환된 `{met, unmet, abandoned}` 를 **최종 보고에 사람 말로 싣는다**(확인됨 · 아직 안 됨 · 포기 — 게이트·원장·met 같은 말은 쓰지 않는다). 이탈(abandoned)이 1건이라도 있으면
 done 이 아니라 **부분 완료**다 — 무엇을 왜 포기했는지 사유를 함께 보고한다.
 
+`close` 가 계획서 `status:` 도 쓴다(v3.53, 결과의 `plan`): 미충족·포기·무효가 **전부 0** 이면 `done`, 하나라도 있으면 `blocked` + `blocked_reason`(어느 조건이 왜) — 원장이 닫힌 것은 목표 완료가 아니다. 이 줄을 손으로 `done` 으로 고치지 않는다. 취소면 `close {scope} --status cancelled --reason "{사유}"`, 닫은 뒤 다시 검증하려 `reopen` 하면 `executing` 으로 돌아간다. `planWarning` 이 오면 보고에 한 줄.
+
 #### 7.3 문서 통합 제안
 
 작업 완료 후:
 - `docs/tasks/` 에 작업 파일이 있고 Goal 이 전부 달성됐으면 → `/cd` 를 Skill 도구로 이어서 부른다(완료 처리·history 이관). 되돌리기 어려운 단계(PR 머지·브랜치 삭제)는 `/cd` 가 판정한다
+  - **관제 모드면 `/cd` 를 부르지 않는다 (v3.53)** — 먼저 `node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" control status` 를 돌린다. 결과의 `control` 이 있고 `fresh: true` 이고 `control.participants` 에 이 세션 id(`CLAUDE_CODE_SESSION_ID`)가 있으면 이 세션은 관제 참여 세션이다 → SendMessage(to `control.name`)로 완료 보고 한 번: 계획 id · 마지막 커밋 sha(`git rev-parse HEAD`) · 가지 · 워크트리 경로 · 미충족 0 증거(7.2.5 `close` 결과 `unmet`·`abandoned`·`invalid` 가 모두 0, 계획서 `status: done`). 그 뒤 「완료했습니다」로 끝낸다 — 마감(/cd)은 관제가 일괄로 한다. 참여 세션이 아니거나 표식이 없으면 지금처럼 `/cd`.
 - 규칙 파일이 업데이트되면 → `docs/rules/` 경로 언급
 
 #### 7.4 plan 문서의 진행상황 갱신 (v3.4+, 핸드오프로 진입한 경우)
@@ -982,6 +986,7 @@ done 이 아니라 **부분 완료**다 — 무엇을 왜 포기했는지 사유
 ```markdown
 ## 진행상황
 - **작업 브랜치**: {0.4 의 5-a 가 쓴 소유 기록 줄 — **그대로 보존한다.** 이 줄을 지우면 다음 실행의 재개 판정(①)이 이 브랜치를 남의 것으로 보고 차단한다}
+- **세션**: {이 세션 이름(관제가 부르는 이름) 또는 `CLAUDE_CODE_SESSION_ID` — `plan scan --sessions` 가 맡은 세션이 살아 있는지 이 값으로 본다}
 - **마지막 업데이트**: {오늘}
 - **현재 경로**: {Plan A / Plan B / Plan A → Plan B}
 - **Goal 달성**: {N/M} ✓
@@ -999,10 +1004,10 @@ done 이 아니라 **부분 완료**다 — 무엇을 왜 포기했는지 사유
 
 **계획서 본문도 같이 고친다 (3.48.0)** — 문서만 보고 완료를 판정할 수 있어야 한다(갱신이 없어 "전체 38 완료 표시 0" 을 확인하려고 에이전트 7~14개를 띄운 적이 있다):
 - 7.2.5 `lens-gate close` 결과의 `met` 에 든 조건 → `✅ 검증` 표 그 행의 `통과` 칸 맨 앞에 `✅ `. 끝낸 단계의 `- [ ]`(🛠 어떻게·`📌 진행 체크리스트`) → `- [x]`.
-- Goal 이 전부 달성됐으면 frontmatter `status:` → `done`(`executing`·`approved` 어느 쪽이었든).
+- frontmatter `status:` 는 원장이 있으면 7.2.5 `close` 가 이미 썼다(`done`/`blocked`) — 손대지 않는다. **원장이 없는 실행**(게이트 0개)이면 직접 쓴다: Goal 전부 달성 → `node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-cli.js" plan status {plan_doc_path} done`, 미달 → `… plan status {plan_doc_path} blocked --reason "{무엇이 왜 안 됐나}"`, 대표 답·외부 대기로 멈추면 `--waiting-on "{무엇을 기다리나}"` 를 붙인다.
 - `last_tip:` 은 7.5 커밋 뒤에 적는다.
 
-Goal 달성이 N == M 이면 `/cd` 로 이어서 마감한다(7.3). `/cp done` 은 v3.34 에 없어진 명령이다 — 안내하지 않는다.
+Goal 달성이 N == M 이면 `/cd` 로 이어서 마감한다(7.3) — 관제 참여 세션이면 7.3 대로 `/cd` 대신 관제에 완료 보고. `/cp done` 은 v3.34 에 없어진 명령이다 — 안내하지 않는다.
 
 > **편차 기록이 왜 필수인가 (v3.25)**: `/cp`(계획) → `/cc`(실행) → **???** → 다음 계획. 지금까지 되먹임 경로가 "재개 포인트 한 줄"뿐이라, **실행 중 계획이 틀렸다는 걸 알아내도 어디에도 남지 않았다.** 그러면 다음 계획이 같은 실수를 반복한다. 편차를 기록해야 고리가 닫힌다.
 >

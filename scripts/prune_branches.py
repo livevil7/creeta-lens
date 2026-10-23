@@ -1046,6 +1046,7 @@ def prune(
     worktrees: list[dict] | None = None,
     removed_worktrees: list[str] | None = None,
     pushed: set[str] | None = None,
+    failed: list[str] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Delete only the `delete` verdicts. Returns (deleted, skipped-with-reason).
 
@@ -1091,6 +1092,8 @@ def prune(
     """
     deleted: list[str] = []
     skipped: list[str] = []
+    # failed 를 주면 시도했다 실패한 것(lease 거부·삭제 실패·부분 삭제)을 skipped 와 따로 모은다.
+    fail = skipped if failed is None else failed
     if removed_worktrees is None:
         removed_worktrees = []
     if worktrees is None and not remote:
@@ -1178,7 +1181,7 @@ def prune(
                         # snapholo-data-overhaul). 등록이 사라졌으면 브랜치 삭제는 안전하다.
                         if any(w["path"] == holder["path"] for w in _worktrees(repo)):
                             raise
-                        skipped.append("%s: 워크트리 등록은 지웠지만 빈 폴더 %s 는 다른 프로세스가 사용 중 — 손으로 지울 것" % (name, holder["path"]))
+                        fail.append("%s: 워크트리 등록은 지웠지만 빈 폴더 %s 는 다른 프로세스가 사용 중 — 손으로 지울 것" % (name, holder["path"]))
                     removed_worktrees.append(str(holder["path"]))
                 # 판정 SHA(브랜치)와 판정 base SHA(verify)를 한 트랜잭션에 실은
                 # 원자적 삭제(branch-lifecycle.md §7.1). 판정과 삭제 사이에 다른
@@ -1202,30 +1205,30 @@ def prune(
         except (subprocess.CalledProcessError, OSError) as exc:
             stderr = getattr(exc, "stderr", "") or str(exc)
             if remote and "-> %s (stale info)" % base in stderr:
-                skipped.append(
+                fail.append(
                     "%s: base %s 가 진전됨 — 판정 base SHA %s 가 더는 원격 tip 이 아니다. "
                     "삭제 근거(base 에 패치 존재)가 무효일 수 있어 push 전체 거부, fetch 후 재판정 필요"
                     % (name, base, base_sha[:12])
                 )
             elif remote and "stale info" in stderr:
-                skipped.append(
+                fail.append(
                     "%s: 원격이 진전됨 — 판정 SHA %s 가 더는 원격 tip 이 아니다. 삭제 거부, fetch 후 재판정 필요"
                     % (name, sha[:12])
                 )
             elif not remote and "refs/heads/%s'" % base in stderr and "but expected" in stderr:
-                skipped.append(
+                fail.append(
                     "%s: base %s 가 진전됨 — 판정 base SHA %s 가 더는 로컬 base tip 이 아니다. "
                     "삭제 근거(base 에 패치 존재)가 무효일 수 있어 트랜잭션 전체 거부, 재판정 필요"
                     % (name, base, base_sha[:12])
                 )
             elif not remote and "but expected" in stderr:
-                skipped.append(
+                fail.append(
                     "%s: 로컬이 진전됨 — 판정 SHA %s 가 더는 로컬 tip 이 아니다. 삭제 거부, 재판정 필요"
                     % (name, sha[:12])
                 )
             else:
                 detail = stderr.strip().splitlines()
-                skipped.append("%s: 삭제 실패 — %s" % (name, detail[-1] if detail else "원인 불명"))
+                fail.append("%s: 삭제 실패 — %s" % (name, detail[-1] if detail else "원인 불명"))
     return deleted, skipped
 
 
@@ -1407,36 +1410,73 @@ def _render_multi(results: list[dict], skipped_dirs: list[str]) -> str:
     return "\n".join(lines)
 
 
-def finish(repo: Path, *, base: str | None, delete_without_pr_check: bool) -> int:
+def finish(
+    repo: Path,
+    *,
+    base: str | None,
+    delete_without_pr_check: bool,
+    only: list[str] | None = None,
+    as_json: bool = False,
+) -> int:
     """/cd 마무리 한 번에: fetch → 로컬 base 최신화 → 원격·로컬 병합 브랜치와 그 워크트리 정리.
 
     판정·보호·lease 는 전부 기존 경로(_judge_repo / prune)를 그대로 탄다.
     여기서 더하는 것은 순서와 fetch 하나다. 로컬 판정은 로컬 base 를 기준으로
     하므로, 워크트리에서만 일해 뒤처진 원래 체크아웃의 base 를 먼저 맞춘다.
+
+    only 를 주면 그 이름과 정확히 같은 가지(와 그 워크트리)만 지운다 — `<가지>-*`
+    작업자 가지는 포함하지 않는다(다른 세션 가지일 수 있다, 지울 것은 목록에 직접 적는다).
+    목록 밖 delete 판정은 skipped 에 「범위 밖」으로만 남긴다.
+    failed(시도했다 실패·차단)가 있거나 base 최신화가 안 되면 종료 1.
     """
+    out: dict = {
+        "removed_remote": [],
+        "removed_local": [],
+        "removed_worktrees": [],
+        "skipped": [],
+        "failed": [],
+        "base_updated": False,
+    }
     lines: list[str] = []
+
+    def note(bucket: str, text: str) -> None:
+        name, _, reason = text.partition(": ")
+        out[bucket].append({"name": name, "reason": reason})
+
+    def emit() -> int:
+        if as_json:
+            print(json.dumps(out, ensure_ascii=False, indent=2))
+        else:
+            print("\n".join(lines))
+            for item in out["failed"]:
+                print("실패 %s: %s" % (item["name"], item["reason"]), file=sys.stderr)
+        return 1 if out["failed"] or not out["base_updated"] else 0
+
     if not _git_ok(repo, "fetch", "--prune", "origin"):
-        print("fetch 실패 — 원격 상태 확인 불가, 아무것도 지우지 않았다", file=sys.stderr)
-        return 1
+        note("failed", "fetch: 실패 — 원격 상태 확인 불가, 아무것도 지우지 않았다")
+        return emit()
     resolved_base = base or resolve_base(repo)["base"]
     if not resolved_base:
-        print("base 를 해석하지 못했다 — --base 로 지정하라", file=sys.stderr)
-        return 1
+        note("failed", "base: 해석하지 못했다 — --base 로 지정하라")
+        return emit()
 
     holder = next((w for w in _worktrees(repo) if w["branch"] == resolved_base), None)
     if holder is None:
         ok = _git_ok(repo, "fetch", "origin", "%s:%s" % (resolved_base, resolved_base))
         lines.append("base %s: %s" % (resolved_base, "원격에 맞춤" if ok else "fast-forward 불가 — 그대로 둠"))
     elif _git_maybe(holder["path"], "status", "--porcelain", "--untracked-files=no"):
+        ok = False
         lines.append("base %s: %s 에 미커밋 변경 — 최신화 건너뜀" % (resolved_base, holder["path"]))
     else:
         ok = _git_ok(holder["path"], "merge", "--ff-only", "--quiet", "origin/%s" % resolved_base)
         lines.append(
             "base %s: %s" % (resolved_base, "원격에 맞춤" if ok else "fast-forward 불가(로컬에만 있는 커밋) — 그대로 둠")
         )
+    out["base_updated"] = ok
 
-    blocked = False
-    removed: list[str] = []
+    scope = set(only) if only else None
+    seen: set[str] = set()
+    removed = out["removed_worktrees"]
     # 원격 삭제가 tracking ref 를 지우기 전에 「push 된 적 있음」을 잡아 둔다.
     pushed = _pushed_names(repo)
     for remote in ("origin", None):
@@ -1444,37 +1484,55 @@ def finish(repo: Path, *, base: str | None, delete_without_pr_check: bool) -> in
         where = "원격" if remote else "로컬"
         if result["skipped"]:
             lines.append("%s: 건너뜀 — %s" % (where, result["skipped"]))
+            note("skipped", "%s: %s" % (where, result["skipped"]))
             continue
         if result["push_target_ok"] is False:
-            blocked = True
             lines.append("%s: 차단 — fetch/push 대상이 다르다 (%s)" % (where, result.get("push_target_reason")))
+            note("failed", "%s: 차단 — fetch/push 대상이 다르다 (%s)" % (where, result.get("push_target_reason")))
             continue
         if not result["pr_guard_ok"] and not delete_without_pr_check:
-            blocked = True
             lines.append("%s: 차단 — 열린 PR 보호 검사 불가: %s" % (where, "; ".join(result["warnings"])))
+            note("failed", "%s: 차단 — 열린 PR 보호 검사 불가: %s" % (where, "; ".join(result["warnings"])))
             continue
         if not result["default_guard_ok"]:
-            blocked = True
             lines.append("%s: 차단 — 기본 브랜치 조회 실패 (%s)" % (where, result.get("default_guard_reason")))
+            note("failed", "%s: 차단 — 기본 브랜치 조회 실패 (%s)" % (where, result.get("default_guard_reason")))
             continue
+        targets = result["branches"]
+        if scope is not None:
+            seen.update(item["branch"] for item in targets if item["branch"] in scope)
+            for item in targets:
+                if item["branch"] in scope and item["verdict"] != "delete":
+                    note("skipped", "%s: %s %s" % (item["branch"], where, _detail(item)))
+                elif item["branch"] not in scope and item["verdict"] == "delete":
+                    note("skipped", "%s: %s 범위 밖 — 지우지 않음" % (item["branch"], where))
+            targets = [item for item in targets if item["branch"] in scope]
+        failures: list[str] = []
         deleted, skipped = prune(
             repo,
-            result["branches"],
+            targets,
             remote=remote,
             base=result["base"],
             base_sha=result.get("base_sha"),
             removed_worktrees=removed,
             pushed=pushed,
+            failed=failures,
         )
+        out["removed_remote" if remote else "removed_local"].extend(deleted)
+        for text in skipped:
+            note("skipped", text)
+        for text in failures:
+            note("failed", text)
         lines.append("%s 브랜치 삭제 %d: %s" % (where, len(deleted), ", ".join(deleted) or "없음"))
-        lines.extend("  %s" % note for note in skipped)
+        lines.extend("  %s" % text for text in skipped + failures)
+    for name in sorted((scope or set()) - seen):
+        note("skipped", "%s: 원격·로컬 어디에도 없음 — 이미 정리됨" % name)
     _git_ok(repo, "worktree", "prune")
     lines.append("워크트리 제거 %d: %s" % (len(removed), ", ".join(removed) or "없음"))
     detached = [str(w["path"]) for w in _worktrees(repo)[1:] if w["branch"] is None]
     if detached:
         lines.append("브랜치 없는(detached) 워크트리 — 사람 확인: %s" % ", ".join(detached))
-    print("\n".join(lines))
-    return 1 if blocked else 0
+    return emit()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1516,14 +1574,28 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="/cd 마무리: fetch → 로컬 base fast-forward → 원격·로컬 병합 브랜치와 그 워크트리 삭제 (한 레포)",
     )
+    parser.add_argument(
+        "--only",
+        default=None,
+        help="--finish 와 함께: 이 가지들(쉼표 구분, 정확한 이름)과 그 워크트리만 지운다. <가지>-* 작업자 가지는 포함하지 않는다",
+    )
     args = parser.parse_args(argv)
 
     if args.finish:
-        if args.repo_root or args.remote or args.apply or args.json:
-            parser.error("--finish 는 --repo/--base/--delete-without-pr-check 하고만 쓴다 (스스로 적용한다)")
+        if args.repo_root or args.remote or args.apply:
+            parser.error("--finish 는 --repo/--base/--delete-without-pr-check/--json/--only 하고만 쓴다 (스스로 적용한다)")
+        only = [name.strip() for name in (args.only or "").split(",") if name.strip()]
+        if args.only is not None and not only:
+            parser.error("--only 에 가지 이름이 없다")
         return finish(
-            (args.repo or Path.cwd()).resolve(), base=args.base, delete_without_pr_check=args.delete_without_pr_check
+            (args.repo or Path.cwd()).resolve(),
+            base=args.base,
+            delete_without_pr_check=args.delete_without_pr_check,
+            only=only or None,
+            as_json=args.json,
         )
+    if args.only is not None:
+        parser.error("--only 는 --finish 와 함께만 쓴다")
 
     if args.repo and args.repo_root:
         parser.error("--repo 와 --repo-root 는 함께 쓸 수 없다")

@@ -1,3 +1,28 @@
+## [3.53.0] - 2026-10-24
+
+**관제 모드 · 일괄 마감 · 한 단어·부분 승인 · 멈춘 계획 알림 · 계획서 모델 등급별.** 대표 지시 1,641건(2026-10-12~23, SJ-ROG·SJ-OMEN) 분석: 세션 배정·감독·마감 지시 ≈90회가 Lens 밖(메모리 손 규칙)에서 돌았고, 한 단어 승인 ≈77회·부분 승인 ≈10회를 /cp 가 정식으로 받지 못했으며, SJ-ROG 계획서는 승인 7·실행 중 2 가 멈춘 채 완료 1뿐이었다. 대표 추가 지시(2026-10-23): *"/cp 할때 꼭 fable을 쓰는 규칙도 바꾸긴 해야할듯"* · *"난이도에 따라서 조절을 해야지 무조건은 아닌거 같으ㅁ"*. 계획서 `docs/tasks/2026-10-23-control-mode-approval-loop.md`.
+
+### Added (v3.53.0)
+
+- **`/ct` 관제탑** (`skills/ct/SKILL.md`, Claude Code 전용) — 여러 세션에 역할 이름을 붙여 배정(`templates/ct-assign.md`: [이름] 머리 · 보고 6줄 · 대표에게 직접 묻지 말고 관제로 · 승인 전달 5요소) · 관제판(`templates/ct-board.html` = cp 질문 블록 재사용) · `/ct 점검`(첫 줄 멈춘 계획) · 재시작 복구 · `/ct 마감`(→ /cd 일괄 모드).
+- **관제 표식** `lib/control-mode.js` + `lens-cli control on|off|status|heartbeat` — 참여 세션 id·범위·소유 관제, 12시간 만료. `hooks/pre-tool-ask.js` 가 **참여 세션만** 질문창을 관제로 돌린다(무관 세션·관제 자신·만료·표식 없음은 통과, `LENS_ASK_GUARD=0` 탈출구).
+- **멈춘 계획 스캔** `lib/plan-scan.js` + `lens-cli plan scan <root> [--git] [--json] [--sessions]` — 첫 줄 「멈춘 계획 N건 — 어디서」(재개 포인트 · 체크 N/M · 원장 미충족), 맡은 세션이 없거나 idle 인 실행 중 계획은 즉시 멈춤, `waiting_on` 은 정당한 대기, 결과를 `.lens/plan-scan.json` 캐시로.
+- **계획 상태 쓰기** `lens-cli plan status <doc> <executing|done|blocked|parked|cancelled>` · **/cd 읽기 전용 판정** `lib/cd-manager.js` + `lens-cli cd inspect`.
+- `scripts/prune_branches.py --finish --json --only <가지,…>` — 정리 결과 구조화(removed_* · skipped · failed · base_updated), 실패가 있으면 종료 1, `--only` 범위 밖은 지우지 않는다.
+
+### Changed (v3.53.0)
+
+- **계획서 작성 모델 = 등급별** — 기본 등급은 opus 이상 세션이 직접, deep 만 fable(`hooks/pre-tool-plan-doc.js` TIER_ORDER · Edit 뒤 내용의 grade · 위임 티어 이상 인정 · grade 가 deep 이 아니면 기본). /cp 계약 카드 12 · harness-rules 4.1.
+- **/cp 승인** — 직전 턴이 승인 질문이면 채팅 한 단어(`a` 지금 실행 · `b` 고칠 곳 · `c 1-5` 일부만 실행 · `d` 보관)를 그 선택지로 · 「일부만 실행」= 행 번호, 나머지 행은 보류 · 단계·목표·검증 행의 `(#n)` 표기로 미승인 작업이 실행 목록·완료 조건에서 빠진다 · 기본 등급·대표 결정 0·Blocker 0·정지 지점 없음이면 승인 질문 생략 · 관제 모드면 질문은 관제판으로 · 「계획만 보관」= `status: parked` · 인자 없는 /cp 는 `plan scan` 결과로 보고.
+- **/cc 상태 고리** — `lens-gate create` 가 executing, `close` 는 미충족·포기·무효 전부 0 일 때만 done(아니면 blocked+사유), `--status cancelled`, reopen → executing · 관제 모드면 끝나도 /cd 대신 관제에 완료 보고.
+- **/cd 일괄 모드** — 계획별 판정 → 묶음 승인 한 번(정지 지점) → 레포 간 병렬·같은 레포 직렬 → 레포마다 `--finish --json --only` 한 번 → 전→후 표 · pr-manual 은 In Review · 커밋은 그 계획 경로만 · `autoDeleteMergedBranch:false` 존중.
+- **세션 시작** — 스캔 캐시만 읽어 멈춘 계획 한 줄(git·스캔 없음), Recent Plans 도 같은 캐시.
+- `templates/cp-questions.html` — 「일부만 실행」 선택지, JSON 이 깨져도 「채팅으로 답해 주세요」 안내.
+
+### Fixed (v3.53.0)
+
+- `lib/plan-coverage.test.js` 「in-flight repo plans」 — 커밋된 `.research.md` 를 계획서로 검사하던 기존 실패.
+
 ## [3.52.1] - 2026-10-08
 
 ### Fixed (v3.52.1)

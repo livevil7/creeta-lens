@@ -78,7 +78,8 @@ const write = (plan, model, extra = {}) => run({
   cwd: extra.cwd,
 });
 
-const DRAFT = '---\nplan_id: 2026-09-16-x\nkind: 개선\nstatus: draft\n---\n\n# 계획\n';
+// grade: deep — fable 을 요구하는 케이스들의 의미를 지킨다 (v3.53: deep 이 아니면 opus 로 충분)
+const DRAFT = '---\nplan_id: 2026-09-16-x\nkind: 개선\ngrade: deep\nstatus: draft\n---\n\n# 계획\n';
 
 console.log('\n[Lens] pre-tool-plan-doc tests\n');
 
@@ -261,6 +262,77 @@ test('E6: 거부 문구가 Agent 를 못 부르는 컨텍스트의 탈출구(LEN
   const r = write(plan, 'claude-opus-5', { content: DRAFT });
   assert.ok(denied(r));
   assert.match(r.hookSpecificOutput.permissionDecisionReason, /Agent 를 부를 수 없는 컨텍스트면 `LENS_PLANNER_GATE=0` 으로 끄고 계획서 `planner_model` 에 사유를 적어라/);
+});
+
+// ── v3.53 — the tier follows the grade (owner 2026-10-23): 기본 = opus 이상 · deep = fable ──
+
+console.log('\n  -- 등급별 모델 (C1) --');
+
+const BASIC = DRAFT.replace('grade: deep', 'grade: 기본');
+const DEEP = DRAFT; // DRAFT 는 deep — 위 케이스들이 fable 을 요구하는 의미 그대로
+
+test('C1: opus 세션 + 기본 등급은 직접 써도 통과한다', () => {
+  const { plan } = repo(BASIC);
+  assert.deepStrictEqual(write(plan, 'claude-opus-5', { content: BASIC }), {});
+});
+
+test('C1: grade: standard(레포 어휘의 기본)도 opus 세션이면 통과', () => {
+  const body = DRAFT.replace('grade: deep', 'grade: standard');
+  const { plan } = repo(body);
+  assert.deepStrictEqual(write(plan, 'claude-opus-5', { content: body }), {});
+});
+
+test('C1: grade 가 없으면 기본 — opus 세션이면 통과', () => {
+  const body = DRAFT.replace('grade: deep\n', '');
+  const { plan } = repo(body);
+  assert.deepStrictEqual(write(plan, 'claude-opus-5', { content: body }), {});
+});
+
+test('C1: opus 세션 + deep 등급은 거부한다 (fable 위임 안내)', () => {
+  const { plan } = repo(DEEP);
+  const r = write(plan, 'claude-opus-5', { content: DEEP });
+  assert.ok(denied(r), JSON.stringify(r));
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /deep 등급/);
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /Agent\(model: "fable"\)/);
+});
+
+test('C1: sonnet 세션 + 기본 등급은 거부한다 (opus 위임 안내)', () => {
+  const { plan } = repo(BASIC);
+  const r = write(plan, 'claude-sonnet-5', { content: BASIC });
+  assert.ok(denied(r), JSON.stringify(r));
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /Agent\(model: "opus"\)/);
+});
+
+test('C1: Edit 로 grade 를 기본→deep 으로 바꾸는 opus 는 변경 후 내용으로 거부한다', () => {
+  const { plan } = repo(BASIC);
+  const r = run({
+    tool_name: 'Edit',
+    tool_input: { file_path: plan, old_string: 'grade: 기본', new_string: 'grade: deep' },
+    transcript_path: transcript('claude-opus-5'),
+  });
+  assert.ok(denied(r), JSON.stringify(r));
+});
+
+test('C1: sonnet 세션이라도 이 세션의 opus 위임 기록이 있으면 기본 등급은 통과', () => {
+  const { plan } = repo(BASIC);
+  const t = session('s-c1op', 'claude-sonnet-5');
+  board('s-c1op', [{ id: 'p', model: 'opus', status: 'running' }]);
+  const r = run({ tool_name: 'Write', tool_input: { file_path: plan, content: BASIC }, transcript_path: t, session_id: 's-c1op' });
+  assert.deepStrictEqual(r, {});
+});
+
+test('C1: 서브에이전트는 자기 모델로 판정 — opus 서브에이전트는 기본 통과 · sonnet 서브에이전트는 거부', () => {
+  const { plan } = repo(BASIC);
+  const t = session('s-c1sub', 'claude-fable-5-1', { a0op: 'claude-opus-5', a0so: 'claude-sonnet-5' });
+  const as = agentId => run({ tool_name: 'Write', tool_input: { file_path: plan, content: BASIC }, transcript_path: t, session_id: 's-c1sub', agent_id: agentId });
+  assert.deepStrictEqual(as('a0op'), {});
+  assert.ok(denied(as('a0so')));
+});
+
+test('B3: parked(계획만 보관) 계획서 Edit 는 승인 뒤 갱신처럼 통과', () => {
+  const { plan } = repo(DEEP.replace('status: draft', 'status: parked'));
+  const r = run({ tool_name: 'Edit', tool_input: { file_path: plan, old_string: '# 계획', new_string: '# 계획 2' }, transcript_path: transcript('claude-sonnet-5') });
+  assert.deepStrictEqual(r, {});
 });
 
 console.log(`\n  ${passed} passed, ${failed} failed\n`);

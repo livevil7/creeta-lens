@@ -8,7 +8,8 @@
  *   1. 첫 줄 = `[Lens /cp 답변] <plan_id>` — 세션이 다른 댓글과 구별하는 표지;
  *   2. 질문마다 한 줄 `[id] 질문 → 답` — 안 고른 질문도 `(답 없음)` 으로 남는다;
  *   3. 댓글이 거부하는 제어문자를 뺀다(줄바꿈·탭은 남긴다);
- *   4. 예시 JSON 이 파싱되고 승인 질문의 선택지가 계약 카드 8 의 셋이다.
+ *   4. 예시 JSON 이 파싱되고 승인 질문의 선택지가 계약 카드 8 의 넷이다(v3.53 「일부만 실행」);
+ *   5. 깨진 JSON 은 null — 블록 자리에 안내 문구를 그린다.
  *
  * Run: node templates/cp-questions.test.js  → exit 0 iff all pass.
  */
@@ -78,11 +79,21 @@ t('other:true 는 적는 칸 달린 「기타」를 덧붙인다', () => {
   assert.strictEqual(opts[2].text, true);
 });
 
-t('예시 JSON 이 파싱되고 승인 선택지가 셋이다', () => {
+t('예시 JSON 이 파싱되고 승인 선택지가 넷이다 — 「일부만 실행」은 행 번호 적는 칸', () => {
   const ex = JSON.parse(json);
   const approve = ex.questions.find(q => q.id === 'approve');
-  assert.deepStrictEqual(ctx.lensCpOptions(approve).map(o => o.label), ['지금 실행', '고칠 곳 있음', '계획만 보관']);
+  const opts = ctx.lensCpOptions(approve);
+  assert.deepStrictEqual(opts.map(o => o.label), ['지금 실행', '고칠 곳 있음', '일부만 실행', '계획만 보관']);
+  assert.strictEqual(opts[2].text, true);
   assert.ok(ex.questions.every(q => /^[A-Za-z0-9_]+$/.test(q.id)));
+});
+
+t('깨진 질문 JSON 은 null 이고 블록 자리에 안내 문구를 그린다', () => {
+  assert.strictEqual(ctx.lensCpParse('{ "plan_id": "x", "questions": [ { "id": "d1", }'), null);
+  assert.strictEqual(ctx.lensCpParse('{"plan_id":"x"}'), null);
+  assert.ok(ctx.lensCpParse(json));
+  assert.strictEqual(ctx.LENS_CP_BROKEN, '질문 블록을 읽지 못했습니다 — 채팅으로 답해 주세요');
+  assert.ok(/if \(!data\) \{ form\.textContent = LENS_CP_BROKEN/.test(code), 'DOM 분기가 안내 문구를 그리지 않는다');
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -1,4 +1,4 @@
-# Lens v3.52.1
+# Lens v3.53.0
 
 **Never wonder which plugin to use again.**
 
@@ -105,7 +105,7 @@ Key behaviors:
 
 Unlike `/cc`, which starts building immediately, `/cp` generates a **work plan document** before any execution. Every plan is built on four themes — **What (goal) → Why (the problem/motivation) → How (Plan A/B) → Review (verification)** — with **Why** a required gate so you never finely solve the wrong problem. The plan is saved as a markdown file and presented for your approval. `/cp` is the **fast/standard lane** — quick fixes and standard plans. Grades scale the ceremony to the risk of the task.
 
-**The plan opens on the running engine's own surface before you are asked to approve it (v3.37, reworked v3.39).** A saved path is not a report. The plan is a markdown file the gates read; what you see is whatever the engine already has — a **Claude Code Artifact** URL, a **Codex app inline visualization**, or, where neither exists, the markdown file delivered to you (Lens builds no HTML of its own since v3.42). The show is recorded with the document's hash, so a plan edited after it was shown goes `stale` and must be shown again before approval. There are no slide decks or boards any more (v3.39). Approval is a report first, then one question with outcome-named choices — *run now* / *change something* / *keep the plan for later* — and `/cc` does not ask again for a plan you approved. Plans come in three kinds: **new**, **improvement** (must carry an AS-IS → TO-BE section) and **research report**. **And the plan itself is written by the top model tier** (currently `fable`): if the session is running on something lower, `/cp` delegates Plan A/B design and the document to a top-tier agent with the full research payload, and records which model wrote it in the plan's `planner_model` frontmatter.
+**The plan opens on the running engine's own surface before you are asked to approve it (v3.37, reworked v3.39).** A saved path is not a report. The plan is a markdown file the gates read; what you see is whatever the engine already has — a **Claude Code Artifact** URL, a **Codex app inline visualization**, or, where neither exists, the markdown file delivered to you (Lens builds no HTML of its own since v3.42). The show is recorded with the document's hash, so a plan edited after it was shown goes `stale` and must be shown again before approval. There are no slide decks or boards any more (v3.39). Approval is a report first, then one question with outcome-named choices — *run now* / *change something* / *keep the plan for later* — and `/cc` does not ask again for a plan you approved. Plans come in three kinds: **new**, **improvement** (must carry an AS-IS → TO-BE section) and **research report**. **The plan is written by a model matched to its grade (v3.53):** a default-grade plan is written by the session itself when it runs on the upper tier (`opus`) or above, a `deep` plan only by the top tier (`fable`); a lower session delegates the document with the full research payload, and the plan's `planner_model` frontmatter records which model wrote it. Approval also accepts a one-word chat reply to the approval question (`a` run now · `b` change · `c` run only rows N–M · `d` keep for later), and a default-grade plan with no owner decision, no blocker and no stop point runs without asking.
 
 | You type | What happens |
 | --- | --- |
@@ -227,6 +227,16 @@ Every run writes a pre-upgrade snapshot to `~/.claude/lens/cu-last-scan.json` an
 | Output | Synthesized multi-agent output | Work plan document + execution | Mirrored repos + invariant report |
 | Speed | Slower (parallel agents) | Deliberate (plan → approve → execute) | Fast |
 | Use when | The work is clear and splits into independent pieces | You want to review before running | Switching machines |
+
+### `/ct` — Control tower for several sessions (Claude Code only)
+
+```bash
+/ct            # start: role-name the open sessions and hand out work
+/ct 점검       # check: stalled plans first, then who is doing what, overlaps, waiting prompts
+/ct 마감       # close every finished plan at once (calls /cd batch mode)
+```
+
+One control session gives each worker session a role name, sends assignments with a fixed six-line report contract, collects owner decisions on one board page (the same question block `/cp` uses), passes answers back, and re-assigns work after restarts. While control mode is on, participating sessions send their questions to the control session instead of opening their own prompt.
 
 ## How It Works
 

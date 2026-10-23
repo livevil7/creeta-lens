@@ -18,6 +18,7 @@ const { loadMemory, saveMemory, recordSessionStart, formatMemorySummary } = requ
 const { initSession, loadDashboard, saveDashboard, getDashboardPath } = require(path.join(PLUGIN_ROOT, 'lib', 'agent-tracker'));
 const { formatPlanSummary, ensurePlansDir } = require(path.join(PLUGIN_ROOT, 'lib', 'plan-manager'));
 const { formatAuditNudge } = require(path.join(PLUGIN_ROOT, 'lib', 'capability-audit'));
+const { readScanCache } = require(path.join(PLUGIN_ROOT, 'lib', 'plan-scan'));
 
 // Load config
 const config = safeReadJson(path.join(PLUGIN_ROOT, 'lens.config.json'), {}) || {};
@@ -93,14 +94,17 @@ function main() {
     }
     const memorySummary = formatMemorySummary(memory);
 
-    // 3. Build plan history for context
-    const planSummary = formatPlanSummary(config.planDir || null);
+    // 3. Plan history + the stalled-plan line — both from the plan-scan cache
+    //    only (v3.53). No scan, no git here: the hook's 5 s covers everything.
+    const caches = readPlanCaches(projectRoot);
+    const planSummary = formatPlanSummary(caches);
+    const stalledLine = newConversation ? formatStalledLine(caches) : '';
 
     // 3b. /crv capability-audit staleness nudge — Lens repo only, NO network.
     const auditNudge = formatAuditNudge({ root: projectRoot, config });
 
     // 4. Build additional context
-    const additionalContext = languageLine(source) + buildAdditionalContext({
+    const additionalContext = languageLine(source) + (stalledLine ? `${stalledLine}\n\n` : '') + buildAdditionalContext({
       memorySummary,
       planSummary,
       auditNudge,
@@ -109,7 +113,7 @@ function main() {
     // 6. Output response
     const response = {
       ...(newConversation
-        ? { systemMessage: `Lens v3.52.1 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready` }
+        ? { systemMessage: `Lens v3.53.0 activated - ${skills.length} skills from ${[...new Set(skills.map(s => s.plugin))].length} plugins detected | Agent Dashboard + Plan System ready${stalledLine ? `\n${stalledLine}` : ''}` }
         : {}),
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
@@ -129,7 +133,7 @@ function main() {
   } catch (err) {
     // Fail gracefully - don't break the session
     const fallback = {
-      systemMessage: 'Lens v3.52.1 activated (scan skipped)',
+      systemMessage: 'Lens v3.53.0 activated (scan skipped)',
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         error: err.message,
@@ -194,6 +198,34 @@ function clearPreviousSessionProgressClock(newConversation) {
 }
 
 /**
+ * The plan-scan cache (`lens-cli plan scan` writes it) at the project root, or —
+ * for a session opened on a workspace folder — the caches one level down.
+ */
+function readPlanCaches(root) {
+  const own = readScanCache(root);
+  if (own) return [own];
+  const found = [];
+  try {
+    for (const d of fs.readdirSync(root, { withFileTypes: true })) {
+      if (!d.isDirectory() || d.name.startsWith('.')) continue;
+      const c = readScanCache(path.join(root, d.name));
+      if (c) found.push(c);
+    }
+  } catch {}
+  return found;
+}
+
+/** `[Lens] 멈춘 계획 N건 (스캔 HH:MM 기준) — /cp 로 보기`, or '' when none / no cache. */
+function formatStalledLine(caches) {
+  const n = caches.reduce((sum, c) => sum + c.stalled.length, 0);
+  if (!n) return '';
+  const times = caches.map(c => Date.parse(c.scannedAt)).filter(Number.isFinite);
+  const at = times.length ? new Date(Math.min(...times)) : null;
+  const hhmm = at ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : '?';
+  return `[Lens] 멈춘 계획 ${n}건 (스캔 ${hhmm} 기준) — /cp 로 보기`;
+}
+
+/**
  * F6: after a compaction (or a fork) the conversation continues from a summary,
  * and answers drifted to English — 49 in one session, recurring even after the
  * user objected. Startup output stays as it was.
@@ -215,7 +247,7 @@ function languageLine(source) {
 // What remains is Lens-only state the host cannot know: session memory, plan
 // history, and the /crv staleness nudge.
 function buildAdditionalContext({ memorySummary, planSummary, auditNudge }) {
-  let ctx = `# Lens v3.52.1 - Session Startup\n\n`;
+  let ctx = `# Lens v3.53.0 - Session Startup\n\n`;
 
   // /crv capability-audit nudge (Lens repo only; muted single line)
   if (auditNudge) {
@@ -236,7 +268,7 @@ function buildAdditionalContext({ memorySummary, planSummary, auditNudge }) {
 }
 
 function buildFallbackContext() {
-  return `# Lens v3.52.1 - Session Startup
+  return `# Lens v3.53.0 - Session Startup
 
 Session memory could not be loaded (scan or read error). Lens skills still work; run \`/cp\` or \`/cc\` directly.
 `;

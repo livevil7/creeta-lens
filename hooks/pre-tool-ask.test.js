@@ -51,13 +51,15 @@ function transcript(entries) {
 }
 
 const STORE = fs.mkdtempSync(path.join(os.tmpdir(), 'lens-ask-store-'));
+// v3.53 control-mode marker — never the user's real ~/.claude/lens/control.json.
+const CONTROL_FILE = path.join(STORE, 'control.json');
 
 function run(payload, env = {}) {
   const out = execFileSync(process.execPath, [HOOK], {
     input: JSON.stringify(payload),
     env: {
       ...process.env, CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT, CLAUDE_HOOK_INPUT: '', LENS_ASK_GUARD: '',
-      LENS_SESSION_STORE: STORE, CLAUDE_CODE_SESSION_ID: '', ...env,
+      LENS_SESSION_STORE: STORE, CLAUDE_CODE_SESSION_ID: '', LENS_CONTROL_FILE: CONTROL_FILE, ...env,
     },
   }).toString().trim();
   return JSON.parse(out || '{}');
@@ -246,6 +248,56 @@ test('both problems at once are reported together', () => {
   assert.match(r.hookSpecificOutput.permissionDecisionReason, /보고가 먼저/);
   assert.match(r.hookSpecificOutput.permissionDecisionReason, /승인된 실행이 열려 있다/);
 });
+
+test('during the run, /cd header "작업 완료 — 기존 task 정리" is allowed', () => {
+  const { root } = runRepo('S1');
+  assert.deepStrictEqual(ask('작업 완료 — 기존 task 정리', { cwd: root }), {});
+});
+
+// ── v3.53 — control mode: participant sessions ask the control session ──
+
+console.log('\n  -- 관제 모드 --');
+
+function control({ hoursAgo = 0 } = {}) {
+  const at = new Date(Date.now() - hoursAgo * 3600 * 1000).toISOString();
+  fs.writeFileSync(CONTROL_FILE, JSON.stringify({ name: '관제', sessionId: 'CTL', board: 'https://x', participants: ['W1', 'W2'], scope: '', createdAt: at, updatedAt: at }));
+}
+const plainAsk = (session, env) => ask('방향', { cwd: os.tmpdir(), session, env });
+
+test('control mode: a participant session is refused and pointed at the control', () => {
+  control();
+  const r = plainAsk('W1');
+  assert.ok(denied(r), JSON.stringify(r));
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /관제 모드 — SendMessage\(to 관제\)/);
+  assert.match(r.hookSpecificOutput.permissionDecisionReason, /LENS_ASK_GUARD=0/);
+});
+
+test('control mode: an unrelated session passes', () => {
+  control();
+  assert.deepStrictEqual(plainAsk('X9'), {});
+});
+
+test('control mode: the control session itself passes', () => {
+  control();
+  assert.deepStrictEqual(plainAsk('CTL'), {});
+});
+
+test('control mode: a marker older than 12 hours passes', () => {
+  control({ hoursAgo: 13 });
+  assert.deepStrictEqual(plainAsk('W1'), {});
+});
+
+test('control mode: LENS_ASK_GUARD=0 passes', () => {
+  control();
+  assert.deepStrictEqual(plainAsk('W1', { LENS_ASK_GUARD: '0' }), {});
+});
+
+test('control mode: no marker passes', () => {
+  fs.rmSync(CONTROL_FILE, { force: true });
+  assert.deepStrictEqual(plainAsk('W1'), {});
+});
+
+fs.rmSync(CONTROL_FILE, { force: true });
 
 console.log(`\n  ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);
