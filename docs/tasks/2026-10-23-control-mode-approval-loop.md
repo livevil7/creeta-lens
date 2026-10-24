@@ -6,8 +6,8 @@ kind: 개선
 grade: 기본
 created: 2026-10-23
 status: executing
-status_at: 2026-10-23T21:18:27.184Z
-waiting_on: "대표 승인: v3.53.0 태그·Release · 대표 확인 4건"
+status_at: 2026-10-24T00:12:44.357Z
+waiting_on: "대표 확인 4건(검증 15~18) · 다른 PC /lens-upgrade"
 approved_at: 2026-10-23T23:52+09:00
 approved_via: artifact + AskUserQuestion
 approval_note: "[d1] 이번 계획으로 흡수하고, 그 계획은 1단계만 끝난 것으로 마감 (추천) · [d2] 네 가지 조건을 다 만족할 때만 생략 (추천) · [approve] 지금 실행"
@@ -157,7 +157,7 @@ Done: 관제 세션에서 「서버·수집 세션에 이 일 나눠」 → 두 
 ### F. 문서·릴리스
 
 - [x] F1 배선 — `CLAUDE.md` 스킬 표 · `README.md` · `docs/START_HERE.md` · `docs/rules/harness-rules.md`(관제·승인 전달·상태 판정 계약 정본) · `scripts/bump-version.sh` 배너 치환·검증 목록에 `skills/ct/SKILL.md`(Lens Control) 추가, 분모 갱신 · `docs/rules/release-guide.md` 파일 수(13곳·11파일 혼재, Codex manifest 누락)를 bump 검증 목록 기준으로 · `CHANGELOG.md` 3.53.0.
-- [ ] F2 릴리스·적용 — `bash scripts/bump-version.sh 3.53.0` → CHANGELOG 확정 → 버전 커밋 → 태그 → push → GitHub Release(release-guide 순서). **정지 지점: 태그 push·GitHub Release 직전 1회.** 릴리스는 적용이 아니다 — 뒤이어 머신별 `/lens-upgrade` 와 새 세션에서 `Lens Control v3.53.0 로드됨` 배너 확인(검증 18, 대표 확인).
+- [x] F2 릴리스·적용 — `bash scripts/bump-version.sh 3.53.0` → CHANGELOG 확정 → 버전 커밋 → 태그 → push → GitHub Release(release-guide 순서). **정지 지점: 태그 push·GitHub Release 직전 1회.** 릴리스는 적용이 아니다 — 뒤이어 머신별 `/lens-upgrade` 와 새 세션에서 `Lens Control v3.53.0 로드됨` 배너 확인(검증 18, 대표 확인).
 
 ### 우회로
 
@@ -246,7 +246,7 @@ Blocker 1건 — 첫 행(워크트리·가지 삭제: 영향 높음 · 되돌리
 - **마지막 업데이트**: 2026-10-23
 - **현재 경로**: Plan A
 - **Goal 달성**: 5/5 ✓ (QA 실측 재현 5/5 · 자동 완료 조건 13/13) — 대표 확인 4건(검증 15~18) 대기
-- **재개 포인트**: v3.53.0 태그 push · GitHub Release(정지 지점 — 대표 승인 대기) → 머신별 /lens-upgrade → 대표 확인 4건 → /cd. 그 뒤 2026-10-03 공용 계획 채널을 1단계 완료로 /cd (d1)
+- **재개 포인트**: v3.53.0 릴리스 완료(2026-10-24 — master·태그 32a251e, GitHub Release, SJ-OMEN /lens-upgrade 3.53.0 확인). 남은 것: 대표 확인 4건(검증 15~18) · 다른 PC /lens-upgrade · 그 뒤 이 계획 /cd · 2026-10-03 공용 계획 채널 1단계 완료로 /cd (d1)
 
 ### 편차 기록 (계획 ↔ 실제)
 - E7 관제 표식 → 참여 세션 id 목록 + 범위만, 만료는 12시간 하나(30분 심박 규칙 없음) (이유: 관제가 잠깐 조용해도 참여 세션이 대표에게 직접 묻기 시작하면 관제 목적이 깨짐 — Leader 판단, ct SKILL 복구 절에 명시)
