@@ -18,6 +18,7 @@
 - **/cd 일괄 모드** — 계획별 판정 → 묶음 승인 한 번(정지 지점) → 레포 간 병렬·같은 레포 직렬 → 레포마다 `--finish --json --only` 한 번 → 전→후 표 · pr-manual 은 In Review · 커밋은 그 계획 경로만 · `autoDeleteMergedBranch:false` 존중.
 - **세션 시작** — 스캔 캐시만 읽어 멈춘 계획 한 줄(git·스캔 없음), Recent Plans 도 같은 캐시.
 - `templates/cp-questions.html` — 「일부만 실행」 선택지, JSON 이 깨져도 「채팅으로 답해 주세요」 안내.
+- **모델 배분 기본값을 sonnet 으로** — /cc Worker 기본 = Medium(sonnet), Hard(opus) 는 틀리면 손해가 큰 설계·보안·비가역 판단만, Supervisor·QA 기본 sonnet(고위험이면 opus, TOP 은 대표 지정 때만), /cp 판단 조사도 기본 sonnet. 대표 지시(2026-10-24): *"sonnet도 많이 좋아졌대 어렵지 않은건 sonnet으로 하는게 좋겠는데, 너무 토큰을 빨리써."*
 
 ### Fixed (v3.53.0)
 
