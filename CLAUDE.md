@@ -4,9 +4,10 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.53.0**
-- Updated: 2026-10-24
+- Current: **v3.54.0**
+- Updated: 2026-11-01
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.54.0 feat: **`/cp` 가 쓸 스킬을 계획에서 고른다** — Phase 2.3 · 계약 섹션 `## 🧰 쓸 스킬`(페이지 결정 블록·승인 보고 `🧰` 줄·핸드오프 `[SKILLS]`) · 게이트가 2026-11-02 이후 계획서에 필수(이전은 경고) · `/cc` 1.3 은 `[SKILLS]` 를 출발점으로. 대표 지시 *"cp단계에서 스킬도 바로 고르고 계획서에서도 내가 바로 알수 있게"*(2026-11-01).
 - v3.52.0 feat: **`/cd` 가 끝까지 닫는다** — 병합(`pr-manual` 레포는 PR 까지) → 완료 내용은 계획서·git 에서 채움(질문 없음) → history 커밋·푸시 → `prune_branches.py --finish` 로 병합된 브랜치·워크트리 전부 정리 + 원래 체크아웃 base 최신화. 이름만 예약한 계획서는 `never-branched`(`--no-pr`). 테스트 `scripts/prune_finish.test.py`.
 - v3.51.0 feat: **`/cp`·`/cc` 에 Jev 레인** — 항목 N개를 선택지로 판별하는 일(짝 맞추기·분류)을 `scripts/jev.js` 로. 문턱 0.80 · `--one-to-one` 충돌 검사 내장. 세기·숫자·언어 판정·되돌릴 수 없는 자동 반영에는 쓰지 않는다(SnapHolo 실측). SoT: `docs/rules/harness-rules.md` §4.9.1.
 - v3.50.0 feat: **`/cp` 질문을 계획서 페이지 안에서 받는다.** 대표 지시 *"객관식이던 주관식이건 내가 답변을 할 수 있는걸 아티팩트 자체에 작성을 해서 물어보게끔"*(2026-09-24). artifact 레인에서 승인·🙋 대표 결정·모호성 질문은 `templates/cp-questions.html` 블록(JSON 만 채워 붙인다)으로 묻고, 답은 `comments` capability `sendToClaude` 댓글 한 건으로 세션에 온다 — 질문창은 watch 가 없을 때만. 테스트 `templates/cp-questions.test.js`. SoT: `docs/rules/harness-rules.md` §4.13.

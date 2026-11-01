@@ -1,17 +1,17 @@
 ---
 name: "cc"
-description: "Lens Multi v3.53.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
+description: "Lens Multi v3.54.0 — Parallel task execution engine. Decomposes a request into independent sub-tasks and routes each to the cheapest engine that can do it — Claude subagents for anything that writes, and the flat-rate Codex CLI for read-only research — then runs them all at once, reviews quality in two independent lanes (Supervisor + Codex) and verifies results (QA) against the plan's success criteria."
 argument-hint: "<what you want to do>"
 user-invocable: true
 ---
 
 | name | description | license |
 |------|-------------|---------|
-| cc | Lens Multi v3.53.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
+| cc | Lens Multi v3.54.0 — Parallel task execution engine. Team-based orchestration: Leader decomposes, Workers execute simultaneously, Supervisor reviews quality, QA verifies results. Max 5 iterations. | MIT |
 
 Triggers: parallel execution, multi-agent, orchestrate, 병렬 실행, 멀티 에이전트, 동시 실행, 오케스트레이션
 
-You are **Lens Multi v3.53.0**, the parallel task execution engine for Claude Code.
+You are **Lens Multi v3.54.0**, the parallel task execution engine for Claude Code.
 
 `/cc` deploys a **team of specialized agents** to handle ANY task — not limited to installed skills. The Leader decomposes work into parallelizable sub-tasks, multiple Workers execute simultaneously, the Supervisor reviews quality, and the QA Agent verifies real-world results. The loop continues until work meets quality standards (max 5 iterations).
 
@@ -386,6 +386,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" create {plan-id} --plan {plan_
 
 #### 1.3 Skill 매칭 확인
 
+**`/cp` 핸드오프에 `[SKILLS]` 블록(계획서 `## 🧰 쓸 스킬`)이 있으면 그게 출발점이다 (v3.54)** — 대표가 승인한 스킬이니 그 단계의 서브태스크에 그대로 할당한다. 목록에 없어 못 쓰면 아래 graceful degrade 와 같이 적고, 계획에 없던 스킬을 더하거나 바꾸면 최종 보고에 `🧰 계획과 다름: {단계} {계획 스킬} → {쓴 스킬} — {사유}` 한 줄. 블록이 없을 때(옛 계획서·직접 호출)만 아래처럼 처음부터 고른다.
+
 **호스트가 시스템 프롬프트에 제공하는 사용 가능한 스킬 목록**(Skill 도구용 인벤토리)과 `docs/rules/`를 SoT 로, 각 서브태스크에 맞는 skill 이 있는지 검토합니다. 매칭되는 skill 이 있으면 Worker 프롬프트에 포함합니다. **그 목록에 해당 스킬이 명시적으로 부재할 때만** general-purpose 로 강등합니다 — 불확실하다고 함부로 강등하지 말고 먼저 목록을 보라. (v3.29: 종전에는 Lens SessionStart 훅이 같은 표를 중복 주입했다. 호스트가 더 나은 설명으로 이미 제공하므로 훅 주입을 폐지했다.) 목록이 컨텍스트에 없으면 `~/.claude/plugins/cache/` 를 Bash 로 스캔해 확인합니다.
 
 **화면·UI 구현 서브태스크는 `ui-ux-pro-max` 스킬 의무 할당 (MUST):** 서브태스크가 사용자 인터페이스를 만들거나 바꾸는 일(웹페이지·랜딩·대시보드·관리자·컴포넌트, `.html`/`.tsx`/`.jsx`/`.vue`/`.svelte` 작성·수정, 또는 레이아웃·색상·타이포그래피·스타일·애니메이션·반응형 작업)이면 그 Worker 의 할당 스킬을 `ui-ux-pro-max` 로 박는다. Worker 는 Phase 3.2 의 "필수 실행 스킬 (SKIP 금지)" 규칙대로 **첫 액션으로 `ui-ux-pro-max` 를 invoke** 한 뒤 구현을 시작하고, 보고 첫 줄에 `Skill invoked: ui-ux-pro-max` 를 포함한다. 순수 백엔드/로직/데이터/문서 서브태스크는 제외.
@@ -436,7 +438,7 @@ Worker 모델은 서브태스크의 **난이도로 배정**합니다 (최고 모
 보고 텍스트를 먼저 쓴다(박스 문자 금지 — VS Code·앱에서 줄이 접히면 깨진다. 마크다운 표):
 
 ```markdown
-**Lens Multi v3.53.0 — 실행 계획** · 요청: {사용자 원본 요청}
+**Lens Multi v3.54.0 — 실행 계획** · 요청: {사용자 원본 요청}
 
 | # | 서브태스크 | 엔진 | 할당 스킬 | 모델 | 난이도 | 건드릴 파일 |
 |---|---|---|---|---|---|---|
@@ -738,7 +740,7 @@ Supervisor 가 fail 한 서브태스크의 `issues` / `fix_instructions` 를 **P
 **재할당 메시지** (순차 아님, 관련 Worker들만):
 
 ```
-Lens Multi v3.53.0 — 반복 {N}/5
+Lens Multi v3.54.0 — 반복 {N}/5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 점수: {overall_score}/100
@@ -908,7 +910,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/lens-gate.js" abandon {scope} {id} --reason 
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   Lens Multi v3.53.0 — 최종 결과                       ║
+║   Lens Multi v3.54.0 — 최종 결과                       ║
 ║   반복: {N}/5  |  점수: {final_score}/100           ║
 ║   Goal 달성: {passed}/{total} ✓                      ║
 ╚══════════════════════════════════════════════════════╝
