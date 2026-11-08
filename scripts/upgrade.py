@@ -563,6 +563,8 @@ def phase4_install(ctx: Context) -> None:
             ):
                 if not ctx.dry_run:
                     clear_plugin_from_registry()
+                    for path in strip_local_enables(entries):
+                        log_ok(f"removed {PLUGIN_REF} from {path} (backup .bak-lens-upgrade)")
                 log_ok("cleared conflicting registry entries")
             else:
                 fatal("User aborted", code=2)
@@ -585,6 +587,40 @@ def phase4_install(ctx: Context) -> None:
             for line in output.splitlines():
                 print(f"    {UI.dim(line)}")
     log_ok("install command completed")
+
+
+def strip_local_enables(entries: list[dict]) -> list[Path]:
+    """Remove the plugin from the local-scope settings that keep re-registering it.
+
+    A `local` registry entry is not the cause, it is the echo: Claude Code re-creates it
+    at the next session start in that folder as long as `<projectPath>/.claude/
+    settings.local.json` has `enabledPlugins["lens@CreetaCorp"]`. Clearing only the
+    registry (all this script did before v3.55.1) brought the duplicate back minutes
+    later — SJ-OMEN 2026-11-08, twice in one day, reproduced with a headless session in
+    the workspace folder. The user-scope install already enables the plugin everywhere,
+    so the local line is pure duplication. Only `local` scope is touched: `project`
+    scope lives in the committed `.claude/settings.json`, which is the repo's call.
+    """
+    changed: list[Path] = []
+    for e in entries:
+        project = e.get("projectPath")
+        if e.get("scope") != "local" or not project:
+            continue
+        path = Path(project) / ".claude" / "settings.local.json"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        enabled = data.get("enabledPlugins")
+        if not isinstance(enabled, dict) or PLUGIN_REF not in enabled:
+            continue
+        shutil.copy2(path, path.with_name(path.name + ".bak-lens-upgrade"))
+        del enabled[PLUGIN_REF]
+        if not enabled:
+            del data["enabledPlugins"]
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        changed.append(path)
+    return changed
 
 
 def clear_plugin_from_registry() -> None:
