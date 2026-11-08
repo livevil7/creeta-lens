@@ -19,6 +19,11 @@ Triggers: done, complete, finish task, close out, wrap up, 완료, 완료 처리
 
 **진입**: 인자가 있으면 그 task, 없으면 `docs/tasks/` 를 스캔해 체크리스트가 전부 완료된 문서를 찾아 **AskUserQuestion 으로 제안**한다. 자동 실행하지 않는다. 입력이 `{repo, plan, session}` 목록이면(관제 `/ct 마감`) 맨 아래 **일괄 모드**로 간다.
 
+**정리는 언제나 돈다 (v3.55 — 대표 2026-11-08 「cd를 하면 확실하게 정리를 하게 만들어」)** — 닫을 계획서가 0건이어도, 대표가 Skip All 을 골라도, 계획서 없이 base 에 바로 한 작업이어도 `/cd` 는 **마지막에 Phase 4 의 4번(정리)을 반드시 실행**하고 그 결과로 끝낸다. 「닫을 계획서가 없다」로 턴을 끝내지 않는다 — 그렇게 끝낸 `/cd` 가 병합 끝난 가지 3개·빈 작업 폴더 2개를 남겼다(2026-11-08 snapholo-news, 대표 「왜 맨날 병합을 하고 정리를 안해?」). 대상:
+- 레포 안에서 불렀으면 그 레포(`--repo <base 워크트리>`).
+- 워크스페이스 루트(여러 레포를 담은 폴더 — git 레포가 아님)에서 불렀으면 **전체**: `python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py" --finish --repo-root <루트> --json`. 한 단계 아래 묶음 폴더(`GIT/snapholo/*`)까지 보고, 추가 워크트리 · 작업 모양 가지 · `<레포>-*` 남은 폴더가 있는 레포만 돈다.
+- 정리는 승인 질문 없이 돈다 — 지우는 것은 **병합이 증명된** 가지와 그 깨끗한 워크트리, 그리고 빈 폴더뿐이다(판정·lease 는 아래 Phase 4 의 4번 그대로).
+
 ---
 
 ## 절차
@@ -348,6 +353,8 @@ lease 가 `stale info` 로 거부하면 **재시도·force 전환 금지** — "
    python "${CLAUDE_PLUGIN_ROOT}/scripts/prune_branches.py" --repo <base 워크트리> --finish
    ```
    판정·lease·열린 PR 보호는 기존 정리 도구 그대로다. 미커밋 변경·잠김·한 번도 push 안 된 워크트리(다른 세션이 막 만든 것일 수 있다)는 남기고 사유를 보고한다. 브랜치 없는(detached) 워크트리는 지우지 않고 목록만 보고한다. gh 를 못 쓰는 환경(열린 PR 보호 검사 불가)이면 차단으로 끝난다 — 보고하고 넘어간다.
+   **base 밖 통합 가지도 병합으로 친다 (v3.55)** — 작업 모양 가지(feat/fix/ops/docs …)의 내용이 base 가 아닌 원격 통합 가지(`live-theme` · `staging` · `release` 처럼 작업 모양이 아닌 가지)에 다 들어 있으면 `merged_elsewhere` 로 지운다. 삭제 lease 는 base 대신 **그 통합 가지 tip** 이다 — 판정 뒤 그 가지가 움직이면 거부된다. 통합 가지 자체는 이 증명으로 지우지 않는다.
+   **빈 작업 폴더도 지운다 (v3.55)** — 등록이 풀린 `<레포>-*` 빈 폴더는 지우고(`removed_dirs`), 내용이 남은 고아 워크트리 폴더는 지우지 않고 `orphan_dirs` 로 보고한다. 「다른 프로세스가 사용 중」이면 붙잡은 프로세스를 찾아(`handle.exe` 등) 끈 뒤 다시 돌린다.
    **현재 세션이 지울 워크트리 안에 있으면** 먼저 base 워크트리로 작업 위치를 옮긴다 — 자기 폴더는 지워지지 않는다.
    **`lens.config.json` 의 `autoDeleteMergedBranch` 가 `false` 면 이 단계를 통째로 건너뛴다 (v3.53)** — Phase 2.5 가 지키는 설정을 마지막 정리가 어기면 설정이 반쪽이 된다. 완료 메시지에 「브랜치·워크트리 정리 건너뜀 — autoDeleteMergedBranch:false」 한 줄과 남은 가지·워크트리 목록(`git worktree list` · `git branch -r`)을 적는다.
    종료 코드 1(차단·삭제 실패·base 최신화 실패)이면 「미완」으로 보고한다 — 0 이 아니면 일부만 지워졌을 수 있다. 무엇이 남았는지는 `--json` 을 붙이면 `failed[{name,reason}]` 로 나온다. `failed` 가 비어 있고 `base_updated:false` 만이면 삭제는 끝났고 base 체크아웃만 손으로 맞추면 된다(로컬에만 있는 커밋·미커밋 변경) — 그렇게 구분해 보고한다.

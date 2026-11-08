@@ -88,7 +88,7 @@ def only_checks():
     names = lambda key: [x["name"] for x in out[key]]
     reason = lambda key, n: next((x["reason"] for x in out[key] if x["name"] == n), "")
     checks = {
-        "only: json shape": set(out) == {"removed_remote", "removed_local", "removed_worktrees", "skipped", "failed", "base_updated"}
+        "only: json shape": set(out) == {"removed_remote", "removed_local", "removed_worktrees", "skipped", "failed", "base_updated", "removed_dirs", "orphan_dirs"}
         and all(set(x) == {"name", "reason"} for x in out["skipped"] + out["failed"]),
         "only: partial failure exits 1": r.returncode == 1,
         "only: rejected remote delete in failed": names("failed") == ["feat/guarded"],
@@ -109,6 +109,107 @@ def only_checks():
         "rerun: out-of-scope still kept": other.exists() and bool(git(work, "ls-remote", "--heads", "origin", "feat/other")),
     })
     return checks
+
+
+def elsewhere_checks():
+    """2026-11-08 snapholo-news: 테마 수정은 main 이 아니라 live-theme 로 병합된다 —
+    base 하나로만 판정하면 그 가지·워크트리가 영원히 남았다. 빈 작업 폴더도 남았다."""
+    root, origin, work, worktree = setup()
+    git(work, "push", "origin", "main:live-theme")
+    theme = root / "work-theme"
+    git(work, "fetch", "origin")
+    git(work, "worktree", "add", "-b", "fix/theme", str(theme), "origin/live-theme")
+    git(theme, "config", "user.email", "t@example.com")
+    git(theme, "config", "user.name", "t")
+    (theme / "theme.txt").write_text("theme\n")
+    git(theme, "add", "-A")
+    git(theme, "commit", "-m", "theme")
+    git(theme, "push", "-u", "origin", "fix/theme")
+    git(theme, "push", "origin", "HEAD:live-theme")  # main 이 아니라 live-theme 에 병합
+    wip = worktree("wip", merge=False)  # 어디에도 병합 안 됨
+    stray = root / "work-stray"
+    stray.mkdir()  # 등록 풀린 빈 작업 폴더
+    orphan = root / "work-orphan"
+    orphan.mkdir()
+    (orphan / ".git").write_text("gitdir: /nowhere\n")
+    (orphan / "left.txt").write_text("x\n")
+    git(work, "fetch", "origin")
+    r = run(work, "--json")
+    out = json.loads(r.stdout)
+    return {
+        "elsewhere: exit 0": r.returncode == 0,
+        "elsewhere: live-theme-merged branch deleted on origin": not git(work, "ls-remote", "--heads", "origin", "fix/theme"),
+        "elsewhere: live-theme-merged branch deleted locally": not git(work, "branch", "--list", "fix/theme"),
+        "elsewhere: its worktree removed": not theme.exists(),
+        "elsewhere: live-theme itself kept": bool(git(work, "ls-remote", "--heads", "origin", "live-theme")),
+        "elsewhere: unmerged branch kept": wip.exists() and bool(git(work, "ls-remote", "--heads", "origin", "feat/wip")),
+        "elsewhere: empty stray folder removed": not stray.exists() and str(stray) in out["removed_dirs"],
+        "elsewhere: non-empty orphan kept + reported": orphan.exists() and any(d["path"] == str(orphan) for d in out["orphan_dirs"]),
+    }, root
+
+
+def moved_alt_checks():
+    """다른 통합 가지로 증명한 삭제는 그 가지 tip 을 lease 로 싣는다 — 판정 뒤 그 가지가 움직이면 거부."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("prune_branches", SCRIPT)
+    pb = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pb)
+    root, origin, work, worktree = setup()
+    git(work, "push", "origin", "main:live-theme")
+    git(work, "fetch", "origin")
+    git(work, "checkout", "-q", "-b", "fix/moved", "origin/live-theme")
+    (work / "m.txt").write_text("m\n")
+    git(work, "add", "-A")
+    git(work, "commit", "-m", "m")
+    git(work, "push", "-q", "-u", "origin", "fix/moved")
+    git(work, "push", "-q", "origin", "HEAD:live-theme")
+    git(work, "checkout", "-q", "main")
+    git(work, "fetch", "origin")
+    base_sha = git(work, "rev-parse", "origin/main")
+    report = [i for i in pb.classify(work, base="main", remote="origin") if i["branch"] == "fix/moved"]
+    judged = report and report[0]["verdict"] == "delete" and report[0]["reason"] == "merged_elsewhere"
+    other = root / "other"
+    git(root, "clone", "-q", str(origin), str(other))
+    git(other, "config", "user.email", "t@example.com")
+    git(other, "config", "user.name", "t")
+    git(other, "checkout", "-q", "live-theme")
+    (other / "n.txt").write_text("n\n")
+    git(other, "add", "-A")
+    git(other, "commit", "-m", "n")
+    git(other, "push", "-q", "origin", "live-theme")  # 판정 뒤 live-theme 가 움직였다
+    failed: list = []
+    deleted, _ = pb.prune(work, report, remote="origin", base="main", base_sha=base_sha, failed=failed)
+    return {
+        "moved alt: judged merged_elsewhere": bool(judged),
+        "moved alt: delete refused": not deleted and bool(failed) and "live-theme" in failed[0],
+        "moved alt: branch still on origin": bool(git(work, "ls-remote", "--heads", "origin", "fix/moved")),
+    }
+
+
+def repo_root_checks(root):
+    """--finish --repo-root: 워크스페이스 전체를 한 번에 — 정리할 것 있는 레포만 돈다."""
+    work = root / "work"
+    done = root / "work-late"
+    git(work, "worktree", "add", "-b", "feat/late", str(done), "origin/main")
+    git(done, "config", "user.email", "t@example.com")
+    git(done, "config", "user.name", "t")
+    (done / "late.txt").write_text("late\n")
+    git(done, "add", "-A")
+    git(done, "commit", "-m", "late")
+    git(done, "push", "-u", "origin", "feat/late")
+    git(done, "push", "origin", "HEAD:main")
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT), "--finish", "--repo-root", str(root), "--delete-without-pr-check", "--json"],
+        capture_output=True, text=True, encoding="utf-8",
+    )
+    print(r.stdout)
+    out = json.loads(r.stdout)
+    repos = {Path(x["repo"]).name: x for x in out["repos"]}
+    return {
+        "repo-root: work repo visited": "work" in repos,
+        "repo-root: merged branch removed": "feat/late" in repos.get("work", {}).get("removed_local", []),
+        "repo-root: worktree removed": not done.exists(),
+    }
 
 
 def main() -> int:
@@ -134,6 +235,10 @@ def main() -> int:
         "never-pushed worktree kept": fresh_path.exists() and bool(git(work, "branch", "--list", "feat/fresh")),
     }
     checks.update(only_checks())
+    more, eroot = elsewhere_checks()
+    checks.update(more)
+    checks.update(repo_root_checks(eroot))
+    checks.update(moved_alt_checks())
     failed = [k for k, ok in checks.items() if not ok]
     for k, ok in checks.items():
         print("  %s %s" % ("ok  " if ok else "FAIL", k))

@@ -292,6 +292,8 @@ git cherry origin/<base> origin/<branch> | grep '^+'
 | 원격 ref 부재 + **내용이 base 에 없음이 증명됨** | `unpushed` | **삭제·머지 판정 금지.** push+PR 제안은 여기서만 한다. upstream 흔적이 있으면 "병합 없이 원격에서 삭제됐을 수 있음" 을 함께 보고 |
 | 원격 ref 부재 + **증명 실패** (merge-tree 충돌·git &lt;2.38·로컬 ref 도 없음) | `unknown` | **자동 처리 금지.** 사람 확인. push+PR 을 제안하지 않는다 |
 
+> **정리 도구(`prune_branches.py`)만의 추가 판정 — `merged_elsewhere` (v3.55, 2026-11-08)**: 작업 모양 가지가 base 에는 없지만 **base 가 아닌 원격 통합 가지**(작업 모양이 아닌 가지 — `live-theme` · `staging` · `release` …)에 위 ①·② 방식으로 다 들어 있으면 지운다. 실측: snapholo-news 테마 수정은 `live-theme` 로 병합돼(PR #69·#70) base(`main`) 기준으로는 영원히 `unmerged` 였고 워크트리째 쌓였다. 삭제 lease(§7.1)의 base 자리에는 **그 통합 가지와 판정 시점 tip** 을 싣는다 — 판정 뒤 그 가지가 움직이면 삭제 전체가 거부된다. 통합 가지 자체는 이 증명으로 지우지 않는다. `/cd` 의 **task 완료 판정**(`mergedState`)은 여전히 계획의 base 기준이다 — 이 판정은 쓰레기 정리용이지 「계획이 base 에 들어갔다」는 증거가 아니다(§5.1 stacked PR 규칙과 같은 이유).
+>
 > **`unpushed` 와 `unknown` 의 경계는 증명의 방향이다.** `unpushed` 는 "원격에 없다" 가 아니라 **"내용이 base 에 없음이 실제로 증명됐다"** 는 뜻이다. 증명이 실패하면 `unknown` 이다.
 >
 > upstream 설정 유무를 판정 근거로 쓰지 않는다 — **`-u` 없이 push 하면 흔적이 남지 않으므로** "흔적 없음" 과 "push 된 적 없음" 은 구분할 수 없다. 그 정보는 `reason` 을 풍부하게 하는 데만 쓴다.

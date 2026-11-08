@@ -826,6 +826,52 @@ def _classify_one(repo: Path, name: str, ref: str, base_ref: str) -> dict:
     }
 
 
+# base 에 없다는 판정 중 「다른 통합 가지에는 있을 수 있는」 것들 — 계보 다름·판정 실패는 제외.
+ALT_PROOF_REASONS = frozenset({"unmerged_content", "merge_commit_content", "tree_unverified", "automation_commits"})
+
+
+def _alt_bases(repo: Path, remote: str | None, base: str) -> list[tuple[str, str, str]]:
+    """Other integration branches on the remote: (name, full ref, sha).
+
+    snapholo-news 의 테마 수정은 main 이 아니라 live-theme 로 병합된다(PR #69·#70,
+    2026-11-08). base 하나로만 판정하면 그런 가지는 영원히 「미병합」으로 남아 워크트리와
+    함께 쌓였다. 작업 모양이 아닌 원격 가지(live-theme · staging · release …)를 두 번째
+    증명 대상으로 쓴다 — 증명은 같은 _classify_one(내용 기준)이고, 삭제 때는 그 가지
+    tip 을 base 대신 lease 로 싣는다(prune). 로컬 모드도 원격 추적 ref 를 쓴다.
+    """
+    r = remote or "origin"
+    alts = []
+    try:
+        listed = _branches(repo, r)
+    except (subprocess.CalledProcessError, OSError):
+        return []
+    for name, _ref, sha in listed:
+        if name == base or _is_task_shaped_branch(name):
+            continue
+        alts.append((name, "refs/remotes/%s/%s" % (r, name), sha))
+    return alts
+
+
+def _prove_elsewhere(repo: Path, item: dict, name: str, ref: str, alt_bases: list[tuple[str, str, str]]) -> None:
+    """Upgrade ``item`` to delete if its content is proven in another integration branch."""
+    for alt, alt_ref, alt_sha in alt_bases:
+        if alt == name:
+            continue
+        try:
+            proof = _classify_one(repo, name, ref, alt_ref)
+        except (subprocess.CalledProcessError, OSError, ValueError):
+            continue
+        if proof["verdict"] == "delete":
+            item.update(
+                verdict="delete",
+                reason="merged_elsewhere",
+                commits_ahead=0,
+                files_changed=0,
+                proof={"base": alt, "ref": alt_ref, "sha": alt_sha, "how": proof["reason"]},
+            )
+            return
+
+
 def classify(
     repo: Path,
     *,
@@ -838,6 +884,7 @@ def classify(
     base_ref = "%s/%s" % (remote, base) if remote else base
     open_prs = open_prs or {}
     protected_names = _protected_branch_names(repo.resolve().name)
+    alt_bases = _alt_bases(repo, remote, base)
     report = []
     for name, ref, sha in _branches(repo, remote):
         if name == base:
@@ -853,6 +900,8 @@ def classify(
                 "commits_ahead": None,
                 "files_changed": None,
             }
+        if item["verdict"] != "delete" and item["reason"] in ALT_PROOF_REASONS and _is_task_shaped_branch(name):
+            _prove_elsewhere(repo, item, name, ref, alt_bases)
         item["sha"] = sha  # 판정 근거가 된 tip — prune() 의 lease 기준값
         if name == default_branch and item["verdict"] == "delete":
             # base 가 staging 으로 해석되는 레포(Returns_ERP_v20)에서 origin/main 은
@@ -894,6 +943,8 @@ def _detail(item: dict) -> str:
             return "MERGED — 삭제"
         if item["reason"] == "tree_merged":
             return "MERGED(squash — 병합 시뮬레이션 tree 가 base 와 동일) — 삭제"
+        if item["reason"] == "merged_elsewhere":
+            return "MERGED(통합 가지 %s 에 내용 있음 · %s) — 삭제" % (item["proof"]["base"], item["proof"]["how"])
         return "MERGED(patch 동일 + tree 동일) — 삭제"
     if verdict == "archive":
         return "계보 다름 — 태그로 아카이브 (커밋 %d, 병합 대상 아님)" % item["commits_ahead"]
@@ -1118,14 +1169,20 @@ def prune(
             skipped.append("%s: 열린 PR #%d head — 건너뜀" % (name, item["open_pr"]))
             continue
         sha = item.get("sha")
+        # 다른 통합 가지(live-theme 등)에서 증명된 삭제는 그 가지 tip 을 base 대신 lease 로 싣는다 —
+        # 삭제 근거가 「그 가지에 내용이 있다」이므로 그 가지가 움직이면 거부돼야 한다.
+        proof = item.get("proof") or {}
+        lease_base = proof.get("base", base)
+        lease_sha = proof.get("sha", base_sha) if proof else base_sha
+        local_verify_ref = proof.get("ref", "refs/heads/%s" % base)
         if not sha:
             skipped.append("%s: 판정 시점 SHA 없음 — 판정 근거 없이는 삭제하지 않는다, 건너뜀" % name)
             continue
-        if not base_sha:
+        if not lease_sha:
             # base 재검증 기대값이 없으면 "패치가 base 에 있다"는 삭제 근거를
             # 삭제 시점에 다시 증명할 수 없다 — 판정 SHA 부재와 같은 fail-closed.
             skipped.append(
-                "%s: base %s 의 판정 시점 SHA 없음 — base 재검증 없이는 삭제하지 않는다, 건너뜀" % (name, base)
+                "%s: base %s 의 판정 시점 SHA 없음 — base 재검증 없이는 삭제하지 않는다, 건너뜀" % (name, lease_base)
             )
             continue
         try:
@@ -1140,10 +1197,10 @@ def prune(
                     repo,
                     "push",
                     "--atomic",
-                    "--force-with-lease=refs/heads/%s:%s" % (base, base_sha),
+                    "--force-with-lease=refs/heads/%s:%s" % (lease_base, lease_sha),
                     "--force-with-lease=refs/heads/%s:%s" % (name, sha),
                     remote,
-                    "%s:refs/heads/%s" % (base_sha, base),
+                    "%s:refs/heads/%s" % (lease_sha, lease_base),
                     ":refs/heads/%s" % name,
                 )
             else:
@@ -1198,28 +1255,28 @@ def prune(
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    input="verify refs/heads/%s\0%s\0delete refs/heads/%s\0%s\0"
-                    % (base, base_sha, name, sha),
+                    input="verify %s\0%s\0delete refs/heads/%s\0%s\0"
+                    % (local_verify_ref, lease_sha, name, sha),
                 )
             deleted.append(name)
         except (subprocess.CalledProcessError, OSError) as exc:
             stderr = getattr(exc, "stderr", "") or str(exc)
-            if remote and "-> %s (stale info)" % base in stderr:
+            if remote and "-> %s (stale info)" % lease_base in stderr:
                 fail.append(
                     "%s: base %s 가 진전됨 — 판정 base SHA %s 가 더는 원격 tip 이 아니다. "
                     "삭제 근거(base 에 패치 존재)가 무효일 수 있어 push 전체 거부, fetch 후 재판정 필요"
-                    % (name, base, base_sha[:12])
+                    % (name, lease_base, lease_sha[:12])
                 )
             elif remote and "stale info" in stderr:
                 fail.append(
                     "%s: 원격이 진전됨 — 판정 SHA %s 가 더는 원격 tip 이 아니다. 삭제 거부, fetch 후 재판정 필요"
                     % (name, sha[:12])
                 )
-            elif not remote and "refs/heads/%s'" % base in stderr and "but expected" in stderr:
+            elif not remote and "%s'" % local_verify_ref in stderr and "but expected" in stderr:
                 fail.append(
                     "%s: base %s 가 진전됨 — 판정 base SHA %s 가 더는 로컬 base tip 이 아니다. "
                     "삭제 근거(base 에 패치 존재)가 무효일 수 있어 트랜잭션 전체 거부, 재판정 필요"
-                    % (name, base, base_sha[:12])
+                    % (name, lease_base, lease_sha[:12])
                 )
             elif not remote and "but expected" in stderr:
                 fail.append(
@@ -1410,14 +1467,13 @@ def _render_multi(results: list[dict], skipped_dirs: list[str]) -> str:
     return "\n".join(lines)
 
 
-def finish(
+def _finish_repo(
     repo: Path,
     *,
     base: str | None,
     delete_without_pr_check: bool,
     only: list[str] | None = None,
-    as_json: bool = False,
-) -> int:
+) -> tuple[dict, list[str]]:
     """/cd 마무리 한 번에: fetch → 로컬 base 최신화 → 원격·로컬 병합 브랜치와 그 워크트리 정리.
 
     판정·보호·lease 는 전부 기존 경로(_judge_repo / prune)를 그대로 탄다.
@@ -1436,6 +1492,8 @@ def finish(
         "skipped": [],
         "failed": [],
         "base_updated": False,
+        "removed_dirs": [],
+        "orphan_dirs": [],
     }
     lines: list[str] = []
 
@@ -1443,14 +1501,8 @@ def finish(
         name, _, reason = text.partition(": ")
         out[bucket].append({"name": name, "reason": reason})
 
-    def emit() -> int:
-        if as_json:
-            print(json.dumps(out, ensure_ascii=False, indent=2))
-        else:
-            print("\n".join(lines))
-            for item in out["failed"]:
-                print("실패 %s: %s" % (item["name"], item["reason"]), file=sys.stderr)
-        return 1 if out["failed"] or not out["base_updated"] else 0
+    def emit() -> tuple[dict, list[str]]:
+        return out, lines
 
     if not _git_ok(repo, "fetch", "--prune", "origin"):
         note("failed", "fetch: 실패 — 원격 상태 확인 불가, 아무것도 지우지 않았다")
@@ -1529,10 +1581,127 @@ def finish(
         note("skipped", "%s: 원격·로컬 어디에도 없음 — 이미 정리됨" % name)
     _git_ok(repo, "worktree", "prune")
     lines.append("워크트리 제거 %d: %s" % (len(removed), ", ".join(removed) or "없음"))
+    out["removed_dirs"], out["orphan_dirs"] = _sweep_worktree_dirs(repo, removed)
+    if out["removed_dirs"]:
+        lines.append("빈 작업 폴더 삭제 %d: %s" % (len(out["removed_dirs"]), ", ".join(out["removed_dirs"])))
+    for item in out["orphan_dirs"]:
+        lines.append("남은 폴더 — 사람 확인: %s (%s)" % (item["path"], item["reason"]))
     detached = [str(w["path"]) for w in _worktrees(repo)[1:] if w["branch"] is None]
     if detached:
         lines.append("브랜치 없는(detached) 워크트리 — 사람 확인: %s" % ", ".join(detached))
     return emit()
+
+
+def _finish_exit(out: dict) -> int:
+    return 1 if out["failed"] or not out["base_updated"] else 0
+
+
+def _print_finish(out: dict, lines: list[str]) -> None:
+    print("\n".join(lines))
+    for item in out["failed"]:
+        print("실패 %s: %s" % (item["name"], item["reason"]), file=sys.stderr)
+
+
+def finish(
+    repo: Path,
+    *,
+    base: str | None,
+    delete_without_pr_check: bool,
+    only: list[str] | None = None,
+    as_json: bool = False,
+) -> int:
+    out, lines = _finish_repo(repo, base=base, delete_without_pr_check=delete_without_pr_check, only=only)
+    if as_json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+    else:
+        _print_finish(out, lines)
+    return _finish_exit(out)
+
+
+def _sweep_worktree_dirs(repo: Path, removed: list[str]) -> tuple[list[str], list[dict]]:
+    """Remove empty leftover worktree folders; report non-empty orphans.
+
+    `git worktree remove` 가 등록만 지우고 폴더를 못 지우거나(다른 프로세스가 쥠),
+    세션이 등록을 풀고 폴더를 두고 가면 `<레포>-*` 빈 폴더가 쌓인다(2026-11-08
+    snapholo-news-table-fit · -main-tables). 등록된 워크트리 · 다른 레포(.git 폴더)는
+    건드리지 않고 **빈 폴더만** 지운다(os.rmdir 은 빈 폴더만 지운다). 내용이 있는
+    고아 워크트리 폴더(.git 파일만 남고 등록 없음)는 지우지 않고 사람 확인으로 보고한다.
+    """
+    registered = {os.path.normcase(str(Path(w["path"]).resolve())) for w in _worktrees(repo)}
+    candidates = {Path(p) for p in removed}
+    try:
+        candidates |= {p for p in repo.parent.iterdir() if p.is_dir() and p.name.startswith(repo.name + "-")}
+    except OSError:
+        pass
+    swept: list[str] = []
+    orphans: list[dict] = []
+    for path in sorted(candidates):
+        if not path.is_dir() or os.path.normcase(str(path.resolve())) in registered:
+            continue
+        if (path / ".git").is_dir():
+            continue  # 다른 레포
+        try:
+            empty = not any(path.iterdir())
+        except OSError:
+            continue
+        if empty:
+            try:
+                os.rmdir(path)
+                swept.append(str(path))
+            except OSError as exc:
+                orphans.append({"path": str(path), "reason": "빈 폴더지만 지우지 못함(다른 프로세스가 사용 중일 수 있음): %s" % exc.strerror})
+        elif (path / ".git").is_file():
+            orphans.append({"path": str(path), "reason": "git 에 등록되지 않은 워크트리 폴더 — 내용이 있어 지우지 않음"})
+    return swept, orphans
+
+
+def _finish_candidates(root: Path) -> list[Path]:
+    """Repos under ``root`` (GIT/<repo> and GIT/<group>/<repo>) that have something to clean."""
+    found: list[Path] = []
+    for child in sorted(root.iterdir(), key=lambda p: p.name.lower()):
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        if (child / ".git").is_dir():
+            found.append(child)
+        elif not (child / ".git").exists():
+            try:
+                found.extend(
+                    g for g in sorted(child.iterdir(), key=lambda p: p.name.lower()) if g.is_dir() and (g / ".git").is_dir()
+                )
+            except OSError:
+                pass
+    keep = []
+    for repo in found:
+        extra_worktrees = len(_worktrees(repo)) > 1
+        local = _git_maybe(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads") or ""
+        task = any(_is_task_shaped_branch(n) for n in local.splitlines() if n)
+        try:
+            strays = any(
+                p.is_dir() and p.name.startswith(repo.name + "-") and not (p / ".git").is_dir() for p in repo.parent.iterdir()
+            )
+        except OSError:
+            strays = False
+        if extra_worktrees or task or strays:
+            keep.append(repo)
+    return keep
+
+
+def finish_all(root: Path, *, delete_without_pr_check: bool, as_json: bool) -> int:
+    """/cd 마무리를 워크스페이스 전체에 — 정리할 것(추가 워크트리 · 작업 가지 · 남은 폴더)이 있는 레포마다 한 번."""
+    results = []
+    code = 0
+    for repo in _finish_candidates(root):
+        out, lines = _finish_repo(repo, base=None, delete_without_pr_check=delete_without_pr_check)
+        results.append({"repo": str(repo), **out})
+        code |= _finish_exit(out)
+        if not as_json:
+            print("=== %s" % repo)
+            _print_finish(out, lines)
+    if as_json:
+        print(json.dumps({"repos": results}, ensure_ascii=False, indent=2))
+    elif not results:
+        print("정리할 레포 없음 — 추가 워크트리 · 작업 가지 · 남은 폴더 0")
+    return code
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1581,8 +1750,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if args.finish and args.repo_root:
+        if args.repo or args.remote or args.apply or args.only is not None or args.base:
+            parser.error("--finish --repo-root 는 --delete-without-pr-check/--json 하고만 쓴다 (레포마다 base 를 스스로 해석한다)")
+        if not args.repo_root.is_dir():
+            parser.error("--repo-root 경로가 없다: %s" % args.repo_root)
+        return finish_all(args.repo_root.resolve(), delete_without_pr_check=args.delete_without_pr_check, as_json=args.json)
     if args.finish:
-        if args.repo_root or args.remote or args.apply:
+        if args.remote or args.apply:
             parser.error("--finish 는 --repo/--base/--delete-without-pr-check/--json/--only 하고만 쓴다 (스스로 적용한다)")
         only = [name.strip() for name in (args.only or "").split(",") if name.strip()]
         if args.only is not None and not only:
