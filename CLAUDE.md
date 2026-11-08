@@ -4,9 +4,10 @@ Plan-first execution engine for Claude Code: plan with /cp, build in parallel wi
 
 ## Version
 
-- Current: **v3.55.0**
+- Current: **v3.55.1**
 - Updated: 2026-11-08
 - Source of truth: `.claude-plugin/plugin.json`
+- v3.55.1 fix: **중복 등록(user · local) 근본 원인** — `upgrade.py` 가 레지스트리만 지우고 `<폴더>/.claude/settings.local.json` 의 `enabledPlugins["lens@CreetaCorp"]` 를 남겨, 그 폴더의 다음 세션이 local 등록을 다시 만들었다. 이제 그 줄도 백업 후 지운다(project 범위는 안 건드림). 테스트 `scripts/upgrade.test.py` 6/6.
 - v3.55.0 feat: **`/cd` 가 언제나 정리한다** — 계획서 0건이어도 마지막 정리를 돌리고(워크스페이스 루트면 `prune_branches.py --finish --repo-root`), base 밖 통합 가지(`live-theme` 등)에 병합된 작업 가지도 `merged_elsewhere` 로 지우며(lease = 그 통합 가지 tip), 등록 풀린 `<레포>-*` 빈 폴더도 지운다. 대표 지시 *"cd를 하면 확실하게 정리를 하게 만들어"*(2026-11-08). 테스트 `scripts/prune_finish.test.py` 35/35.
 - v3.54.0 feat: **`/cp` 가 쓸 스킬을 계획에서 고른다** — Phase 2.3 · 계약 섹션 `## 🧰 쓸 스킬`(페이지 결정 블록·승인 보고 `🧰` 줄·핸드오프 `[SKILLS]`) · 게이트가 2026-11-02 이후 계획서에 필수(이전은 경고) · `/cc` 1.3 은 `[SKILLS]` 를 출발점으로. 대표 지시 *"cp단계에서 스킬도 바로 고르고 계획서에서도 내가 바로 알수 있게"*(2026-11-01).
 - v3.52.0 feat: **`/cd` 가 끝까지 닫는다** — 병합(`pr-manual` 레포는 PR 까지) → 완료 내용은 계획서·git 에서 채움(질문 없음) → history 커밋·푸시 → `prune_branches.py --finish` 로 병합된 브랜치·워크트리 전부 정리 + 원래 체크아웃 base 최신화. 이름만 예약한 계획서는 `never-branched`(`--no-pr`). 테스트 `scripts/prune_finish.test.py`.

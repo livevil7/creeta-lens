@@ -1,3 +1,12 @@
+## [3.55.1] - 2026-11-08
+
+**Lens 가 user · local 두 곳에 중복 등록되던 근본 원인 수정.** 대표 지시(2026-11-08): *"왜 맨날 두번씩 설치되는지 명확하기 근본적인 원인 찾아서 안그러게해."*
+
+### Fixed (v3.55.1)
+
+- `scripts/upgrade.py` — 중복 등록을 정리할 때 레지스트리만 지우고 `<projectPath>/.claude/settings.local.json` 의 `enabledPlugins["lens@CreetaCorp"]` 는 남겼다. Claude Code 는 그 폴더에서 세션이 뜰 때마다 이 줄을 보고 `local` 등록을 다시 만든다 — SJ-OMEN 에서 업그레이드 5분 뒤 재발, 워크스페이스 폴더(GIT)에서 headless 세션 하나로 재현, 줄을 지운 뒤 같은 시험에서 재발 없음. 이제 `local` 항목의 그 줄을 백업(`.bak-lens-upgrade`) 후 지운다. user 범위 설치가 이미 모든 폴더에서 켜 주므로 잃는 것이 없다. `project` 범위(커밋되는 `.claude/settings.json`)는 건드리지 않는다. 시험 `scripts/upgrade.test.py` 6/6.
+
+
 ## [3.55.0] - 2026-11-08
 
 **`/cd` 가 언제나 정리한다.** 대표 지시(2026-11-08): *"고쳐, lens에서 cd를 하면 확실하게 정리를 하게 만들어. 폴더들 다 너무 쓰레기들이 많이 쌓이잖아."* 발단: snapholo-news 표 수정(PR #69·#70·#71)이 병합·운영 반영까지 하고 가지 3개 · 빈 작업 폴더 2개를 남겼고, 그 뒤 부른 `/cd` 는 「닫을 계획서 없음」으로 끝나 정리를 돌리지 않았다. 정리를 돌렸어도 `live-theme` 로 병합된 가지는 base(`main`) 기준 판정에 걸려 지워지지 않았다.
